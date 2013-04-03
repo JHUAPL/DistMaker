@@ -55,3 +55,52 @@ def isJreAvailable(systemName, jreRelease):
 
 	srcPath = os.path.join(appInstallRoot, 'jre', systemName, jreRelease)
 	return os.path.isdir(srcPath)
+
+
+def buildAppLauncherConfig(destFile, args):
+	classPathStr = ''
+	for aStr in args.classPath:
+		classPathStr += 'java/' + aStr + ':'
+	if len(classPathStr) > 0:
+		classPathStr = classPathStr[0:-1]
+
+	jvmArgsStr = ''
+	for aStr in args.jvmArgs:
+		if len(aStr) > 2 and aStr[0:1] == '\\':
+			aStr = aStr[1:]
+		jvmArgsStr += aStr + ' '
+
+	appArgsStr = ''
+	for aStr in args.appArgs:
+		appArgsStr += ' ' + aStr
+		
+	f = open(destFile, 'wb')
+	
+	# App name section
+	f.write('-name\n')
+	f.write(args.name + '\n')
+	f.write('\n')
+
+	# Version section
+	f.write('-version\n')
+	f.write(args.version + '\n')
+	f.write('\n')
+
+	# MainClass section
+	f.write('-mainClass\n')
+	f.write(args.mainClass + '\n')
+	f.write('\n')
+
+	# ClassPath section
+	f.write('-classPath\n')
+	for aStr in args.classPath:
+		f.write(aStr + '\n')
+	f.write('\n')
+
+	# Application args section
+	f.write('-appArgs\n')
+	for aStr in args.appArgs:
+		f.write(aStr + '\n')
+	f.write('\n')
+
+	f.close()

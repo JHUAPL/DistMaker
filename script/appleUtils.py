@@ -38,12 +38,13 @@ def buildRelease(args, buildPath):
 		tmpPath = tempfile.mkdtemp(dir=buildPath)
 		
 		# Build the contents of the distribution folder
-		buildDistTree(tmpPath, args, isStaticRelease)
+		buildDistTree(buildPath, tmpPath, args, isStaticRelease)
 		
 		# Create the DMG image via genisoimage
 		dmgFile = os.path.join(buildPath, distName + '.dmg')
 #		genisoimage -o Echo.6.dmg -V Echo -max-iso9660-filenames -hfs-unlock      -uid 501 -guid 80  -r  -apple  ../test/tmp8eGdme/
-		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
+#		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
+		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
 		subprocess.call(cmd, stderr=subprocess.STDOUT)
 	
 		# Perform cleanup: Remove the tmp folder
@@ -108,14 +109,12 @@ def buildRelease(args, buildPath):
 #	os.rmdir(tmpPath)
 	
 
-def buildDistTree(rootPath, args, isStaticRelease):
+def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appTemplatePath = os.path.join(appInstallRoot, 'template')
 	appName = args.name
-	dataCodeList = args.dataCode
-	javaCodePath = args.javaCode
 	bgFile = args.bgFile
 	icnsFile = args.icnsFile
 	
@@ -152,24 +151,25 @@ def buildDistTree(rootPath, args, isStaticRelease):
 	srcPath = os.path.join(appTemplatePath, 'apple', 'PkgInfo')
 	dstPath = os.path.join(rootPath, appName + '.app', 'Contents')
 	shutil.copy(srcPath, dstPath)
+	
+	# Determine the payloadPath for where to store the appLauncher
+	payloadPath = os.path.join(rootPath, appName + '.app', 'Contents')
+	if isStaticRelease == False:
+		payloadPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources')
+	
+	# Form the app contents folder
+	srcPath = os.path.join(buildPath, "delta")
+	dstPath = os.path.join(payloadPath, 'app')
+	shutil.copytree(srcPath, dstPath, symlinks=True)
+	
+	# Setup the launcher contents
+	exePath = os.path.join(payloadPath, 'Java')
+	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
+	os.makedirs(exePath)
+	shutil.copy(srcPath, exePath);
 
-	# Copy the dataCode to the proper location
-	for aPath in dataCodeList:
-		srcPath = aPath
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources')
-		dstPath = os.path.join(dstPath, os.path.basename(aPath))
-		shutil.copytree(srcPath, dstPath, symlinks=True)
-		
 	# Build the java component of the distribution
-	if javaCodePath != None:
-		# Copy the javaCode to the proper location
-		srcPath = javaCodePath
-		if isStaticRelease == True:
-			dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Java')
-		else:
-			dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources', 'Java')
-		shutil.copytree(srcPath, dstPath, symlinks=True)
-
+	if args.javaCode != None:
 		# Form the Info.plist file
 		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Info.plist')
 		if isStaticRelease == True:
@@ -255,17 +255,19 @@ def buildPListInfoShared(destFile, args):
 	if args.icnsFile != None:
 		icnsStr = os.path.basename(args.icnsFile)
 	
-	classPathStr = ''
-	for aStr in args.classPath:
-		classPathStr += '$JAVAROOT/' + aStr + ':'
-	if len(classPathStr) > 0:
-		classPathStr = classPathStr[0:-1]
+	classPathStr = '$JAVAROOT/appLauncher.jar'
+#	classPathStr = ''
+#	for aStr in args.classPath:
+#		classPathStr += '$JAVAROOT/' + aStr + ':'
+#	if len(classPathStr) > 0:
+#		classPathStr = classPathStr[0:-1]
 		
 	jvmArgsStr = ''
 	for aStr in args.jvmArgs:
 		if len(aStr) > 2 and aStr[0:1] == '\\':
 			aStr = aStr[1:]
 		jvmArgsStr += aStr + ' '
+	jvmArgsStr += '-Djava.system.class.loader=appLauncher.RootClassLoader'
 
 	f = open(destFile, 'wb')
 	writeln(f, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
@@ -295,12 +297,10 @@ def buildPListInfoShared(destFile, args):
 	
 	tupList = []
 	tupList.append(('JVMVersion', '1.6+'))
-	tupList.append(('MainClass', args.mainClass))
+	tupList.append(('MainClass', 'appLauncher.AppLauncher'))
 	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/Java'))
 	tupList.append(('ClassPath', classPathStr))
 	tupList.append(('VMOptions', jvmArgsStr))
-	
-	
 	
 	for (key,val) in tupList:
 		writeln(f, 3, '<key>' + key + '</key>')
@@ -309,8 +309,8 @@ def buildPListInfoShared(destFile, args):
 	
 	writeln(f, 3, '<key>Arguments</key>')
 	writeln(f, 3, '<array>')
-	for aStr in args.appArgs:
-		writeln(f, 4, '<string>' + aStr + '</string>')
+#	for aStr in args.appArgs:
+#		writeln(f, 4, '<string>' + aStr + '</string>')
 	writeln(f, 3, '</array>')
 	writeln(f, 2, '</dict>')
 	writeln(f, 1, '</dict>')
@@ -324,18 +324,13 @@ def buildPListInfoStatic(destFile, args):
 	if args.icnsFile != None:
 		icnsStr = os.path.basename(args.icnsFile)
 	
-	classPathStr = ''
-	for aStr in args.classPath:
-		classPathStr += '$JAVAROOT/' + aStr + ':'
-	if len(classPathStr) > 0:
-		classPathStr = classPathStr[0:-1]
+	classPathStr = '$JAVAROOT/appLauncher.jar'
+#	classPathStr = ''
+#	for aStr in args.classPath:
+#		classPathStr += '$JAVAROOT/' + aStr + ':'
+#	if len(classPathStr) > 0:
+#		classPathStr = classPathStr[0:-1]
 		
-	jvmArgsStr = ''
-	for aStr in args.jvmArgs:
-		if len(aStr) > 2 and aStr[0:1] == '\\':
-			aStr = aStr[1:]
-		jvmArgsStr += aStr + ' '
-
 	f = open(destFile, 'wb')
 	writeln(f, 0, '<?xml version="1.0" ?>')
 	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
@@ -357,14 +352,33 @@ def buildPListInfoStatic(destFile, args):
 	tupList.append(('NSHumanReadableCopyright', ''))
 	tupList.append(('JVMRuntime', jreRelease))
 	
-	tupList.append(('JVMMainClassName', args.mainClass))
+	tupList.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
 	
 	
 	# Application configuration
 	for (key,val) in tupList:
 		writeln(f, 2, '<key>' + key + '</key>')
 		writeln(f, 2, '<string>' + str(val) + '</string>')
+		
+	# JVM options
+	writeln(f, 2, '<key>JVMOptions</key>')
+	writeln(f, 3, '<array>')
+	for aStr in args.jvmArgs:
+		writeln(f, 4, '<string>' + aStr + '</string>')
+	writeln(f, 4, '<string>-Dapple.laf.useScreenMenuBar=true</string>')
+	writeln(f, 4, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
+	writeln(f, 4, '<string>-Dcom.apple.macos.useScreenMenuBar=true</string>')
+	writeln(f, 4, '<string>-Djava.system.class.loader=appLauncher.RootClassLoader</string>')
+	writeln(f, 3, '</array>')
 	
+#	# App arguments
+#	writeln(f, 2, '<key>JVMArguments</key>')
+#	writeln(f, 3, '<array>')
+#	for aStr in args.appArgs:
+#		writeln(f, 4, '<string>' + args + '</string>')
+#	writeln(f, 3, '</array>')
+	
+
 	# JVM configuration
 	writeln(f, 2, '<key>Java</key>')
 	writeln(f, 2, '<dict>')
@@ -374,20 +388,11 @@ def buildPListInfoStatic(destFile, args):
 #	tupList.append(('MainClass', args.mainClass))
 #	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/Java'))
 	tupList.append(('ClassPath', classPathStr))
-	tupList.append(('JVMOptions', jvmArgsStr))
-	
-	
-	
+
 	for (key,val) in tupList:
 		writeln(f, 3, '<key>' + key + '</key>')
 		writeln(f, 3, '<string>' + str(val) + '</string>')
-
 	
-	writeln(f, 3, '<key>Arguments</key>')
-	writeln(f, 3, '<array>')
-	for aStr in args.appArgs:
-		writeln(f, 4, '<string>' + aStr + '</string>')
-	writeln(f, 3, '</array>')
 	writeln(f, 2, '</dict>')
 	writeln(f, 1, '</dict>')
 	writeln(f, 0, '</plist>')

@@ -42,7 +42,7 @@ def buildRelease(args, buildPath):
 		os.mkdir(dstPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(dstPath, args, isStaticRelease)
+		buildDistTree(buildPath, dstPath, args, isStaticRelease)
 
 		# Create the tar.gz archive
 		tarFile = os.path.join(buildPath, distName + '.tar.gz')
@@ -55,55 +55,42 @@ def buildRelease(args, buildPath):
 	shutil.rmtree(tmpPath)
 
 
-def buildDistTree(rootPath, args, isStaticRelease):
+def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appName = args.name
-	dataCodeList = args.dataCode
-	javaCodePath = args.javaCode
 
-	# Copy the dataCode to the proper location
-	for aPath in dataCodeList:
-		srcPath = aPath
-		dstPath = os.path.join(rootPath, os.path.basename(aPath))
-		shutil.copytree(srcPath, dstPath, symlinks=True)
+	# Form the app contents folder
+	srcPath = os.path.join(buildPath, "delta")
+	dstPath = os.path.join(rootPath, "app")
+	shutil.copytree(srcPath, dstPath, symlinks=True)
+
+	# Setup the launcher contents
+	exePath = os.path.join(rootPath, "launcher")
+	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
+	os.makedirs(exePath)
+	shutil.copy(srcPath, exePath);
 
 	# Build the java component of the distribution
-	if javaCodePath != None:
-		# Copy the javaCode to the proper location
-		srcPath = javaCodePath
-		dstPath = os.path.join(rootPath, 'java')
-		shutil.copytree(srcPath, dstPath, symlinks=True)
-
+	if args.javaCode != None:
 		# Copy over the jre
 		if isStaticRelease == True:
 			srcPath = os.path.join(appInstallRoot, 'jre', 'linux', jreRelease)
 			dstPath = os.path.join(rootPath, os.path.basename(srcPath))
 			shutil.copytree(srcPath, dstPath, symlinks=True)
-
+ 
 		# Form the executable bash script
 		dstPath = os.path.join(rootPath, 'run' + appName)
 		buildBashScript(dstPath, args, isStaticRelease)
 
 
-
 def buildBashScript(destFile, args, isStaticRelease):
-	classPathStr = ''
-	for aStr in args.classPath:
-		classPathStr += 'java/' + aStr + ':'
-	if len(classPathStr) > 0:
-		classPathStr = classPathStr[0:-1]
-
 	jvmArgsStr = ''
 	for aStr in args.jvmArgs:
 		if len(aStr) > 2 and aStr[0:1] == '\\':
 			aStr = aStr[1:]
 		jvmArgsStr += aStr + ' '
-
-	appArgsStr = ''
-	for aStr in args.appArgs:
-		appArgsStr += ' ' + aStr
 
 	f = open(destFile, 'wb')
 	f.write('# Get the instalation path\n')
@@ -113,9 +100,10 @@ def buildBashScript(destFile, args, isStaticRelease):
 	f.write('# Change the working directory to the installation path\n')
 	f.write('cd "$installPath"\n\n')
 
-	exeCmd = 'java ' + jvmArgsStr + ' -cp ' + classPathStr + ' ' + args.mainClass + appArgsStr
+	exeCmd = 'java ' + jvmArgsStr
 	if isStaticRelease == True:
-		exeCmd = jreRelease + '/bin/java ' + jvmArgsStr + ' -cp ' + classPathStr + ' ' + args.mainClass + appArgsStr
+		exeCmd = jreRelease + '/bin/java ' + jvmArgsStr
+	exeCmd = exeCmd + ' -Djava.system.class.loader=appLauncher.RootClassLoader -cp launcher/appLauncher.jar appLauncher.AppLauncher app/app.cfg'
 
 	f.write('# Run the application\n')
 	f.write(exeCmd + '\n')

@@ -135,10 +135,9 @@ if __name__ == "__main__":
 	# Build the Delta (diffs) contents
 	deltaCodePath = os.path.join(buildPath, "delta/code")
 	deltaDataPath = os.path.join(buildPath, "delta/data")
-	os.makedirs(deltaCodePath)
-	os.makedirs(deltaDataPath)
 	
 	# Copy the dataCode to the delta location
+	os.makedirs(deltaDataPath)
 	for aPath in args.dataCode:
 		srcPath = aPath
 		dstPath = os.path.join(deltaDataPath, os.path.basename(aPath))
@@ -148,11 +147,16 @@ if __name__ == "__main__":
 	if args.javaCode != None:
 		# Copy the javaCode to the proper location
 		srcPath = args.javaCode
-		dstPath = os.path.join(deltaCodePath, 'java')
+		dstPath = deltaCodePath;
+#		dstPath = os.path.join(deltaCodePath, 'java')
 		shutil.copytree(srcPath, dstPath, symlinks=True)
+		
+	# Form the app.cfg file	
+	dstPath = os.path.join(buildPath, "delta/app.cfg")
+	miscUtils.buildAppLauncherConfig(dstPath, args)
 	
-	# Build the delta catalog
-	destPath = os.path.join(buildPath, "delta")
+	# Build the delta catalog md5sum
+#	dstPath = os.path.join(buildPath, "delta/md5sum.txt")
 #	buildCatalog.buildCatalog(destPath) 
 		
 	# Build the Apple release	
@@ -163,4 +167,8 @@ if __name__ == "__main__":
 	
 	# Build the Windows release
 	windowsUtils.buildRelease(args, buildPath)
+	
+	# Copy over the deploy script
+	srcPath = os.path.join(miscUtils.getInstallRoot(), "deployDist.py")
+	shutil.copy(srcPath, buildPath)
 	

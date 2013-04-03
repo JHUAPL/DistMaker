@@ -42,7 +42,7 @@ def buildRelease(args, buildPath):
 		os.mkdir(dstPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(dstPath, args, isStaticRelease)
+		buildDistTree(buildPath, dstPath, args, isStaticRelease)
 
 		# Create the zip file
 		zipFile = os.path.join(buildPath, distName + ".zip")
@@ -52,33 +52,31 @@ def buildRelease(args, buildPath):
 	shutil.rmtree(tmpPath)
 
 
-def buildDistTree(rootPath, args, isStaticRelease):
+def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appName = args.name
-	dataCodeList = args.dataCode
-	javaCodePath = args.javaCode
 
-	# Copy the dataCode to the proper location
-	for aPath in dataCodeList:
-		srcPath = aPath
-		dstPath = os.path.join(rootPath, os.path.basename(aPath))
-		shutil.copytree(srcPath, dstPath, symlinks=True)
+	# Form the app contents folder
+	srcPath = os.path.join(buildPath, "delta")
+	dstPath = os.path.join(rootPath, "app")
+	shutil.copytree(srcPath, dstPath, symlinks=True)
+
+	# Setup the launcher contents
+	exePath = os.path.join(rootPath, "launcher")
+	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
+	os.makedirs(exePath)
+	shutil.copy(srcPath, exePath);
 
 	# Build the java component of the distribution
-	if javaCodePath != None:
-		# Copy the javaCode to the proper location
-		srcPath = javaCodePath
-		dstPath = os.path.join(rootPath, 'java')
-		shutil.copytree(srcPath, dstPath, symlinks=True)
-
+	if args.javaCode != None:
 		# Copy over the jre
 		if isStaticRelease == True:
 			srcPath = os.path.join(appInstallRoot, 'jre', 'windows', jreRelease)
 			dstPath = os.path.join(rootPath, os.path.basename(srcPath))
 			shutil.copytree(srcPath, dstPath, symlinks=True)
-
+ 
 		# Generate the iconFile
 		winIconFile = None
 		origIconFile = args.iconFile
@@ -98,7 +96,7 @@ def buildDistTree(rootPath, args, isStaticRelease):
 		# Build the windows executable 
 		launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
 		subprocess.check_call([launch4jExe, configFile], stderr=subprocess.STDOUT)
-		print(launch4jExe + ' ' + configFile)
+#		print(launch4jExe + ' ' + configFile)
 
 		# Perform cleanup
 		os.remove(configFile)
@@ -106,16 +104,6 @@ def buildDistTree(rootPath, args, isStaticRelease):
 			os.remove(winIconFile)
 
 def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
-	classPathStr = ''
-	for aStr in args.classPath:
-		classPathStr += 'java/' + aStr + ':'
-	if len(classPathStr) > 0:
-		classPathStr = classPathStr[0:-1]
-
-	appArgsStr = ''
-	for aStr in args.appArgs:
-		appArgsStr += ' ' + aStr
-
 	f = open(destFile, 'wb')
 
 	writeln(f, 0, "<launch4jConfig>")
@@ -127,8 +115,7 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	writeln(f, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
 #	writeln(f, 1, "<supportUrl>url</supportUrl>");
 
-	if len(appArgsStr) > 0:
-			writeln(f, 1, "<cmdLine>" + appArgsStr + "</cmdLine>");
+	writeln(f, 1, "<cmdLine>app/app.cfg</cmdLine>");
 	writeln(f, 1, "<chdir>.</chdir>");
 	writeln(f, 1, "<priority>normal</priority>");
 	writeln(f, 1, "<customProcName>true</customProcName>");
@@ -137,9 +124,8 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 		writeln(f, 1, "<icon>" + iconFile + "</icon>");
 
 	writeln(f, 1, "<classPath>");
-	writeln(f, 2, "<mainClass>" + args.mainClass + "</mainClass>");
-	for aClassPath in args.classPath:
-		writeln(f, 2, "<cp>" + 'java/' + aClassPath + "</cp>");
+	writeln(f, 2, "<mainClass>appLauncher.AppLauncher</mainClass>");
+	writeln(f, 2, "<cp>launcher/appLauncher.jar</cp>");
 	writeln(f, 1, "</classPath>");
 
 	if args.forceSingleInstance != False:
@@ -159,6 +145,7 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");
 	for aJvmArg in args.jvmArgs:
 		writeln(f, 2, "<opt>" + aJvmArg + "</opt>");
+	writeln(f, 2, "<opt>-Djava.system.class.loader=appLauncher.RootClassLoader</opt>");
 	writeln(f, 1, "</jre>");
 
 	writeln(f, 0, "");
