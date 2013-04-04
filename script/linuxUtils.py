@@ -97,13 +97,13 @@ def buildBashScript(destFile, args, isStaticRelease):
 	f.write('installPath=$(readlink -f "$BASH_SOURCE")\n')
 	f.write('installPath=$(dirname "$installPath")\n\n')
 
-	f.write('# Change the working directory to the installation path\n')
-	f.write('cd "$installPath"\n\n')
+	f.write('# Change the working directory to the app folder in the installation path\n')
+	f.write('cd "$installPath"/app\n\n')
 
 	exeCmd = 'java ' + jvmArgsStr
 	if isStaticRelease == True:
-		exeCmd = jreRelease + '/bin/java ' + jvmArgsStr
-	exeCmd = exeCmd + ' -Djava.system.class.loader=appLauncher.RootClassLoader -cp launcher/appLauncher.jar appLauncher.AppLauncher app/app.cfg'
+		exeCmd = '../' + jreRelease + '/bin/java ' + jvmArgsStr
+	exeCmd = exeCmd + ' -Djava.system.class.loader=appLauncher.RootClassLoader -cp ../launcher/appLauncher.jar appLauncher.AppLauncher app.cfg'
 
 	f.write('# Run the application\n')
 	f.write(exeCmd + '\n')

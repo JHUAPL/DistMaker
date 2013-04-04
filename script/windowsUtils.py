@@ -116,7 +116,7 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 #	writeln(f, 1, "<supportUrl>url</supportUrl>");
 
 	writeln(f, 1, "<cmdLine>app/app.cfg</cmdLine>");
-	writeln(f, 1, "<chdir>.</chdir>");
+	writeln(f, 1, "<chdir>app/</chdir>");
 	writeln(f, 1, "<priority>normal</priority>");
 	writeln(f, 1, "<customProcName>true</customProcName>");
 	writeln(f, 1, "<stayAlive>false</stayAlive>");

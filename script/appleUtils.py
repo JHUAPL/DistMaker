@@ -147,10 +147,11 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
 		shutil.copy(srcPath, dstPath)
 	
-	# Copy over the PkgInfo file
-	srcPath = os.path.join(appTemplatePath, 'apple', 'PkgInfo')
-	dstPath = os.path.join(rootPath, appName + '.app', 'Contents')
-	shutil.copy(srcPath, dstPath)
+	# Write out the PkgInfo file	
+	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', "PkgInfo")
+	f = open(dstPath, 'wb')
+	f.write('APPL????')
+	f.close()
 	
 	# Determine the payloadPath for where to store the appLauncher
 	payloadPath = os.path.join(rootPath, appName + '.app', 'Contents')
@@ -298,7 +299,7 @@ def buildPListInfoShared(destFile, args):
 	tupList = []
 	tupList.append(('JVMVersion', '1.6+'))
 	tupList.append(('MainClass', 'appLauncher.AppLauncher'))
-	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/Java'))
+	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/app'))
 	tupList.append(('ClassPath', classPathStr))
 	tupList.append(('VMOptions', jvmArgsStr))
 	
@@ -306,7 +307,6 @@ def buildPListInfoShared(destFile, args):
 		writeln(f, 3, '<key>' + key + '</key>')
 		writeln(f, 3, '<string>' + str(val) + '</string>')
 
-	
 	writeln(f, 3, '<key>Arguments</key>')
 	writeln(f, 3, '<array>')
 #	for aStr in args.appArgs:
@@ -386,7 +386,8 @@ def buildPListInfoStatic(destFile, args):
 	tupList = []
 #	tupList.append(('JVMVersion', '1.6+'))
 #	tupList.append(('MainClass', args.mainClass))
-#	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/Java'))
+	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/app'))
+
 	tupList.append(('ClassPath', classPathStr))
 
 	for (key,val) in tupList:
