@@ -115,7 +115,7 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	writeln(f, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
 #	writeln(f, 1, "<supportUrl>url</supportUrl>");
 
-	writeln(f, 1, "<cmdLine>app/app.cfg</cmdLine>");
+	writeln(f, 1, "<cmdLine>app.cfg</cmdLine>");
 	writeln(f, 1, "<chdir>app/</chdir>");
 	writeln(f, 1, "<priority>normal</priority>");
 	writeln(f, 1, "<customProcName>true</customProcName>");
@@ -125,7 +125,7 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 
 	writeln(f, 1, "<classPath>");
 	writeln(f, 2, "<mainClass>appLauncher.AppLauncher</mainClass>");
-	writeln(f, 2, "<cp>launcher/appLauncher.jar</cp>");
+	writeln(f, 2, "<cp>../launcher/appLauncher.jar</cp>");
 	writeln(f, 1, "</classPath>");
 
 	if args.forceSingleInstance != False:
