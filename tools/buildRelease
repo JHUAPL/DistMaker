@@ -1,0 +1,123 @@
+#! /usr/bin/env python
+
+import fnmatch
+import os
+import subprocess
+import shutil
+import signal
+import sys
+import time
+
+# Globals
+# The version of DistMaker
+version = '0.33'
+
+
+def logAndPrint(message="", indent=0, showTime=False):
+	while indent > 0:
+		indent -= 1
+		message = '   ' + message
+	if showTime == True:
+		message = '[' + getCurrTimeStr() + '] ' + message;
+#	logging.info(message)
+	print message
+
+
+def buildRelease():
+	# Determine the workPath
+	workPath = "DistMaker-" + version
+	destFileGZ = "DistMaker-" + version + ".tar.gz"
+
+	# Bail if the work folder for which we compose the release already exists
+	if os.path.exists(workPath) == True:
+		logAndPrint("Aborting DistMaker release build. Release folder already exists: " + workPath, indent=1)
+		exit(-1)
+
+	# Bail if the release already exists
+	if os.path.exists('release/' + destFileGZ) == True:
+		logAndPrint("Aborting DistMaker release build. Release already exists. File: release/" + destFileGZ, indent=1)
+		exit(-1)
+
+	# Laydown the structure
+	os.mkdir(workPath)
+	os.mkdir(workPath + "/lib")
+	os.mkdir(workPath + "/script")
+	os.mkdir(workPath + "/jre")
+
+	# Let the user know of the version we are building
+	print "Building DistMaker release " + version + "..."
+
+	# Copy the libraries
+	shutil.copy2('lib/glum.jar', workPath + '/lib/')
+	shutil.copy2('lib/guava-13.0.1.jar', workPath + '/lib/')
+	shutil.copy2('bin/distMaker.jar', workPath + '/lib/')
+
+	# Copy the scripts
+	shutil.copy2('script/appleUtils.py', workPath + '/script/')
+	shutil.copy2('script/linuxUtils.py', workPath + '/script/')
+	shutil.copy2('script/windowsUtils.py', workPath + '/script/')
+	shutil.copy2('script/buildDist.py', workPath + '/script/')
+	shutil.copy2('script/deployDist.py', workPath + '/script/')
+	shutil.copy2('script/miscUtils.py', workPath + '/script/')
+	
+	# Copy the launch4J utility
+	shutil.copytree('launch4j', workPath + '/launch4j')
+
+	# Copy the jre tree
+	shutil.copytree('jre/apple', workPath + '/jre/apple', symlinks=True)
+	shutil.copytree('jre/linux', workPath + '/jre/linux', symlinks=True)
+	shutil.copytree('jre/windows', workPath + '/jre/windows', symlinks=True)
+
+	# Copy the template tree
+	shutil.copytree('template', workPath + '/template')
+
+	# Form the archive
+	exeCmd = ['tar', '-czf', destFileGZ, workPath]
+	retCode = subprocess.call(exeCmd)
+	if retCode != 0:
+		print "Failed to build tar.gz file: " + destFileGZ
+		exit(-1)
+
+	# Remove the workPath
+	shutil.rmtree(workPath)
+
+	# Move the release to the official release folder
+	shutil.move(destFileGZ, 'release/')
+
+	print "DistMaker release " + version + " built."
+
+
+def printUsage():
+	scriptName = os.path.split(sys.argv[0])[1]
+	print scriptName + ' [-full]'
+	print '      -full:     Force a full build of the main jar file.'
+	exit(-1)
+
+
+def handleSignal(signal, frame):
+		print 'You pressed Ctrl+C!'
+		sys.exit(0)
+
+
+if __name__ == "__main__":
+	argv = sys.argv;
+	argc = len(argv);
+
+	doFullBuild = False
+	if argc == 2 and argv[1] == "-full":
+		doFullBuild = True
+	elif argc != 1:
+		print '   Invalid num args. Num Args:' + str(argc)
+		printUsage()
+
+	# Logic to capture Ctrl-C and bail
+	signal.signal(signal.SIGINT, handleSignal)
+
+	#TODO: Add logic to check for a working environment
+	#validateEnvironment()
+
+	#TODO: Finish this functionality
+	if doFullBuild == True:
+		print "Unsupported action: [-full]. Skipping..."
+
+	buildRelease()
