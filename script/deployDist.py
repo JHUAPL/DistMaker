@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 import argparse
-import datetime
 import getpass
 import math
 import os
@@ -9,6 +8,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 
 def getDistInfo(distPath):
 	appName = None
@@ -54,10 +54,20 @@ def handleSignal(signal, frame):
 		sys.exit(0)
 
 
-def updateVersionInfo(installPath, appName, version):
-	verFile = os.path.join(installPath, 'versionInfo.txt')
+def updateAppConfig(versionPath, deployDate):
+	cfgFile = os.path.join(versionPath, 'delta', 'app.cfg')
 	
-	versionInfo = []
+	# Updated the config file
+	f = open(cfgFile, 'a')
+	f.write('-deployDate\n')
+	f.write(str(deployDate) + '\n')
+	f.close()
+
+
+def updateReleaseInfo(installPath, appName, version, deployDate):
+	verFile = os.path.join(installPath, 'releaseInfo.txt')
+	
+	releaseInfo = []
 	
 	# Read the file
 	if os.path.isfile(verFile) == True:
@@ -65,18 +75,16 @@ def updateVersionInfo(installPath, appName, version):
 		for line in f:
 			tokens = line[:-1].split(',', 1);
 			if len(tokens) == 2 and tokens[0] != 'name':
-				versionInfo.append((tokens[0], tokens[1]))
+				releaseInfo.append((tokens[0], tokens[1]))
 		f.close()
 
-	# Record the new version		
-	exeDate = datetime.date.today()
-	dateStamp = exeDate.strftime('%Y%b%d')
-	versionInfo.append((dateStamp, version))
+	# Add the new version		
+	releaseInfo.append((version, deployDate))
 	
 	# Write the updated file
 	f = open(verFile, 'w')
 	f.write('name' + ',' + appName + '\n')
-	for verTup in versionInfo:
+	for verTup in releaseInfo:
 		f.write(verTup[0] + ',' + verTup[1] + '\n')
 	f.close()
 
@@ -139,10 +147,17 @@ if __name__ == "__main__":
 			print('Application ' + appName + ' with version, ' + version + ', has already been deployed.')
 			print('Release will not be made for app ' + appName)
 			exit()
-			
+
 	# Copy over the contents of the release folder to the deploy location
 	shutil.copytree(distPath, versionPath, symlinks=True) 
+	
+	# Compute the official deployDate			
+	exeDate = time.localtime()
+	deployDate = time.strftime('%Y%b%d %H:%M:%S', exeDate)
+			
+	# Update the app.cfg file
+	updateAppConfig(versionPath, deployDate)
 		
 	# Update the version info
-	updateVersionInfo(installPath, appName, version)
+	updateReleaseInfo(installPath, appName, version, deployDate)
 

@@ -155,9 +155,18 @@ if __name__ == "__main__":
 	dstPath = os.path.join(buildPath, "delta/app.cfg")
 	miscUtils.buildAppLauncherConfig(dstPath, args)
 	
-	# Build the delta catalog md5sum
+	# Build the delta md5sum catalog
+	# Use extreme caution when editing the line below since we have enabled the shell!!!
+	# Currently there is no external (uncleansed) input in the command, and be sure to not introduce it!
 #	dstPath = os.path.join(buildPath, "delta/md5sum.txt")
-#	buildCatalog.buildCatalog(destPath) 
+#	buildCatalog.buildCatalog(destPath)
+	dstPath = os.path.join(buildPath, "delta")
+	subprocess.check_call("find * -name '*' -type f -print0 | sort -d -z | xargs -0 md5sum > ../md5sum.txt", cwd=dstPath, shell=True)
+	
+	# Move the md5sum catalog into the delta folder
+	srcPath = os.path.join(buildPath, "md5sum.txt")
+	dstPath = os.path.join(buildPath, "delta/md5sum.txt")
+	os.rename(srcPath, dstPath)
 		
 	# Build the Apple release	
 	appleUtils.buildRelease(args, buildPath)
