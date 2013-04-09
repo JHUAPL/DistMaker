@@ -1,5 +1,6 @@
 package distMaker;
 
+import glum.gui.panel.generic.MessagePanel;
 import glum.gui.panel.task.FullTaskPanel;
 import glum.io.IoUtil;
 import glum.net.Credential;
@@ -13,6 +14,7 @@ import java.net.URL;
 import java.util.List;
 
 import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
 
 import distMaker.gui.PickReleasePanel;
 
@@ -25,13 +27,18 @@ public class DistMakerEngine
 
 	// Gui vars
 	private JFrame parentFrame;
+	private MessagePanel msgPanel;
 	private PickReleasePanel pickVersionPanel;
 
 	public DistMakerEngine(JFrame aParentFrame, URL aUpdateUrl)
 	{
 		updateUrl = aUpdateUrl;
+		currRelease = null;
 		refCredential = null;
+		
 		parentFrame = aParentFrame;
+		msgPanel = new MessagePanel(parentFrame);
+		msgPanel.setSize(375, 180);
 
 		initialize();
 	}
@@ -42,9 +49,28 @@ public class DistMakerEngine
 	public void checkForUpdates()
 	{
 		FullTaskPanel taskPanel;
+		File installPath;
 		String appName;
-
+		
+		// Bail if we do not have a valid release
+		if (currRelease == null)
+		{
+			if (DistUtils.isDevelopersRelease(getClass()) == true)
+				displayErrorDialog("Updates are not possible in a developer environment.");
+			else
+				displayErrorDialog(null);
+			return;
+		}
 		appName = currRelease.getName();
+
+		// Determine the destination where to drop the release
+		installPath = DistUtils.getAppPath().getParentFile();
+		if (installPath.setWritable(true) == false)
+		{
+			displayErrorDialog("The install path, " + installPath + ", is not writable. Please run as the proper user");
+			return;
+		}
+			
 
 		// Setup our TaskPanel
 		taskPanel = new FullTaskPanel(parentFrame, true, false);
@@ -61,6 +87,16 @@ public class DistMakerEngine
 	 */
 	public void markSystemFullyStarted()
 	{
+		String msg;
+
+		// Notify the user, if the application has been successfully updated
+		if (System.getProperty("distMaker.isUpdated") != null)
+		{
+			msg = "The application, " + currRelease.getName() + ", has been updated to ";
+			msg += "version: " + currRelease.getVersion();
+			displayErrorDialog(msg);
+		}
+		
 		// TODO: Flush this out
 	}
 
@@ -86,13 +122,13 @@ public class DistMakerEngine
 		BufferedReader br;
 		DateUnit dateUnit;
 		String currInstr, strLine;
-		String appName, verName, deployStr;
-		long deployTime;
+		String appName, verName, buildStr;
+		long buildTime;
 
 		currRelease = null;
 		appName = null;
 		verName = null;
-		deployStr = null;
+		buildStr = null;
 
 		// Locate the official DistMaker configuration file associated with this release
 		appPath = DistUtils.getAppPath();
@@ -100,7 +136,13 @@ public class DistMakerEngine
 
 		// Bail if there is no configuration file
 		if (cfgFile.isFile() == false)
+		{
+			// Alert the user to the incongruence if this is not a developer's build
+			if (DistUtils.isDevelopersRelease(getClass()) == false)
+				displayErrorDialog(null);
+				
 			return;
+		}
 
 		// Read in the configuration file
 		br = null;
@@ -129,8 +171,8 @@ public class DistMakerEngine
 					appName = strLine;
 				else if (currInstr.equals("-version") == true)
 					verName = strLine;
-				else if (currInstr.equals("-deployDate") == true)
-					deployStr = strLine;
+				else if (currInstr.equals("-buildDate") == true)
+					buildStr = strLine;
 			}
 
 		}
@@ -143,16 +185,21 @@ public class DistMakerEngine
 			IoUtil.forceClose(br);
 		}
 
-		if (appName == null || verName == null || deployStr == null)
+		if (appName == null || verName == null)
 		{
+			displayErrorDialog(null);
 			System.out.println("Failed to properly parse DistMaker config file: " + cfgFile);
 			return;
 		}
 
 		// Form the installed Release
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm:ss");
-		deployTime = dateUnit.parseString(deployStr, 0);
-		currRelease = new Release(appName, verName, deployTime);
+		
+		buildTime = 0;
+		if (buildStr != null)
+			buildTime = dateUnit.parseString(buildStr, 0);
+		
+		currRelease = new Release(appName, verName, buildTime);
 
 		// Form the PickReleasePanel
 		pickVersionPanel = new PickReleasePanel(parentFrame, currRelease);
@@ -168,27 +215,46 @@ public class DistMakerEngine
 	{
 		List<Release> fullList;
 		Release chosenItem;
-		File destPath;
+		File installPath, destPath;
 		String appName;
 		boolean isPass;
-
-		// Determine the destination where to drop the release
-		destPath = new File(DistUtils.getAppPath().getParentFile(), "delta");
+				
+		// Determine the path to download updates
+		installPath = DistUtils.getAppPath().getParentFile();
+		destPath = new File(installPath, "delta");
 
 		// Status info
 		appName = currRelease.getName();
-		aTask.infoAppendln("Application: " + appName + " - " + currRelease.getVersion() + '\n');
+		aTask.infoAppendln("Application: " + appName + " - " + currRelease.getVersion());
 
 		// Retrieve the list of available releases
 		aTask.infoAppendln("Checking for updates...\n");
 		fullList = DistUtils.getAvailableReleases(aTask, updateUrl, appName, refCredential);
 		if (fullList == null)
+		{
+			aTask.abort();
 			return;
+		}
 
 		// Prompt the user for the Release
 		aTask.infoAppendln("Please select the release to install...");
 		pickVersionPanel.setConfiguration(fullList);
-		pickVersionPanel.setVisibleAsModal();
+		try
+		{
+			SwingUtilities.invokeAndWait(new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					pickVersionPanel.setVisibleAsModal();
+				}
+			});
+		}
+		catch (Exception aExp)
+		{
+			aExp.printStackTrace();
+		}
+//		pickVersionPanel.setVisibleAsModal();
 		chosenItem = pickVersionPanel.getChosenItem();
 		if (chosenItem == null)
 		{
@@ -196,10 +262,12 @@ public class DistMakerEngine
 			aTask.abort();
 			return;
 		}
+		
+		
 
 		// Log the user chosen action
 		aTask.infoAppendln("\tRelease chosen: " + chosenItem.getVersion());
-		if (currRelease.getDeployTime() < chosenItem.getDeployTime())
+		if (currRelease.getBuildTime() < chosenItem.getBuildTime())
 			aTask.infoAppendln("\t" + appName + " will be updated...");
 		else
 			aTask.infoAppendln("\t" + appName + " will be reverted...");
@@ -210,11 +278,12 @@ public class DistMakerEngine
 		{
 			IoUtil.deleteDirectory(destPath);
 			aTask.infoAppendln("Application update aborted.");
+			aTask.abort();
 			return;
 		}
 
 		// Notify the user of success
-		aTask.infoAppendln(appName + " has been updated to version: " + chosenItem.getDeployTime() + ".");
+		aTask.infoAppendln(appName + " has been updated to version: " + chosenItem.getVersion() + ".");
 		aTask.infoAppendln("These updates will become active when " + appName + " is restarted.");
 	}
 
@@ -233,12 +302,15 @@ public class DistMakerEngine
 
 		// Retrieve the list of files to download
 		fileList = DistUtils.getFileListForRelease(aTask, updateUrl, aRelease, destPath, refCredential);
+		if (fileList == null)
+			return false;
 
 		// Compute some baseline vars
-		baseUrlStr = updateUrl.toString() + "/" + aRelease.getVersion() + "/";
-		clipLen = destPath.getAbsolutePath().length();
+		baseUrlStr = updateUrl.toString() + "/" + aRelease.getName() + "/" + aRelease.getVersion() + "/" + "delta/";
+		clipLen = destPath.getAbsolutePath().length() + 1;
 
 		// Download the individual files
+		aTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Files: " + fileList.size());
 		for (File aFile : fileList)
 		{
 			// Bail if we have been aborted
@@ -248,20 +320,38 @@ public class DistMakerEngine
 			srcUrlStr = baseUrlStr + aFile.getAbsolutePath().substring(clipLen);
 			srcUrl = IoUtil.createURL(srcUrlStr);
 
-			aTask.infoAppendln(srcUrlStr + " -> " + aFile);
+			aTask.infoAppendln("\t" + srcUrlStr + " -> " + aFile);
 			aFile.getParentFile().mkdirs();
-			isPass = IoUtil.copyUrlToFile(srcUrl, aFile);// , Username, Password);
-			if (isPass == false)
-			{
-				aFile.delete();
-				aTask.infoAppendln("Failed to download resource: " + srcUrl);
-				aTask.infoAppendln("\tSource: " + srcUrlStr);
-				aTask.infoAppendln("\tDest: " + aFile);
-				return false;
-			}
+//			isPass = IoUtil.copyUrlToFile(srcUrl, aFile);// , Username, Password);
+//			if (isPass == false)
+//			{
+//				aFile.delete();
+//				aTask.infoAppendln("Failed to download resource: " + srcUrl);
+//				aTask.infoAppendln("\tSource: " + srcUrlStr);
+//				aTask.infoAppendln("\tDest: " + aFile);
+//				return false;
+//			}
 		}
 
 		return true;
+	}
+	
+	/**
+	 * Helper method to display an erroneous DistMaker configuration
+	 */
+	private void displayErrorDialog(String aMsg)
+	{
+		// Default message
+		if (aMsg == null)
+		{
+			aMsg = "This application does not appear to be a properly configured DistMaker application.\n\n";
+			aMsg += "Please check installation configuration.";
+		}
+		
+		// Display the message
+		msgPanel.setTitle("Application Updater");
+		msgPanel.setInfo(aMsg);
+		msgPanel.setVisible(true);
 	}
 
 }

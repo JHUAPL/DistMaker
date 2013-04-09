@@ -8,11 +8,11 @@ import shutil
 import signal
 import subprocess
 import sys
-import time
 
 def getDistInfo(distPath):
 	appName = None
 	version = None
+	buildDate = None
 	
 	cfgFile = os.path.join(distPath, 'delta', 'app.cfg')
 	if os.path.isfile(cfgFile) == False:
@@ -20,32 +20,27 @@ def getDistInfo(distPath):
 		print('Release will not be deployed...')
 		exit()
 		
-	isNameMode = isVerMode = False
+	exeMode = None
 	f = open(cfgFile, 'r')
 	for line in f:
 		line = line[:-1]
-		if line == '-name':
-			isNameMode = True
-			isVerMode = False
-		elif line == '-version':
-			isNameMode = False
-			isVerMode = True
-		elif line.startswith('-') == True:
-			isNameMode = False
-			isVerMode = False
-		elif isNameMode == True and len(line) > 0:
+		if line.startswith('-') == True:
+			exeMode = line;
+		elif exeMode == '-name' and len(line) > 0:
 			appName = line
-		elif isVerMode == True and len(line) > 0:
+		elif exeMode  == '-version' and len(line) > 0:
 			version = line
+		elif exeMode  == '-buildDate' and len(line) > 0:
+			buildDate = line
 	f.close()
 	
-	if appName == None or version == None:
+	if appName == None or version == None or buildDate == None:
 		print('Distribution corresponding to the folder: ' + distPath + ' does not appear to be valid!')
 		print('The configuration file, ' + cfgFile+ ', is not valid.')
 		print('Release will not be made for app ' + appName)
 		exit()
 		
-	return (appName, version)
+	return (appName, version, buildDate)
 
 
 def handleSignal(signal, frame):
@@ -54,39 +49,40 @@ def handleSignal(signal, frame):
 		sys.exit(0)
 
 
-def updateAppConfig(versionPath, deployDate):
-	cfgFile = os.path.join(versionPath, 'delta', 'app.cfg')
-	
-	# Updated the config file
-	f = open(cfgFile, 'a')
-	f.write('-deployDate\n')
-	f.write(str(deployDate) + '\n')
-	f.close()
-
-
-def updateReleaseInfo(installPath, appName, version, deployDate):
+def updateReleaseInfo(installPath, appName, version, buildDate):
 	verFile = os.path.join(installPath, 'releaseInfo.txt')
 	
 	releaseInfo = []
 	
-	# Read the file
-	if os.path.isfile(verFile) == True:
-		f = open(verFile, 'r')
-		for line in f:
-			tokens = line[:-1].split(',', 1);
-			if len(tokens) == 2 and tokens[0] != 'name':
-				releaseInfo.append((tokens[0], tokens[1]))
+	# Create the release info file
+	if os.path.isfile(verFile) == False:
+		f = open(verFile, 'w')
+		f.write('name' + ',' + appName + '\n')
 		f.close()
 
-	# Add the new version		
-	releaseInfo.append((version, deployDate))
-	
-	# Write the updated file
-	f = open(verFile, 'w')
-	f.write('name' + ',' + appName + '\n')
-	for verTup in releaseInfo:
-		f.write(verTup[0] + ',' + verTup[1] + '\n')
+	# Updated the release info file
+	f = open(verFile, 'a')
+	f.write(version + ',' + buildDate + '\n')
 	f.close()
+	
+#	# Read the file
+#	if os.path.isfile(verFile) == True:
+#		f = open(verFile, 'r')
+#		for line in f:
+#			tokens = line[:-1].split(',', 1);
+#			if len(tokens) == 2 and tokens[0] != 'name':
+#				releaseInfo.append((tokens[0], tokens[1]))
+#		f.close()
+
+#	# Add the new version		
+#	releaseInfo.append((version, buildDate))
+	
+#	# Write the updated file
+#	f = open(verFile, 'w')
+#	f.write('name' + ',' + appName + '\n')
+#	for verTup in releaseInfo:
+#		f.write(verTup[0] + ',' + verTup[1] + '\n')
+#	f.close()
 
 	
 if __name__ == "__main__":
@@ -125,8 +121,8 @@ if __name__ == "__main__":
 		print('Release will not be deployed...')
 		exit()
 		
-	# Determine the appName and version of the distribution
-	(appName, version) = getDistInfo(distPath)
+	# Determine the appName, version, and buildDate of the distribution
+	(appName, version, buildDate) = getDistInfo(distPath)
 
 	# Check to see if the deployed location already exists
 	installPath = os.path.join(rootPath, appName)
@@ -151,13 +147,5 @@ if __name__ == "__main__":
 	# Copy over the contents of the release folder to the deploy location
 	shutil.copytree(distPath, versionPath, symlinks=True) 
 	
-	# Compute the official deployDate			
-	exeDate = time.localtime()
-	deployDate = time.strftime('%Y%b%d %H:%M:%S', exeDate)
-			
-	# Update the app.cfg file
-	updateAppConfig(versionPath, deployDate)
-		
 	# Update the version info
-	updateReleaseInfo(installPath, appName, version, deployDate)
-
+	updateReleaseInfo(installPath, appName, version, buildDate)

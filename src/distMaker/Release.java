@@ -2,18 +2,17 @@ package distMaker;
 
 import glum.database.QueryItem;
 
-
 public class Release implements Comparable<Release>, QueryItem<LookUp>
 {
 	private String appName;
-	private String verName;
-	private long deployTime;
+	private String version;
+	private long buildTime;
 
-	public Release(String aAppName, String aVerName, long aDeployTime)
+	public Release(String aAppName, String aVersion, long aBuildTime)
 	{
 		appName = aAppName;
-		verName = aVerName;
-		deployTime = aDeployTime;
+		version = aVersion;
+		buildTime = aBuildTime;
 	}
 
 	/**
@@ -29,23 +28,23 @@ public class Release implements Comparable<Release>, QueryItem<LookUp>
 	 */
 	public String getVersion()
 	{
-		return verName;
+		return version;
 	}
 
 	/**
-	 * Returns the time at which this version was deployed (made available to the public/customer)
+	 * Returns the time at which this version was built.
 	 */
-	public long getDeployTime()
+	public long getBuildTime()
 	{
-		return deployTime;
+		return buildTime;
 	}
 
 	@Override
 	public int compareTo(Release o)
 	{
-		if (deployTime < o.deployTime)
+		if (buildTime < o.buildTime)
 			return -1;
-		else if (deployTime > o.deployTime)
+		else if (buildTime > o.buildTime)
 			return 1;
 
 		return 0;
@@ -56,11 +55,11 @@ public class Release implements Comparable<Release>, QueryItem<LookUp>
 	{
 		switch (aEnum)
 		{
-			case DeployTime:
-			return deployTime;
+			case BuildTime:
+			return buildTime;
 
-			case VersionName:
-			return verName;
+			case Version:
+			return version;
 
 			default:
 			return null;
@@ -71,6 +70,46 @@ public class Release implements Comparable<Release>, QueryItem<LookUp>
 	public void setValue(LookUp aEnum, Object aObj)
 	{
 		throw new RuntimeException("Unsupported operation");
+	}
+
+	@Override
+	public int hashCode()
+	{
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((appName == null) ? 0 : appName.hashCode());
+		result = prime * result + (int)(buildTime ^ (buildTime >>> 32));
+		result = prime * result + ((version == null) ? 0 : version.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj)
+	{
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Release other = (Release)obj;
+		if (appName == null)
+		{
+			if (other.appName != null)
+				return false;
+		}
+		else if (!appName.equals(other.appName))
+			return false;
+		if (buildTime != other.buildTime)
+			return false;
+		if (version == null)
+		{
+			if (other.version != null)
+				return false;
+		}
+		else if (!version.equals(other.version))
+			return false;
+		return true;
 	}
 
 }

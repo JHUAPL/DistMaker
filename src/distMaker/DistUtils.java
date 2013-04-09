@@ -1,14 +1,13 @@
 package distMaker;
 
-import glum.gui.GuiUtil;
 import glum.io.IoUtil;
 import glum.net.*;
 import glum.reflect.ReflectUtil;
 import glum.task.Task;
+import glum.unit.DateUnit;
 
 import java.io.*;
-import java.net.URL;
-import java.net.URLConnection;
+import java.net.*;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -23,7 +22,7 @@ public class DistUtils
 	 */
 	public static File getAppPath()
 	{
-		File jarPath, currPath, testPath;
+		File jarPath, currPath, testFile;
 
 		jarPath = ReflectUtil.getInstalledRootDir(DistUtils.class);
 
@@ -31,13 +30,49 @@ public class DistUtils
 		while (currPath != null)
 		{
 			currPath = currPath.getParentFile();
-			testPath = new File(currPath, "app.cfg");
-			if (testPath.isFile() == true)
-				return testPath;
+			testFile = new File(currPath, "app.cfg");
+			if (testFile.isFile() == true)
+				return currPath;
 		}
 
 		// Return default location
 		return jarPath.getParentFile().getParentFile();
+	}
+
+	/**
+	 * Utility method to determine if this appears to be a delevolper's release (run from eclipse)
+	 */
+	public static boolean isDevelopersRelease(Class<?> refClass)
+	{
+		String dataPath;
+		URL aUrl;
+
+		// Attempt to determine the default data directory
+		aUrl = refClass.getResource(refClass.getSimpleName() + ".class");
+		// System.out.println("URL:" + aUrl);
+		try
+		{
+			dataPath = aUrl.toURI().toString();
+			dataPath = URLDecoder.decode(dataPath, "UTF-8");
+		}
+		catch (Exception aExp)
+		{
+			dataPath = aUrl.getPath();
+			try
+			{
+				dataPath = URLDecoder.decode(dataPath, "UTF-8");
+			}
+			catch (Exception aExp2)
+			{
+				;
+			}
+		}
+
+		// Remove the jar file component from the path "!*.jar"
+		if (dataPath.lastIndexOf("!") != -1)
+			return false;
+		else
+			return true;
 	}
 
 	/**
@@ -50,6 +85,7 @@ public class DistUtils
 		URLConnection connection;
 		InputStream inStream;
 		BufferedReader bufReader;
+		DateUnit dateUnit;
 		String errMsg;
 
 		errMsg = null;
@@ -63,7 +99,7 @@ public class DistUtils
 		{
 			String[] tokens;
 			String strLine, verName;
-			long deployTime;
+			long buildTime;
 
 			// Read the contents of the file
 			connection = catUrl.openConnection();
@@ -90,8 +126,11 @@ public class DistUtils
 				// if (tokens.length == 2)
 				{
 					verName = tokens[0];
-					deployTime = GuiUtil.readLong(tokens[1], 0);
-					fullList.add(new Release(appName, verName, deployTime));
+
+					dateUnit = new DateUnit("", "yyyyMMMdd HH:mm:ss");
+					buildTime = dateUnit.parseString(tokens[1], 0);
+
+					fullList.add(new Release(appName, verName, buildTime));
 				}
 			}
 		}
@@ -190,7 +229,7 @@ public class DistUtils
 				if (strLine == null)
 					break;
 
-				tokens = strLine.split(",");
+				tokens = strLine.split("\\s+");
 				if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
 					; // Nothing to do
 				else if (tokens.length != 2)

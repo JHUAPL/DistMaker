@@ -1,6 +1,7 @@
 #! /usr/bin/env python
-import sys
 import os
+import time
+import sys
 
 def handleSignal(signal, frame):
 		"""Signal handler, typically used to capture ctrl-c."""
@@ -84,6 +85,13 @@ def buildAppLauncherConfig(destFile, args):
 	# Version section
 	f.write('-version\n')
 	f.write(args.version + '\n')
+	f.write('\n')
+
+	# Build date section
+	exeDate = time.localtime()
+	buildDate = time.strftime('%Y%b%d %H:%M:%S', exeDate)
+	f.write('-buildDate\n')
+	f.write(buildDate + '\n')
 	f.write('\n')
 
 	# MainClass section
