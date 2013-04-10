@@ -4,9 +4,9 @@ import glum.gui.FocusUtil;
 import glum.gui.GuiUtil;
 import glum.gui.action.ClickAction;
 import glum.gui.panel.GlassPanel;
-import glum.gui.panel.itemList.*;
-import glum.gui.panel.itemList.query.QueryComposer;
-import glum.gui.panel.itemList.query.QueryItemHandler;
+import glum.gui.panel.itemList.ItemListPanel;
+import glum.gui.panel.itemList.StaticItemProcessor;
+import glum.gui.panel.itemList.query.*;
 import glum.unit.ConstUnitProvider;
 import glum.unit.DateUnit;
 import glum.zio.raw.ZioRaw;
@@ -16,7 +16,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
-
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.EmptyBorder;
@@ -36,6 +35,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	private JLabel titleL;
 	private JRadioButton newestRB, olderRB;
 	private ItemListPanel<Release> listPanel;
+	private QueryTableCellRenderer col0Renderer, col1Renderer;
 	private JButton abortB, proceedB;
 	private JTextArea infoTA, warnTA;
 	private Font smallFont;
@@ -65,7 +65,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	}
 
 	/**
-	 * Returns the VersionInfo selected by the user. This will be null if the user aborted the action.
+	 * Returns the Release selected by the user. This will be null if the user aborted the action.
 	 */
 	public Release getChosenItem()
 	{
@@ -103,13 +103,15 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		myItemProcessor.setItems(fullList);
 
 		// Update the infoTA
-		infoMsg = "The latest release of " + appName + ", " + lastVerStr + ", was built on " + lastBuildStr + ".";
+		infoMsg = "The latest release of " + appName + ", " + lastVerStr + ", was built on " + lastBuildStr + ". ";
 		if (newestItem.equals(installedItem) == true)
 			infoMsg += "You have the latest release of " + appName + "!";
 		else
 			infoMsg += "Your current version is " + currVerStr + ", which was built on: " + currBuildStr;
+		infoMsg += "\n";
 
 		infoTA.setText(infoMsg);
+		updateGui();
 	}
 
 	@Override
@@ -128,7 +130,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 			chosenItem = listPanel.getSelectedItem();
 			if (newestRB.isSelected() == true)
 				chosenItem = newestItem;
-			
+
 			setVisible(false);
 		}
 		else
@@ -153,10 +155,9 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	private void buildGuiArea()
 	{
 		JPanel tmpPanel;
-		JScrollPane tmpScrollPane;
 
 		// Form the layout
-		setLayout(new MigLayout("", "[left][grow][]", "[][][]3[grow][]"));
+		setLayout(new MigLayout("", "[left][grow][]", "[][][][]3[grow]10[]"));
 
 		// Title Area
 		titleL = new JLabel("Please select an update", JLabel.CENTER);
@@ -164,7 +165,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 
 		// Info area
 		infoTA = GuiUtil.createUneditableTextArea(2, 0);
-		add(infoTA, "growx,span,wrap");
+		add(infoTA, "w 0::,growx,span,wrap");
 
 		// Latest version area
 		newestRB = GuiUtil.createJRadioButton("Unspecified", this, smallFont);
@@ -184,9 +185,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 
 		// Warn Area
 		warnTA = GuiUtil.createUneditableTextArea(0, 0);
-		warnTA.setBorder(null);
-		tmpScrollPane = new JScrollPane(warnTA);
-		add(tmpScrollPane, "growx,growy,h 40::,span,wrap");
+		add(warnTA, "w 0::,growx,span,wrap");
 
 		// Action area
 		abortB = GuiUtil.createJButton("Abort", this, smallFont);
@@ -203,7 +202,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	private JPanel buildItemListTablePanel()
 	{
 		QueryComposer<LookUp> aComposer;
-		ItemHandler<Release> aItemHandler;
+		QueryItemHandler<Release> aItemHandler;
 		DateUnit dateUnit;
 
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm");
@@ -211,6 +210,12 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		aComposer = new QueryComposer<LookUp>();
 		aComposer.addAttribute(LookUp.Version, String.class, "Version", null);
 		aComposer.addAttribute(LookUp.BuildTime, new ConstUnitProvider(dateUnit), "Build Date", null);
+
+		col0Renderer = new QueryTableCellRenderer();
+		col1Renderer = new QueryTableCellRenderer();
+		col1Renderer.setUnit(dateUnit);
+		aComposer.setRenderer(LookUp.Version, col0Renderer);
+		aComposer.setRenderer(LookUp.BuildTime, col1Renderer);
 
 		aItemHandler = new QueryItemHandler<Release>(aComposer);
 		myItemProcessor = new StaticItemProcessor<Release>();
@@ -238,6 +243,12 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		// Determine if we are ready to proceed
 		isEnabled = (pickItem != null && pickItem.equals(installedItem) == false);
 		proceedB.setEnabled(isEnabled);
+
+		// Update the older release area
+		isEnabled = olderRB.isSelected();
+		GuiUtil.setEnabled(listPanel, isEnabled);
+		col0Renderer.setEnabled(isEnabled);
+		col1Renderer.setEnabled(isEnabled);
 
 		// Determine the warnMsg
 		warnMsg = null;

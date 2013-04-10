@@ -35,7 +35,7 @@ public class DistMakerEngine
 		updateUrl = aUpdateUrl;
 		currRelease = null;
 		refCredential = null;
-		
+
 		parentFrame = aParentFrame;
 		msgPanel = new MessagePanel(parentFrame);
 		msgPanel.setSize(375, 180);
@@ -50,15 +50,15 @@ public class DistMakerEngine
 	{
 		FullTaskPanel taskPanel;
 		File installPath;
-		String appName;
-		
+		String appName, infoMsg;
+
 		// Bail if we do not have a valid release
 		if (currRelease == null)
 		{
-			if (DistUtils.isDevelopersRelease(getClass()) == true)
-				displayErrorDialog("Updates are not possible in a developer environment.");
+			if (DistUtils.isDevelopersEnvironment() == true)
+				displayNotice("Updates are not possible in a developer environment.");
 			else
-				displayErrorDialog(null);
+				displayNotice(null);
 			return;
 		}
 		appName = currRelease.getName();
@@ -67,37 +67,21 @@ public class DistMakerEngine
 		installPath = DistUtils.getAppPath().getParentFile();
 		if (installPath.setWritable(true) == false)
 		{
-			displayErrorDialog("The install path, " + installPath + ", is not writable. Please run as the proper user");
+			infoMsg = "The install path, " + installPath + ", is not writable.\n";
+			infoMsg += "Please run as the proper user or ensure you are running via writeable media.";
+			displayNotice(infoMsg);
 			return;
 		}
-			
 
 		// Setup our TaskPanel
 		taskPanel = new FullTaskPanel(parentFrame, true, false);
 		taskPanel.setTitle(appName + ": Checking for updates...");
 		taskPanel.setSize(640, taskPanel.getPreferredSize().height);
+		taskPanel.setTabSize(2);
 		taskPanel.setVisible(true);
 
 		// Launch the actual checking of updates in a separate worker thread
 		ThreadUtil.launchRunnable(new FunctionRunnable(this, "checkForUpdatesWorker", taskPanel), "thread-checkForUpdates");
-	}
-
-	/**
-	 * Notification that the corresponding application has been fully initialized.
-	 */
-	public void markSystemFullyStarted()
-	{
-		String msg;
-
-		// Notify the user, if the application has been successfully updated
-		if (System.getProperty("distMaker.isUpdated") != null)
-		{
-			msg = "The application, " + currRelease.getName() + ", has been updated to ";
-			msg += "version: " + currRelease.getVersion();
-			displayErrorDialog(msg);
-		}
-		
-		// TODO: Flush this out
 	}
 
 	/**
@@ -138,9 +122,9 @@ public class DistMakerEngine
 		if (cfgFile.isFile() == false)
 		{
 			// Alert the user to the incongruence if this is not a developer's build
-			if (DistUtils.isDevelopersRelease(getClass()) == false)
-				displayErrorDialog(null);
-				
+			if (DistUtils.isDevelopersEnvironment() == false)
+				displayNotice(null);
+
 			return;
 		}
 
@@ -187,19 +171,22 @@ public class DistMakerEngine
 
 		if (appName == null || verName == null)
 		{
-			displayErrorDialog(null);
+			displayNotice(null);
 			System.out.println("Failed to properly parse DistMaker config file: " + cfgFile);
 			return;
 		}
 
 		// Form the installed Release
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm:ss");
-		
+
 		buildTime = 0;
 		if (buildStr != null)
 			buildTime = dateUnit.parseString(buildStr, 0);
-		
+
 		currRelease = new Release(appName, verName, buildTime);
+
+		// Notify the user, if the application has been successfully updated
+		markSystemFullyStarted();
 
 		// Form the PickReleasePanel
 		pickVersionPanel = new PickReleasePanel(parentFrame, currRelease);
@@ -218,7 +205,7 @@ public class DistMakerEngine
 		File installPath, destPath;
 		String appName;
 		boolean isPass;
-				
+
 		// Determine the path to download updates
 		installPath = DistUtils.getAppPath().getParentFile();
 		destPath = new File(installPath, "delta");
@@ -262,8 +249,6 @@ public class DistMakerEngine
 			aTask.abort();
 			return;
 		}
-		
-		
 
 		// Log the user chosen action
 		aTask.infoAppendln("\tRelease chosen: " + chosenItem.getVersion());
@@ -285,6 +270,7 @@ public class DistMakerEngine
 		// Notify the user of success
 		aTask.infoAppendln(appName + " has been updated to version: " + chosenItem.getVersion() + ".");
 		aTask.infoAppendln("These updates will become active when " + appName + " is restarted.");
+		aTask.setProgress(1.0);
 	}
 
 	/**
@@ -320,26 +306,27 @@ public class DistMakerEngine
 			srcUrlStr = baseUrlStr + aFile.getAbsolutePath().substring(clipLen);
 			srcUrl = IoUtil.createURL(srcUrlStr);
 
-			aTask.infoAppendln("\t" + srcUrlStr + " -> " + aFile);
+//			aTask.infoAppendln("\t" + srcUrlStr + " -> " + aFile);
+			aTask.infoAppendln("\t(U) " + aFile);
 			aFile.getParentFile().mkdirs();
-//			isPass = IoUtil.copyUrlToFile(srcUrl, aFile);// , Username, Password);
-//			if (isPass == false)
-//			{
-//				aFile.delete();
-//				aTask.infoAppendln("Failed to download resource: " + srcUrl);
-//				aTask.infoAppendln("\tSource: " + srcUrlStr);
-//				aTask.infoAppendln("\tDest: " + aFile);
-//				return false;
-//			}
+			isPass = DistUtils.downloadFile(aTask, srcUrl, aFile, refCredential);
+			if (isPass == false)
+			{
+				aFile.delete();
+				aTask.infoAppendln("Failed to download resource: " + srcUrl);
+				aTask.infoAppendln("\tSource: " + srcUrlStr);
+				aTask.infoAppendln("\tDest: " + aFile);
+				return false;
+			}
 		}
 
 		return true;
 	}
-	
+
 	/**
-	 * Helper method to display an erroneous DistMaker configuration
+	 * Helper method to display a DistMaker information notice
 	 */
-	private void displayErrorDialog(String aMsg)
+	private void displayNotice(String aMsg)
 	{
 		// Default message
 		if (aMsg == null)
@@ -347,11 +334,47 @@ public class DistMakerEngine
 			aMsg = "This application does not appear to be a properly configured DistMaker application.\n\n";
 			aMsg += "Please check installation configuration.";
 		}
-		
+
 		// Display the message
 		msgPanel.setTitle("Application Updater");
 		msgPanel.setInfo(aMsg);
 		msgPanel.setVisible(true);
+	}
+
+	/**
+	 * Notification that the corresponding application has been fully initialized. This helper method will notify the
+	 * user on the status of any update.
+	 */
+	private void markSystemFullyStarted()
+	{
+		String appName, msg;
+		int updateCode;
+
+		updateCode = DistUtils.getUpdateCode();
+		appName = currRelease.getName();
+
+		// No update
+		if (updateCode == 0)
+		{
+			return;
+		}
+		// Update passed
+		else if (DistUtils.getUpdateCode() == 1)
+		{
+			msg = "The application, " + currRelease.getName() + ", has been updated to ";
+			msg += "version: " + currRelease.getVersion();
+		}
+		// Update failed
+		else
+		// if (updateCode == 2)
+		{
+			msg = "There was an issue while updating the " + appName + " application.\n";
+			msg += "The application, " + appName + ", is currently at version: " + currRelease.getVersion() + "\n\n";
+
+			msg += DistUtils.getUpdateMsg();
+		}
+
+		displayNotice(msg);
 	}
 
 }

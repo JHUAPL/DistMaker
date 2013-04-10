@@ -3,6 +3,7 @@ package distMaker;
 import glum.io.IoUtil;
 import glum.net.*;
 import glum.reflect.ReflectUtil;
+import glum.task.ConsoleTask;
 import glum.task.Task;
 import glum.unit.DateUnit;
 
@@ -14,15 +15,25 @@ import com.google.common.collect.Lists;
 
 public class DistUtils
 {
+	// Static members that will be automatically updated by the AppLaunch
+	// Static member to declare the update status, 0: None, 1: Pass, 2: Fail
+	// This field will be automatically updated by the AppLauncher
+	private static boolean isDevelopersEnvironment = true;
+	private static int updateCode = 0;
+	private static String updateMsg = null;
+
 	/**
 	 * Utility method to determine the path where the application is installed.
 	 * <P>
-	 * If this application is not a formal DistMaker application, then the parent folder corresponding to the folder
-	 * which contains this jar will be returned.
+	 * If this application is not a formal DistMaker application, then the working directory will be returned.
 	 */
 	public static File getAppPath()
 	{
 		File jarPath, currPath, testFile;
+
+		// Return the working directory if this is a developers build
+		if (isDevelopersEnvironment() == true)
+			return new File(System.getProperty("user.dir"));
 
 		jarPath = ReflectUtil.getInstalledRootDir(DistUtils.class);
 
@@ -40,39 +51,92 @@ public class DistUtils
 	}
 
 	/**
-	 * Utility method to determine if this appears to be a delevolper's release (run from eclipse)
+	 * Returns the code associated with the update.
 	 */
-	public static boolean isDevelopersRelease(Class<?> refClass)
+	public static int getUpdateCode()
 	{
-		String dataPath;
-		URL aUrl;
+		return updateCode;
+	}
 
-		// Attempt to determine the default data directory
-		aUrl = refClass.getResource(refClass.getSimpleName() + ".class");
-		// System.out.println("URL:" + aUrl);
+	/**
+	 * Returns the message associated with the update.
+	 */
+	public static String getUpdateMsg()
+	{
+		return updateMsg;
+	}
+
+	/**
+	 * Utility method to determine if this appears to be running in the delevolper's environment (run from eclipse)
+	 */
+	public static boolean isDevelopersEnvironment()
+	{
+		return isDevelopersEnvironment;
+	}
+
+	/**
+	 * Downloads the specified file from srcUrl to destFile. Returns true on success
+	 */
+	public static boolean downloadFile(Task aTask, URL aUrl, File aFile, Credential aCredential)
+	{
+		URLConnection connection;
+		InputStream inStream;
+		OutputStream outStream;
+		String errMsg;
+		byte[] byteArr;
+		int numBytes;
+
+		// Ensure we have a valid aTask
+		if (aTask == null)
+			aTask = new ConsoleTask();
+
+		// Allocate space for the byte buffer
+		byteArr = new byte[10000];
+
+		// Perform the actual copying
+		inStream = null;
+		outStream = null;
+		connection = null;
 		try
 		{
-			dataPath = aUrl.toURI().toString();
-			dataPath = URLDecoder.decode(dataPath, "UTF-8");
+			// Open the src stream (with a 30 sec connect timeout)
+			connection = aUrl.openConnection();
+//			connection.setConnectTimeout(30 * 1000);
+//			connection.setReadTimeout(90 * 1000);
+
+			// Open the input/output streams
+			inStream = NetUtil.getInputStream(connection, aCredential);
+			outStream = new FileOutputStream(aFile);
+
+			// Copy the bytes from the instream to the outstream
+			numBytes = 0;
+			while (numBytes != -1)
+			{
+				numBytes = inStream.read(byteArr);
+				if (numBytes > 0)
+					outStream.write(byteArr, 0, numBytes);
+
+				// Bail if aTask is aborted
+				if (aTask.isActive() == false)
+				{
+					aTask.infoAppendln("Download of file: " + aFile + " has been aborted!");
+					return false;
+				}
+			}
 		}
-		catch (Exception aExp)
+		catch (IOException aExp)
 		{
-			dataPath = aUrl.getPath();
-			try
-			{
-				dataPath = URLDecoder.decode(dataPath, "UTF-8");
-			}
-			catch (Exception aExp2)
-			{
-				;
-			}
+			errMsg = getErrorCodeMessage(aUrl, connection, aExp, aFile.getName());
+			aTask.infoAppendln(errMsg);
+			return false;
+		}
+		finally
+		{
+			IoUtil.forceClose(inStream);
+			IoUtil.forceClose(outStream);
 		}
 
-		// Remove the jar file component from the path "!*.jar"
-		if (dataPath.lastIndexOf("!") != -1)
-			return false;
-		else
-			return true;
+		return true;
 	}
 
 	/**
@@ -136,36 +200,7 @@ public class DistUtils
 		}
 		catch (IOException aExp)
 		{
-			Result aResult;
-
-			aExp.printStackTrace();
-			errMsg = "The update site, " + aUpdateUrl + ", is not available.\n\t";
-
-			aResult = NetUtil.getResult(aExp, connection);
-			switch (aResult)
-			{
-				case BadCredentials:
-				errMsg += "The update site is password protected and bad credentials were provided.";
-				break;
-
-				case ConnectFailure:
-				case UnreachableHost:
-				case UnsupportedConnection:
-				errMsg += "The update site appears to be unreachable.";
-				break;
-
-				case Interrupted:
-				errMsg += "The retrival of the catalog file has been interrupted.";
-				break;
-
-				case InvalidResource:
-				errMsg += "The remote catalog file, releaseInfo.txt, does not appear to be valid.";
-				break;
-
-				default:
-				errMsg += "An undefined error occurred while retrieving the remote catalog file.";
-				break;
-			}
+			errMsg = getErrorCodeMessage(aUpdateUrl, connection, aExp, "releaseInfo.txt");
 		}
 		finally
 		{
@@ -244,36 +279,7 @@ public class DistUtils
 		}
 		catch (IOException aExp)
 		{
-			Result aResult;
-
-			aExp.printStackTrace();
-			errMsg = "The update site, " + aUpdateUrl + ", is not available.\n\t";
-
-			aResult = NetUtil.getResult(aExp, connection);
-			switch (aResult)
-			{
-				case BadCredentials:
-				errMsg += "The update site is password protected and bad credentials were provided.";
-				break;
-
-				case ConnectFailure:
-				case UnreachableHost:
-				case UnsupportedConnection:
-				errMsg += "The update site appears to be unreachable.";
-				break;
-
-				case Interrupted:
-				errMsg += "The retrival of the md5sum file has been interrupted.";
-				break;
-
-				case InvalidResource:
-				errMsg += "The remote md5sum file, md5sumInfo.txt, does not appear to be valid.";
-				break;
-
-				default:
-				errMsg += "An undefined error occurred while retrieving the remote md5sum file.";
-				break;
-			}
+			errMsg = getErrorCodeMessage(aUpdateUrl, connection, aExp, "md5sum.txt");
 		}
 		finally
 		{
@@ -295,6 +301,48 @@ public class DistUtils
 		}
 
 		return fullList;
+	}
+
+	/**
+	 * Helper method that converts an IOException to an understandable message
+	 * 
+	 * @param remoteFileName
+	 */
+	private static String getErrorCodeMessage(URL aUpdateUrl, URLConnection aConnection, IOException aExp, String remoteFileName)
+	{
+		Result result;
+		String errMsg;
+
+		aExp.printStackTrace();
+		errMsg = "The update site, " + aUpdateUrl + ", is not available.\n\t";
+
+		result = NetUtil.getResult(aExp, aConnection);
+		switch (result)
+		{
+			case BadCredentials:
+			errMsg += "The update site is password protected and bad credentials were provided.";
+			break;
+
+			case ConnectFailure:
+			case UnreachableHost:
+			case UnsupportedConnection:
+			errMsg += "The update site appears to be unreachable.";
+			break;
+
+			case Interrupted:
+			errMsg += "The retrival of the remote file, releaseInfo.txt, has been interrupted.";
+			break;
+
+			case InvalidResource:
+			errMsg += "The remote file, releaseInfo.txt, does not appear to be valid.";
+			break;
+
+			default:
+			errMsg += "An undefined error occurred while retrieving the remote file, releaseInfo.txt.";
+			break;
+		}
+
+		return errMsg;
 	}
 
 }
