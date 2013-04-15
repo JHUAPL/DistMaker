@@ -15,11 +15,10 @@ import com.google.common.collect.Lists;
 
 public class DistUtils
 {
-	// Static members that will be automatically updated by the AppLaunch
-	// Static member to declare the update status, 0: None, 1: Pass, 2: Fail
-	// This field will be automatically updated by the AppLauncher
+	// Static members that may be automatically updated by the AppLauncher class loader.
+	// Do not rename or change these variables, without changing the AppLauncher class loader.
 	private static boolean isDevelopersEnvironment = true;
-	private static int updateCode = 0;
+	private static int updateCode = 0; // Static member to declare the update status, 0: None, 1: Pass, 2: Fail
 	private static String updateMsg = null;
 
 	/**
@@ -46,7 +45,7 @@ public class DistUtils
 				return currPath;
 		}
 
-		// Return default location
+		// Return default (grandparent to jar) location
 		return jarPath.getParentFile().getParentFile();
 	}
 
@@ -330,19 +329,44 @@ public class DistUtils
 			break;
 
 			case Interrupted:
-			errMsg += "The retrival of the remote file, releaseInfo.txt, has been interrupted.";
+			errMsg += "The retrival of the remote file, " + remoteFileName + ", has been interrupted.";
 			break;
 
 			case InvalidResource:
-			errMsg += "The remote file, releaseInfo.txt, does not appear to be valid.";
+			errMsg += "The remote file, " + remoteFileName + ", does not appear to be valid.";
 			break;
 
 			default:
-			errMsg += "An undefined error occurred while retrieving the remote file, releaseInfo.txt.";
+			errMsg += "An undefined error occurred while retrieving the remote file, " + remoteFileName + ".";
 			break;
 		}
 
 		return errMsg;
+	}
+
+	/**
+	 * Utility method to determine if the specified path is fully writable by this process. This is done by making sure
+	 * that all folders and child folders are writable by the current process. Note after this method is called, all
+	 * folders will have the write permission bit set.
+	 */
+	public static boolean isFullyWriteable(File aPath)
+	{
+		if (aPath.isDirectory() == false)
+			throw new RuntimeException("Specified path is not a folder: " + aPath);
+
+		// Change the reference path to be writable
+		if (aPath.setWritable(true) == false)
+			return false;
+
+		// Recurse on all child folders
+		for (File aFile : aPath.listFiles())
+		{
+			// Check the child folder (recursively)
+			if (aFile.isDirectory() == true && isFullyWriteable(aFile) == false)
+				return false;
+		}
+
+		return true;
 	}
 
 }

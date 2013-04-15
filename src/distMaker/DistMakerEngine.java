@@ -1,6 +1,7 @@
 package distMaker;
 
 import glum.gui.panel.generic.MessagePanel;
+import glum.gui.panel.generic.PromptPanel;
 import glum.gui.panel.task.FullTaskPanel;
 import glum.io.IoUtil;
 import glum.net.Credential;
@@ -28,6 +29,7 @@ public class DistMakerEngine
 	// Gui vars
 	private JFrame parentFrame;
 	private MessagePanel msgPanel;
+	private PromptPanel promptPanel;
 	private PickReleasePanel pickVersionPanel;
 
 	public DistMakerEngine(JFrame aParentFrame, URL aUpdateUrl)
@@ -39,6 +41,8 @@ public class DistMakerEngine
 		parentFrame = aParentFrame;
 		msgPanel = new MessagePanel(parentFrame);
 		msgPanel.setSize(375, 180);
+		promptPanel = new PromptPanel(parentFrame);
+		promptPanel.setSize(300, 150);
 
 		initialize();
 	}
@@ -63,11 +67,11 @@ public class DistMakerEngine
 		}
 		appName = currRelease.getName();
 
-		// Determine the destination where to drop the release
+		// Determine the installation path and ensure the entire tree is writable
 		installPath = DistUtils.getAppPath().getParentFile();
-		if (installPath.setWritable(true) == false)
+		if (DistUtils.isFullyWriteable(installPath) == false)
 		{
-			infoMsg = "The install path, " + installPath + ", is not writable.\n";
+			infoMsg = "The install tree, " + installPath + ", is not completely writable.\n";
 			infoMsg += "Please run as the proper user or ensure you are running via writeable media.";
 			displayNotice(infoMsg);
 			return;
@@ -198,11 +202,11 @@ public class DistMakerEngine
 	 * This method will be called via reflection.
 	 */
 	@SuppressWarnings("unused")
-	private void checkForUpdatesWorker(Task aTask)
+	private void checkForUpdatesWorker(final Task aTask)
 	{
-		List<Release> fullList;
+		final List<Release> fullList;
 		Release chosenItem;
-		File installPath, destPath;
+		final File installPath, destPath;
 		String appName;
 		boolean isPass;
 
@@ -225,7 +229,6 @@ public class DistMakerEngine
 
 		// Prompt the user for the Release
 		aTask.infoAppendln("Please select the release to install...");
-		pickVersionPanel.setConfiguration(fullList);
 		try
 		{
 			SwingUtilities.invokeAndWait(new Runnable()
@@ -233,6 +236,23 @@ public class DistMakerEngine
 				@Override
 				public void run()
 				{
+					// Query the user, if the wish to destroy the old update
+					if (destPath.isDirectory() == true)
+					{
+						promptPanel.setTitle("Overwrite recent update?");
+						promptPanel.setInfo("An update has already been downloaded... If you proceed this update will be removed. Proceed?");
+						promptPanel.setVisibleAsModal();
+						if (promptPanel.isAccepted() == false)
+						{
+							aTask.abort();
+							return;
+						}
+
+						IoUtil.deleteDirectory(destPath);
+					}
+
+					// Query the user of the version to update to
+					pickVersionPanel.setConfiguration(fullList);
 					pickVersionPanel.setVisibleAsModal();
 				}
 			});
@@ -359,7 +379,7 @@ public class DistMakerEngine
 			return;
 		}
 		// Update passed
-		else if (DistUtils.getUpdateCode() == 1)
+		else if (updateCode == 1)
 		{
 			msg = "The application, " + currRelease.getName() + ", has been updated to ";
 			msg += "version: " + currRelease.getVersion();
