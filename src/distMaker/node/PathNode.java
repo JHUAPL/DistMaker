@@ -8,8 +8,8 @@ import java.net.URL;
 
 public class PathNode implements Node
 {
-	private URL rootUrl;
-	private String fileName;
+	protected URL rootUrl;
+	protected String fileName;
 
 	public PathNode(URL aRootUrl, String aFileName)
 	{

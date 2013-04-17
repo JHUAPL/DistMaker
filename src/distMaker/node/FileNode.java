@@ -11,10 +11,10 @@ import distMaker.DistUtils;
 
 public class FileNode implements Node
 {
-	private URL rootUrl;
-	private String md5sum;
-	private String fileName;
-	private long fileLen;
+	protected URL rootUrl;
+	protected String md5sum;
+	protected String fileName;
+	protected long fileLen;
 
 	public FileNode(URL aRootUrl, String aFileName, String aMd5sum, long aFileLen)
 	{

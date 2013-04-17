@@ -7,6 +7,7 @@ import glum.reflect.ReflectUtil;
 import glum.task.ConsoleTask;
 import glum.task.Task;
 import glum.unit.DateUnit;
+import glum.util.ThreadUtil;
 
 import java.io.*;
 import java.net.*;
@@ -231,92 +232,6 @@ public class DistUtils
 	}
 
 	/**
-	 * Returns the list of files (relative to destPath) that are needed for the specified release.
-	 */
-	public static Map<String, Node> readCatalog(Task aTask, URL aUpdateUrl, Credential aCredential)
-	{
-		Map<String, Node> retMap;
-		URL md5sumUrl;
-		URLConnection connection;
-		InputStream inStream;
-		BufferedReader bufReader;
-		String errMsg;
-
-		errMsg = null;
-		retMap = Maps.newLinkedHashMap();
-		md5sumUrl = IoUtil.createURL(aUpdateUrl.toString() + "/catalog.txt");
-
-		connection = null;
-		inStream = null;
-		bufReader = null;
-		try
-		{
-			String[] tokens;
-			String strLine, filename, md5sum;
-			long fileLen;
-
-			// Read the contents of the file
-			connection = md5sumUrl.openConnection();
-			inStream = NetUtil.getInputStream(connection, aCredential);
-			bufReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(inStream)));
-
-			// Read the lines
-			while (true)
-			{
-				strLine = bufReader.readLine();
-
-				// Bail once we are done
-				if (strLine == null)
-					break;
-
-				tokens = strLine.split(",", 4);
-				if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
-					; // Nothing to do
-				else if (tokens.length == 2 && tokens[0].equals("P") == true)
-				{
-					filename = tokens[1];
-					retMap.put(filename, new PathNode(aUpdateUrl, filename));
-				}
-				else if (tokens.length == 4 && tokens[0].equals("F") == true)
-				{
-					md5sum = tokens[1];
-					fileLen = GuiUtil.readLong(tokens[2], -1);
-					filename = tokens[3];
-					retMap.put(filename, new FileNode(aUpdateUrl, filename, md5sum, fileLen));
-				}
-				else
-				{
-					aTask.infoAppendln("Unreconized line: " + strLine);
-				}
-			}
-		}
-		catch (IOException aExp)
-		{
-			errMsg = getErrorCodeMessage(aUpdateUrl, connection, aExp, "md5sum.txt");
-		}
-		finally
-		{
-			IoUtil.forceClose(inStream);
-			IoUtil.forceClose(bufReader);
-		}
-
-		// See if we are in a valid state
-		if (errMsg != null)
-			; // Nothing to do, as an earlier error has occured
-		else if (retMap.size() == 0)
-			errMsg = "The md5sum URL appears to be invalid.";
-
-		// Bail if there were issues
-		if (errMsg != null)
-		{
-			aTask.infoAppendln(errMsg);
-			return null;
-		}
-
-		return retMap;
-	}
-
-	/**
 	 * Helper method that converts an IOException to an understandable message
 	 * 
 	 * @param remoteFileName
@@ -381,6 +296,87 @@ public class DistUtils
 		}
 
 		return true;
+	}
+
+	/**
+	 * Returns a map of Nodes which describe the full content of an update specified in <aUpdateUrl>/catalog.txt
+	 */
+	public static Map<String, Node> readCatalog(Task aTask, File catalogFile, URL aUpdateUrl)
+	{
+		Map<String, Node> retMap;
+		InputStream inStream;
+		BufferedReader bufReader;
+		String errMsg;
+
+		errMsg = null;
+		retMap = Maps.newLinkedHashMap();
+
+		inStream = null;
+		bufReader = null;
+		try
+		{
+			String[] tokens;
+			String strLine, filename, md5sum;
+			long fileLen;
+
+			// Read the contents of the file
+			inStream = new FileInputStream(catalogFile);
+			bufReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(inStream)));
+
+			// Read the lines
+			while (true)
+			{
+				strLine = bufReader.readLine();
+
+				// Bail once we are done
+				if (strLine == null)
+					break;
+
+				tokens = strLine.split(",", 4);
+				if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
+					; // Nothing to do
+				else if (tokens.length == 2 && tokens[0].equals("P") == true)
+				{
+					filename = tokens[1];
+					retMap.put(filename, new PathNode(aUpdateUrl, filename));
+				}
+				else if (tokens.length == 4 && tokens[0].equals("F") == true)
+				{
+					md5sum = tokens[1];
+					fileLen = GuiUtil.readLong(tokens[2], -1);
+					filename = tokens[3];
+					retMap.put(filename, new FileNode(aUpdateUrl, filename, md5sum, fileLen));
+				}
+				else
+				{
+					aTask.infoAppendln("Unreconized line: " + strLine);
+				}
+			}
+		}
+		catch (IOException aExp)
+		{
+			errMsg = ThreadUtil.getStackTrace(aExp);
+		}
+		finally
+		{
+			IoUtil.forceClose(inStream);
+			IoUtil.forceClose(bufReader);
+		}
+
+		// See if we are in a valid state
+		if (errMsg != null)
+			; // Nothing to do, as an earlier error has occurred
+		else if (retMap.size() == 0)
+			errMsg = "The catalog appears to be invalid.";
+
+		// Bail if there were issues
+		if (errMsg != null)
+		{
+			aTask.infoAppendln(errMsg);
+			return null;
+		}
+
+		return retMap;
 	}
 
 }

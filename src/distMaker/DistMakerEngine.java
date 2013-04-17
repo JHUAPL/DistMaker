@@ -19,6 +19,7 @@ import java.util.Map;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
+import distMaker.apple.PropFileUtil;
 import distMaker.gui.PickReleasePanel;
 import distMaker.node.Node;
 
@@ -43,9 +44,9 @@ public class DistMakerEngine
 
 		parentFrame = aParentFrame;
 		msgPanel = new MessagePanel(parentFrame);
-		msgPanel.setSize(375, 180);
+		msgPanel.setSize(450, 250);
 		promptPanel = new PromptPanel(parentFrame);
-		promptPanel.setSize(300, 150);
+		promptPanel.setSize(350, 150);
 
 		initialize();
 	}
@@ -83,7 +84,8 @@ public class DistMakerEngine
 		// Setup our TaskPanel
 		taskPanel = new FullTaskPanel(parentFrame, true, false);
 		taskPanel.setTitle(appName + ": Checking for updates...");
-		taskPanel.setSize(640, taskPanel.getPreferredSize().height);
+//		taskPanel.setSize(680, taskPanel.getPreferredSize().height);
+		taskPanel.setSize(680, 400);
 		taskPanel.setTabSize(2);
 		taskPanel.setVisible(true);
 
@@ -197,6 +199,7 @@ public class DistMakerEngine
 
 		// Form the PickReleasePanel
 		pickVersionPanel = new PickReleasePanel(parentFrame, currRelease);
+		pickVersionPanel.setSize(320, 350);
 	}
 
 	/**
@@ -313,9 +316,10 @@ public class DistMakerEngine
 	 */
 	private boolean downloadRelease(Task aTask, Release aRelease, File destPath)
 	{
-		Map<String, Node> currMap, updateMap;
-		URL staleUrl, updateUrl;
+		Map<String, Node> staleMap, updateMap;
 		Node staleNode, updateNode;
+		URL catUrl, staleUrl, updateUrl;
+		File catalogFile;
 		boolean isPass;
 
 		try
@@ -329,14 +333,22 @@ public class DistMakerEngine
 			aExp.printStackTrace();
 			return false;
 		}
-
+		
+		// Download the update catalog to the (local) delta location
+		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
+		catalogFile = new File(destPath, "catalog.txt");
+		if (DistUtils.downloadFile(aTask, catUrl, catalogFile, refCredential) == false)
+			return false;
+		
 		// Load the map of stale nodes
-		currMap = DistUtils.readCatalog(aTask, staleUrl, null);
-		if (currMap == null)
+		catalogFile = new File(DistUtils.getAppPath(), "catalog.txt");
+		staleMap = DistUtils.readCatalog(aTask, catalogFile, staleUrl);
+		if (staleMap == null)
 			return false;
 
 		// Load the map of update nodes
-		updateMap = DistUtils.readCatalog(aTask, updateUrl, refCredential);
+		catalogFile = new File(destPath, "catalog.txt");
+		updateMap = DistUtils.readCatalog(aTask, catalogFile, updateUrl);
 		if (updateMap == null)
 			return false;
 
@@ -349,7 +361,7 @@ public class DistMakerEngine
 				return false;
 
 			updateNode = updateMap.get(aFileName);
-			staleNode = currMap.get(aFileName);
+			staleNode = staleMap.get(aFileName);
 
 			// Attempt to use the local copy
 			isPass = false;
@@ -360,7 +372,7 @@ public class DistMakerEngine
 					aTask.infoAppendln("\t(L) " + staleNode.getFileName());
 			}
 
-			// Use the remote update copy
+			// Use the remote update copy, if we were not able to use a local stale copy
 			if (isPass == false)
 			{
 				isPass = updateNode.transferContentTo(aTask, refCredential, destPath);
@@ -378,6 +390,39 @@ public class DistMakerEngine
 				return false;
 			}
 		}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		// Update the Info.plist file (Apple specific)
+		File pFile;
+		String errMsg;
+		pFile = new File(destPath.getParentFile(), "Info.plist");
+		if (pFile.isFile() == true)
+		{
+			errMsg = null;
+			if (pFile.setWritable(true) == false)
+				errMsg = "Failure. No writable permmisions for file: " + pFile;
+			else if (PropFileUtil.updateVersion(pFile, aRelease.getVersion()) == false)
+				errMsg = "Failure. Failed to update file: " + pFile;
+			
+			if (errMsg != null)
+			{
+				aTask.infoAppendln(errMsg);
+				return false;
+			}
+		}
+		
+		
+		
+		
+		
+		
 
 		return true;
 	}

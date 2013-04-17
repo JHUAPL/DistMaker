@@ -48,7 +48,7 @@ def buildRelease(args, buildPath):
 		subprocess.call(cmd, stderr=subprocess.STDOUT)
 	
 		# Perform cleanup: Remove the tmp folder
-		shutil.rmtree(tmpPath)
+#		shutil.rmtree(tmpPath)
 	
 	
 	
