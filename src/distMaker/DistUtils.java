@@ -1,5 +1,6 @@
 package distMaker;
 
+import glum.gui.GuiUtil;
 import glum.io.IoUtil;
 import glum.net.*;
 import glum.reflect.ReflectUtil;
@@ -10,8 +11,12 @@ import glum.unit.DateUnit;
 import java.io.*;
 import java.net.*;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
+import distMaker.node.*;
 
 public class DistUtils
 {
@@ -228,9 +233,9 @@ public class DistUtils
 	/**
 	 * Returns the list of files (relative to destPath) that are needed for the specified release.
 	 */
-	public static List<File> getFileListForRelease(Task aTask, URL aUpdateUrl, Release aRelease, File destPath, Credential aCredential)
+	public static Map<String, Node> readCatalog(Task aTask, URL aUpdateUrl, Credential aCredential)
 	{
-		List<File> fullList;
+		Map<String, Node> retMap;
 		URL md5sumUrl;
 		URLConnection connection;
 		InputStream inStream;
@@ -238,8 +243,8 @@ public class DistUtils
 		String errMsg;
 
 		errMsg = null;
-		fullList = Lists.newArrayList();
-		md5sumUrl = IoUtil.createURL(aUpdateUrl.toString() + "/" + aRelease.getName() + "/" + aRelease.getVersion() + "/delta/md5sum.txt");
+		retMap = Maps.newLinkedHashMap();
+		md5sumUrl = IoUtil.createURL(aUpdateUrl.toString() + "/catalog.txt");
 
 		connection = null;
 		inStream = null;
@@ -247,7 +252,8 @@ public class DistUtils
 		try
 		{
 			String[] tokens;
-			String strLine, filename;
+			String strLine, filename, md5sum;
+			long fileLen;
 
 			// Read the contents of the file
 			connection = md5sumUrl.openConnection();
@@ -263,16 +269,24 @@ public class DistUtils
 				if (strLine == null)
 					break;
 
-				tokens = strLine.split("\\s+");
+				tokens = strLine.split(",", 4);
 				if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
 					; // Nothing to do
-				else if (tokens.length != 2)
-					aTask.infoAppendln("Unreconized line: " + strLine);
-				else
-				// if (tokens.length == 2)
+				else if (tokens.length == 2 && tokens[0].equals("P") == true)
 				{
 					filename = tokens[1];
-					fullList.add(new File(destPath, filename));
+					retMap.put(filename, new PathNode(aUpdateUrl, filename));
+				}
+				else if (tokens.length == 4 && tokens[0].equals("F") == true)
+				{
+					md5sum = tokens[1];
+					fileLen = GuiUtil.readLong(tokens[2], -1);
+					filename = tokens[3];
+					retMap.put(filename, new FileNode(aUpdateUrl, filename, md5sum, fileLen));
+				}
+				else
+				{
+					aTask.infoAppendln("Unreconized line: " + strLine);
 				}
 			}
 		}
@@ -289,7 +303,7 @@ public class DistUtils
 		// See if we are in a valid state
 		if (errMsg != null)
 			; // Nothing to do, as an earlier error has occured
-		else if (fullList.size() == 0)
+		else if (retMap.size() == 0)
 			errMsg = "The md5sum URL appears to be invalid.";
 
 		// Bail if there were issues
@@ -299,7 +313,7 @@ public class DistUtils
 			return null;
 		}
 
-		return fullList;
+		return retMap;
 	}
 
 	/**

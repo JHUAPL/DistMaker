@@ -38,15 +38,68 @@ class FancyArgumentParser(argparse.ArgumentParser):
 #			yield arg
 
 
+def buildCatalogFile(deltaPath):
+
+	# Build the delta md5sum catalog
+	records = []
+
+	snipLen = len(deltaPath) + 1
+#	for root, dirNames, fileNames in os.walk(deltaPath, onerror=failTracker.recordError):
+	for root, dirNames, fileNames in os.walk(deltaPath):
+
+		# Presort the results alphabetically
+		dirNames.sort()
+		fileNames.sort()
+
+		# Form the record for the current directory (PathNode)
+		fullPath = root
+		relPath = fullPath[snipLen:]
+		if len(relPath) > 0:
+			record = ('P', relPath)
+			records.append(record)
+
+		# Since we do not visit symbolic links, notify the user of all directories that are symbolic
+		for dirName in dirNames:
+			fullPath = os.path.join(root, dirName)
+			if os.path.islink(fullPath) == True:
+				print("Path links are not supported... Skipping: " + fullPath + "\n")
+
+		# Record all of the file nodes
+		for fileName in fileNames:
+			fullPath = os.path.join(root, fileName)
+			if os.path.islink(fullPath) == True:
+				print("File links are not supported... Skipping: " + fullPath + "\n")
+			elif os.path.isfile(fullPath) == True:
+				# Gather the various stats of the specified file
+				stat = os.stat(fullPath)
+				md5sum = miscUtils.computeMd5ForFile(fullPath)
+				relPath = fullPath[snipLen:]
+				record = ('F', md5sum, str(stat.st_size), relPath)
+				records.append(record)
+			else:
+				print("Undefined node. Full path: " + fullPath + "\n")
+
+
+	# Save the records to the catalog file
+	dstPath = os.path.join(deltaPath, "catalog.txt")
+	f = open(dstPath, 'wb')
+	for aRecord in records:
+		if len(aRecord) == 2:
+			f.write(aRecord[0] + ',' + aRecord[1] + '\n')
+		else:
+			f.write(aRecord[0] + ',' + aRecord[1] + ',' + aRecord[2] + ',' + aRecord[3] + '\n')
+	f.close()
+
+
 def getClassPath(javaCodePath):
 	retList = []
-	
+
 	# Ensure the javaCodePath has a trailing slash
 	# to allow for proper computation of clipLen 
 	if javaCodePath.endswith('/') == False:
 		javaCodePath += '/'
 	clipLen = len(javaCodePath)
-	
+
 	# Form the default list of all jar files
 	for path, dirs, files in os.walk(javaCodePath):
 		for file in files:
@@ -55,7 +108,7 @@ def getClassPath(javaCodePath):
 				filePath = filePath[clipLen:]
 				retList.append(filePath)
 #				print('Found jar file at: ' + filePath)
-				
+
 	return retList
 
 
@@ -65,7 +118,7 @@ if __name__ == "__main__":
 
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, miscUtils.handleSignal)
-	
+
 	# Set up the argument parser	
 	parser = FancyArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@')
 	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
@@ -77,8 +130,9 @@ if __name__ == "__main__":
 	parser.add_argument('-javaCode', '-jc', help='A folder which contains the Java build.')
 	parser.add_argument('-jvmArgs', help='JVM arguments.', nargs='+', default=[])
 	parser.add_argument('-classPath', help='Class path listing of jar files relative to javaCode. Leave blank for auto determination.', nargs='+', default=[])
+	parser.add_argument('-debug', help='Turn on debug options for built applications.', action='store_true', default=False)
 	parser.add_argument('-company', help='Company / Provider info.')
-	parser.add_argument('-bgFile',  help='Background file used for apple dmg file.')
+	parser.add_argument('-bgFile', help='Background file used for apple dmg file.')
 	parser.add_argument('-iconFile', help='PNG file used for linux/windows icon.')
 	parser.add_argument('-icnsFile', help='Icon file used for apple build.')
 	parser.add_argument('-forceSingleInstance', help='Force the application to have only one instance..', default=False)
@@ -91,24 +145,24 @@ if __name__ == "__main__":
 			exit()
 
 	# Parse the args		
-	parser.formatter_class.max_help_position = 50	
+	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
 #	print args
-	
+
 	# Ensure we are getting the bare minimum options
 	if args.name == None:
 		print('At a minimum the application name must be specified. Exiting...')
 		exit();
-		
+
 	# Ensure java options are specified properly
 	if (args.javaCode == None and args.mainClass != None) or (args.javaCode != None and args.mainClass == None):
 		print('Both javaCode and mainClass must be specified, if either are specified. Exiting...')
 		exit();
-	
+
 	# Form the classPath if none specified
 	if args.javaCode != None and len(args.classPath) == 0:
 		args.classPath = getClassPath(args.javaCode)
-		
+
 	# Clean up the jvmArgs to replace the escape sequence '\-' to '-'
 	# and to ensure that all the args start with the '-' character
 	newJvmArgs = []
@@ -122,62 +176,52 @@ if __name__ == "__main__":
 			newJvmArgs.append(aJvmArg)
 	args.jvmArgs = newJvmArgs
 
-		
+
 	# Bail if the release has already been built
 	buildPath = os.path.abspath(args.name + '-' + args.version)
 	if (os.path.exists(buildPath) == True):
 		print('   [ERROR] The release appears to be built. Path: ' + buildPath)
 		exit(-1)
-	
+
 	# Form the buildPath
 	os.makedirs(buildPath)
-	
+
 	# Build the Delta (diffs) contents
-	deltaCodePath = os.path.join(buildPath, "delta/code")
-	deltaDataPath = os.path.join(buildPath, "delta/data")
-	
+	deltaPath = os.path.join(buildPath, "delta")
+	deltaCodePath = os.path.join(deltaPath, "code")
+	deltaDataPath = os.path.join(deltaPath, "data")
+
 	# Copy the dataCode to the delta location
 	os.makedirs(deltaDataPath)
 	for aPath in args.dataCode:
 		srcPath = aPath
 		dstPath = os.path.join(deltaDataPath, os.path.basename(aPath))
-		shutil.copytree(srcPath, dstPath, symlinks=True)
-		
+		shutil.copytree(srcPath, dstPath, symlinks=False)
+
 	# Build the java component of the distribution
 	if args.javaCode != None:
 		# Copy the javaCode to the proper location
 		srcPath = args.javaCode
 		dstPath = deltaCodePath;
-#		dstPath = os.path.join(deltaCodePath, 'java')
-		shutil.copytree(srcPath, dstPath, symlinks=True)
-		
+		shutil.copytree(srcPath, dstPath, symlinks=False)
+
 	# Form the app.cfg file	
 	dstPath = os.path.join(buildPath, "delta/app.cfg")
 	miscUtils.buildAppLauncherConfig(dstPath, args)
-	
+
 	# Build the delta md5sum catalog
-	# Use extreme caution when editing the line below since we have enabled the shell!!!
-	# Currently there is no external (uncleansed) input in the command, and be sure to not introduce it!
-#	dstPath = os.path.join(buildPath, "delta/md5sum.txt")
-#	buildCatalog.buildCatalog(destPath)
-	dstPath = os.path.join(buildPath, "delta")
-	subprocess.check_call("find * -name '*' -type f -print0 | sort -d -z | xargs -0 md5sum > ../md5sum.txt", cwd=dstPath, shell=True)
-	
-	# Move the md5sum catalog into the delta folder
-	srcPath = os.path.join(buildPath, "md5sum.txt")
-	dstPath = os.path.join(buildPath, "delta/md5sum.txt")
-	os.rename(srcPath, dstPath)
-		
+	buildCatalogFile(deltaPath)
+
 	# Build the Apple release	
 	appleUtils.buildRelease(args, buildPath)
-	
+
 	# Build the Linux release
 	linuxUtils.buildRelease(args, buildPath)
-	
+
 	# Build the Windows release
 	windowsUtils.buildRelease(args, buildPath)
-	
+
 	# Copy over the deploy script
 	srcPath = os.path.join(miscUtils.getInstallRoot(), "deployDist.py")
 	shutil.copy(srcPath, buildPath)
-	
+

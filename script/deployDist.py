@@ -99,7 +99,7 @@ if __name__ == "__main__":
 	# Set up the argument parser	
 	parser = argparse.ArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@')
 	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
-	parser.add_argument('rootLoc', help='Root location to deploy the specified distribution.')
+	parser.add_argument('deployRoot', help='Root location to deploy the specified distribution.')
 	parser.add_argument('distLoc', nargs='?', default=scriptPath, help='The location of the distribution to deploy.')
 
 	# Intercept any request for a  help message and bail
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	
 	distPath = args.distLoc
-	rootPath = args.rootLoc
+	rootPath = args.deployRoot
 
 	# Retrieve the distPath and ensure that it exists 
 	if os.path.isdir(distPath) == False:
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 	# Check to see if the deployed location already exists
 	installPath = os.path.join(rootPath, appName)
 	if os.path.isdir(installPath) == False:
-		print('Application ' + appName + ' has never been deployed to the root location: ' + args.rootLoc)
+		print('Application ' + appName + ' has never been deployed to the root location: ' + args.deployRoot)
 		print('Create a new release of the application at the specified location?')
 		input = raw_input('--> ').upper()
 		if input != 'Y' and input != 'YES':

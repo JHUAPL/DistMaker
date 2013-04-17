@@ -107,8 +107,10 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	f = open(destFile, 'wb')
 
 	writeln(f, 0, "<launch4jConfig>")
-	writeln(f, 1, "<headerType>gui</headerType>");
-#	writeln(f, 1, "<headerType>console</headerType>");
+	if args.debug == True:
+		writeln(f, 1, "<headerType>console</headerType>");
+	else:
+		writeln(f, 1, "<headerType>gui</headerType>");
 	writeln(f, 1, "<outfile>" + args.name + ".exe</outfile>");
 	writeln(f, 1, "<dontWrapJar>true</dontWrapJar>");
 	writeln(f, 1, "<errTitle>" + args.name + "</errTitle>");

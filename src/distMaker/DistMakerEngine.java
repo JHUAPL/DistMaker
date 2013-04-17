@@ -11,18 +11,21 @@ import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
 
 import java.io.*;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
 import distMaker.gui.PickReleasePanel;
+import distMaker.node.Node;
 
 public class DistMakerEngine
 {
 	// State vars
-	private URL updateUrl;
+	private URL updateSiteUrl;
 	private Release currRelease;
 	private Credential refCredential;
 
@@ -32,9 +35,9 @@ public class DistMakerEngine
 	private PromptPanel promptPanel;
 	private PickReleasePanel pickVersionPanel;
 
-	public DistMakerEngine(JFrame aParentFrame, URL aUpdateUrl)
+	public DistMakerEngine(JFrame aParentFrame, URL aUpdateSiteUrl)
 	{
-		updateUrl = aUpdateUrl;
+		updateSiteUrl = aUpdateSiteUrl;
 		currRelease = null;
 		refCredential = null;
 
@@ -206,13 +209,13 @@ public class DistMakerEngine
 	{
 		final List<Release> fullList;
 		Release chosenItem;
-		final File installPath, destPath;
+		final File installPath, deltaPath;
 		String appName;
 		boolean isPass;
 
 		// Determine the path to download updates
 		installPath = DistUtils.getAppPath().getParentFile();
-		destPath = new File(installPath, "delta");
+		deltaPath = new File(installPath, "delta");
 
 		// Status info
 		appName = currRelease.getName();
@@ -220,7 +223,7 @@ public class DistMakerEngine
 
 		// Retrieve the list of available releases
 		aTask.infoAppendln("Checking for updates...\n");
-		fullList = DistUtils.getAvailableReleases(aTask, updateUrl, appName, refCredential);
+		fullList = DistUtils.getAvailableReleases(aTask, updateSiteUrl, appName, refCredential);
 		if (fullList == null)
 		{
 			aTask.abort();
@@ -237,7 +240,7 @@ public class DistMakerEngine
 				public void run()
 				{
 					// Query the user, if the wish to destroy the old update
-					if (destPath.isDirectory() == true)
+					if (deltaPath.isDirectory() == true)
 					{
 						promptPanel.setTitle("Overwrite recent update?");
 						promptPanel.setInfo("An update has already been downloaded... If you proceed this update will be removed. Proceed?");
@@ -248,7 +251,7 @@ public class DistMakerEngine
 							return;
 						}
 
-						IoUtil.deleteDirectory(destPath);
+						IoUtil.deleteDirectory(deltaPath);
 					}
 
 					// Query the user of the version to update to
@@ -277,11 +280,21 @@ public class DistMakerEngine
 		else
 			aTask.infoAppendln("\t" + appName + " will be reverted...");
 
-		// Download the release
-		isPass = downloadRelease(aTask, chosenItem, destPath);
+		// Form the destination path
+		isPass = deltaPath.mkdirs();
 		if (isPass == false || aTask.isActive() == false)
 		{
-			IoUtil.deleteDirectory(destPath);
+			aTask.infoAppendln("Failed to create delta path: " + deltaPath);
+			aTask.infoAppendln("Application update aborted.");
+			aTask.abort();
+			return;
+		}
+
+		// Download the release
+		isPass = downloadRelease(aTask, chosenItem, deltaPath);
+		if (isPass == false || aTask.isActive() == false)
+		{
+			IoUtil.deleteDirectory(deltaPath);
 			aTask.infoAppendln("Application update aborted.");
 			aTask.abort();
 			return;
@@ -300,42 +313,68 @@ public class DistMakerEngine
 	 */
 	private boolean downloadRelease(Task aTask, Release aRelease, File destPath)
 	{
-		List<File> fileList;
-		String baseUrlStr, srcUrlStr;
-		URL srcUrl;
-		int clipLen;
+		Map<String, Node> currMap, updateMap;
+		URL staleUrl, updateUrl;
+		Node staleNode, updateNode;
 		boolean isPass;
 
-		// Retrieve the list of files to download
-		fileList = DistUtils.getFileListForRelease(aTask, updateUrl, aRelease, destPath, refCredential);
-		if (fileList == null)
+		try
+		{
+			staleUrl = DistUtils.getAppPath().toURI().toURL();
+			updateUrl = IoUtil.createURL(updateSiteUrl.toString() + "/" + aRelease.getName() + "/" + aRelease.getVersion() + "/delta");
+		}
+		catch (MalformedURLException aExp)
+		{
+			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
+			aExp.printStackTrace();
+			return false;
+		}
+
+		// Load the map of stale nodes
+		currMap = DistUtils.readCatalog(aTask, staleUrl, null);
+		if (currMap == null)
 			return false;
 
-		// Compute some baseline vars
-		baseUrlStr = updateUrl.toString() + "/" + aRelease.getName() + "/" + aRelease.getVersion() + "/" + "delta/";
-		clipLen = destPath.getAbsolutePath().length() + 1;
+		// Load the map of update nodes
+		updateMap = DistUtils.readCatalog(aTask, updateUrl, refCredential);
+		if (updateMap == null)
+			return false;
 
 		// Download the individual files
-		aTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Files: " + fileList.size());
-		for (File aFile : fileList)
+		aTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Nodes: " + updateMap.size());
+		for (String aFileName : updateMap.keySet())
 		{
 			// Bail if we have been aborted
 			if (aTask.isActive() == false)
 				return false;
 
-			srcUrlStr = baseUrlStr + aFile.getAbsolutePath().substring(clipLen);
-			srcUrl = IoUtil.createURL(srcUrlStr);
+			updateNode = updateMap.get(aFileName);
+			staleNode = currMap.get(aFileName);
 
-//			aTask.infoAppendln("\t" + srcUrlStr + " -> " + aFile);
-			aTask.infoAppendln("\t(U) " + aFile);
-			aFile.getParentFile().mkdirs();
-			isPass = DistUtils.downloadFile(aTask, srcUrl, aFile, refCredential);
+			// Attempt to use the local copy
+			isPass = false;
+			if (staleNode != null && updateNode.areContentsEqual(staleNode) == true)
+			{
+				isPass = staleNode.transferContentTo(aTask, refCredential, destPath);
+				if (isPass == true)
+					aTask.infoAppendln("\t(L) " + staleNode.getFileName());
+			}
+
+			// Use the remote update copy
 			if (isPass == false)
 			{
-				aFile.delete();
-				aTask.infoAppendln("Failed to download resource: " + srcUrl);
-				aTask.infoAppendln("\tSource: " + srcUrlStr);
-				aTask.infoAppendln("\tDest: " + aFile);
+				isPass = updateNode.transferContentTo(aTask, refCredential, destPath);
+				if (isPass == true)
+					aTask.infoAppendln("\t(R) " + updateNode.getFileName());
+			}
+
+			// Log the failure and bail
+			if (isPass == false)
+			{
+				aTask.infoAppendln("Failed to download from update site.");
+				aTask.infoAppendln("\tSite: " + updateUrl);
+				aTask.infoAppendln("\tFile: " + updateNode.getFileName());
+				aTask.infoAppendln("\tDest: " + destPath);
 				return false;
 			}
 		}

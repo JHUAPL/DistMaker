@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import hashlib
 import os
 import time
 import sys
@@ -112,3 +113,16 @@ def buildAppLauncherConfig(destFile, args):
 	f.write('\n')
 
 	f.close()
+
+
+# Source: http://stackoverflow.com/questions/1131220/get-md5-hash-of-a-files-without-open-it-in-python
+def computeMd5ForFile(evalFile, block_size=2**20):
+	f = open(evalFile, 'rb')
+	md5 = hashlib.md5()
+	while True:
+		data = f.read(block_size)
+		if not data:
+			break
+		md5.update(data)
+	f.close()
+	return md5.hexdigest()
