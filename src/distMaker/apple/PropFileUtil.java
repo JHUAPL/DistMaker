@@ -2,15 +2,16 @@ package distMaker.apple;
 
 import glum.io.IoUtil;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
 
-import javax.xml.parsers.*;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.*;
-import org.xml.sax.SAXException;
 
 /**
  * Utility class which contains a set of methods to interact with an Apple Info.plist file.
@@ -64,20 +65,9 @@ public class PropFileUtil
 
 			return true;
 		}
-		catch (ParserConfigurationException aExp)
+		catch (Exception aExp)
 		{
 			aExp.printStackTrace();
-//			System.out.println(aExp);
-		}
-		catch (SAXException aExp)
-		{
-			aExp.printStackTrace();
-//			System.out.println(aExp);
-		}
-		catch (IOException aExp)
-		{
-			aExp.printStackTrace();
-//			System.err.println(aExp);
 		}
 
 		return false;
@@ -103,25 +93,19 @@ public class PropFileUtil
 			// Serialize the Document
 			oStream = new FileOutputStream(aFile);
 			tr.transform(new DOMSource(aDoc), new StreamResult(oStream));
+
+			return true;
 		}
-		catch (TransformerException aExp)
+		catch (Exception aExp)
 		{
 			aExp.printStackTrace();
-//			System.out.println(aExp);
-			return false;
-		}
-		catch (IOException aExp)
-		{
-			aExp.printStackTrace();
-//			System.out.println(aExp);
-			return false;
 		}
 		finally
 		{
 			IoUtil.forceClose(oStream);
 		}
 
-		return true;
+		return false;
 	}
 
 }

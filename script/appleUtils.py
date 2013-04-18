@@ -42,13 +42,12 @@ def buildRelease(args, buildPath):
 		
 		# Create the DMG image via genisoimage
 		dmgFile = os.path.join(buildPath, distName + '.dmg')
-#		genisoimage -o Echo.6.dmg -V Echo -max-iso9660-filenames -hfs-unlock      -uid 501 -guid 80  -r  -apple  ../test/tmp8eGdme/
 #		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
 		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
 		subprocess.call(cmd, stderr=subprocess.STDOUT)
 	
 		# Perform cleanup: Remove the tmp folder
-#		shutil.rmtree(tmpPath)
+		shutil.rmtree(tmpPath)
 	
 	
 	
@@ -272,7 +271,7 @@ def buildPListInfoShared(destFile, args):
 
 	f = open(destFile, 'wb')
 	writeln(f, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
-	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
+#	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
 	writeln(f, 0, '<plist version="1.0">')
 	writeln(f, 1, '<dict>')
 	
@@ -333,7 +332,7 @@ def buildPListInfoStatic(destFile, args):
 		
 	f = open(destFile, 'wb')
 	writeln(f, 0, '<?xml version="1.0" ?>')
-	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
+#	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
 	writeln(f, 0, '<plist version="1.0">')
 	writeln(f, 1, '<dict>')
 	
@@ -365,9 +364,13 @@ def buildPListInfoStatic(destFile, args):
 	writeln(f, 3, '<array>')
 	for aStr in args.jvmArgs:
 		writeln(f, 4, '<string>' + aStr + '</string>')
+#	if icnsStr != None:
+#		writeln(f, 4, '<string>-Xdock:icon=Contents/Resources/' + icnsStr + '</string>')
 	writeln(f, 4, '<string>-Dapple.laf.useScreenMenuBar=true</string>')
 	writeln(f, 4, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
 	writeln(f, 4, '<string>-Dcom.apple.macos.useScreenMenuBar=true</string>')
+	writeln(f, 4, '<string>-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name + '</string>')
+	writeln(f, 4, '<string>-Dapple.awt.application.name=' + args.name + '</string>')
 	writeln(f, 4, '<string>-Djava.system.class.loader=appLauncher.RootClassLoader</string>')
 	writeln(f, 3, '</array>')
 	

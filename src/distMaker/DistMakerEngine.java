@@ -46,7 +46,7 @@ public class DistMakerEngine
 		msgPanel = new MessagePanel(parentFrame);
 		msgPanel.setSize(450, 250);
 		promptPanel = new PromptPanel(parentFrame);
-		promptPanel.setSize(350, 150);
+		promptPanel.setSize(400, 200);
 
 		initialize();
 	}
@@ -208,11 +208,11 @@ public class DistMakerEngine
 	 * This method will be called via reflection.
 	 */
 	@SuppressWarnings("unused")
-	private void checkForUpdatesWorker(final Task aTask)
+	private void checkForUpdatesWorker(Task aTask)
 	{
-		final List<Release> fullList;
+		List<Release> fullList;
 		Release chosenItem;
-		final File installPath, deltaPath;
+		File installPath, deltaPath;
 		String appName;
 		boolean isPass;
 
@@ -237,44 +237,24 @@ public class DistMakerEngine
 		aTask.infoAppendln("Please select the release to install...");
 		try
 		{
-			SwingUtilities.invokeAndWait(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					// Query the user, if the wish to destroy the old update
-					if (deltaPath.isDirectory() == true)
-					{
-						promptPanel.setTitle("Overwrite recent update?");
-						promptPanel.setInfo("An update has already been downloaded... If you proceed this update will be removed. Proceed?");
-						promptPanel.setVisibleAsModal();
-						if (promptPanel.isAccepted() == false)
-						{
-							aTask.abort();
-							return;
-						}
+			FunctionRunnable aFuncRunnable;
 
-						IoUtil.deleteDirectory(deltaPath);
-					}
-
-					// Query the user of the version to update to
-					pickVersionPanel.setConfiguration(fullList);
-					pickVersionPanel.setVisibleAsModal();
-				}
-			});
+			aFuncRunnable = new FunctionRunnable(this, "queryUserForInput", aTask, deltaPath, fullList);
+			SwingUtilities.invokeAndWait(aFuncRunnable);
 		}
 		catch (Exception aExp)
 		{
 			aExp.printStackTrace();
 		}
-//		pickVersionPanel.setVisibleAsModal();
+
+		// Bail if the task has been aborted
+		if (aTask.isActive() == false)
+			return;
+
+		// Retrieve the chosen item
 		chosenItem = pickVersionPanel.getChosenItem();
 		if (chosenItem == null)
-		{
-			aTask.infoAppendln("No release specified. Update has been aborted.");
-			aTask.abort();
 			return;
-		}
 
 		// Log the user chosen action
 		aTask.infoAppendln("\tRelease chosen: " + chosenItem.getVersion());
@@ -310,6 +290,24 @@ public class DistMakerEngine
 	}
 
 	/**
+	 * Helper method to display a DistMaker information notice
+	 */
+	private void displayNotice(String aMsg)
+	{
+		// Default message
+		if (aMsg == null)
+		{
+			aMsg = "This application does not appear to be a properly configured DistMaker application.\n\n";
+			aMsg += "Please check installation configuration.";
+		}
+
+		// Display the message
+		msgPanel.setTitle("Application Updater");
+		msgPanel.setInfo(aMsg);
+		msgPanel.setVisible(true);
+	}
+
+	/**
 	 * Helper method to download the specified release.
 	 * <P>
 	 * Returns true if the release was downloaded properly.
@@ -333,13 +331,13 @@ public class DistMakerEngine
 			aExp.printStackTrace();
 			return false;
 		}
-		
+
 		// Download the update catalog to the (local) delta location
 		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
 		catalogFile = new File(destPath, "catalog.txt");
 		if (DistUtils.downloadFile(aTask, catUrl, catalogFile, refCredential) == false)
 			return false;
-		
+
 		// Load the map of stale nodes
 		catalogFile = new File(DistUtils.getAppPath(), "catalog.txt");
 		staleMap = DistUtils.readCatalog(aTask, catalogFile, staleUrl);
@@ -373,7 +371,7 @@ public class DistMakerEngine
 			}
 
 			// Use the remote update copy, if we were not able to use a local stale copy
-			if (isPass == false)
+			if (isPass == false && aTask.isActive() == true)
 			{
 				isPass = updateNode.transferContentTo(aTask, refCredential, destPath);
 				if (isPass == true)
@@ -381,7 +379,7 @@ public class DistMakerEngine
 			}
 
 			// Log the failure and bail
-			if (isPass == false)
+			if (isPass == false && aTask.isActive() == true)
 			{
 				aTask.infoAppendln("Failed to download from update site.");
 				aTask.infoAppendln("\tSite: " + updateUrl);
@@ -390,59 +388,11 @@ public class DistMakerEngine
 				return false;
 			}
 		}
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		// Update the Info.plist file (Apple specific)
-		File pFile;
-		String errMsg;
-		pFile = new File(destPath.getParentFile(), "Info.plist");
-		if (pFile.isFile() == true)
-		{
-			errMsg = null;
-			if (pFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (PropFileUtil.updateVersion(pFile, aRelease.getVersion()) == false)
-				errMsg = "Failure. Failed to update file: " + pFile;
-			
-			if (errMsg != null)
-			{
-				aTask.infoAppendln(errMsg);
-				return false;
-			}
-		}
-		
-		
-		
-		
-		
-		
 
-		return true;
-	}
+		// Update the platform configuration files
+		isPass = updatePlatformConfigFiles(aTask, aRelease);
 
-	/**
-	 * Helper method to display a DistMaker information notice
-	 */
-	private void displayNotice(String aMsg)
-	{
-		// Default message
-		if (aMsg == null)
-		{
-			aMsg = "This application does not appear to be a properly configured DistMaker application.\n\n";
-			aMsg += "Please check installation configuration.";
-		}
-
-		// Display the message
-		msgPanel.setTitle("Application Updater");
-		msgPanel.setInfo(aMsg);
-		msgPanel.setVisible(true);
+		return isPass;
 	}
 
 	/**
@@ -479,6 +429,82 @@ public class DistMakerEngine
 		}
 
 		displayNotice(msg);
+	}
+
+	/**
+	 * Helper method that prompts the user for forms of input depending on the state of the App
+	 * <P>
+	 * This method will be called via reflection.
+	 */
+	@SuppressWarnings("unused")
+	private void queryUserForInput(Task aTask, File deltaPath, List<Release> fullList)
+	{
+		Release chosenItem;
+
+		// Query the user, if the wish to destroy the old update
+		if (deltaPath.isDirectory() == true)
+		{
+			promptPanel.setTitle("Overwrite recent update?");
+			promptPanel.setInfo("An update has already been downloaded... If you proceed this update will be removed. Proceed?");
+			promptPanel.setVisibleAsModal();
+			if (promptPanel.isAccepted() == false)
+			{
+				aTask.infoAppendln("Previous update will not be overwritten.");
+				aTask.abort();
+				return;
+			}
+
+			// Remove the retrieved update, and restore the platform configuration files to this (running) release
+			// It is necessary to do this, since the user may later cancel the update request and it is important to
+			// leave the program and configuration files in a stable state.
+			IoUtil.deleteDirectory(deltaPath);
+			updatePlatformConfigFiles(aTask, currRelease);
+		}
+
+		// Query the user of the version to update to
+		pickVersionPanel.setConfiguration(fullList);
+		pickVersionPanel.setVisibleAsModal();
+		chosenItem = pickVersionPanel.getChosenItem();
+		if (chosenItem == null)
+		{
+			aTask.infoAppendln("No release specified. Update has been aborted.");
+			aTask.abort();
+			return;
+		}
+	}
+
+	/**
+	 * Helper method to update platform specific configuration files
+	 */
+	private boolean updatePlatformConfigFiles(Task aTask, Release aRelease)
+	{
+		File installPath, pFile;
+		String errMsg;
+
+		// Get the top level install path
+		installPath = DistUtils.getAppPath().getParentFile();
+
+		// Apple specific platform files
+		pFile = new File(installPath, "Info.plist");
+		if (pFile.isFile() == false)
+			pFile = new File(installPath.getParentFile(), "Info.plist");
+
+		if (pFile.isFile() == true)
+		{
+			errMsg = null;
+			if (pFile.setWritable(true) == false)
+				errMsg = "Failure. No writable permmisions for file: " + pFile;
+			else if (PropFileUtil.updateVersion(pFile, aRelease.getVersion()) == false)
+				errMsg = "Failure. Failed to update file: " + pFile;
+
+			if (errMsg != null)
+			{
+				aTask.infoAppendln(errMsg);
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 }

@@ -124,7 +124,8 @@ public class DistUtils
 				// Bail if aTask is aborted
 				if (aTask.isActive() == false)
 				{
-					aTask.infoAppendln("Download of file: " + aFile + " has been aborted!");
+					aTask.infoAppendln("File transfer request has been aborted...");
+					aTask.infoAppendln("\tFile: " + aFile);
 					return false;
 				}
 			}
