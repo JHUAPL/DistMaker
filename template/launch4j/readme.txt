@@ -1,0 +1,1 @@
+The file launch4j, is an update to the script found when the package launch3j-3.1.0-beta1-linux.tgz is unpacked. It is a slight modification to the original script, to allow the script to be run from any location rather than the folder where the script is located. 
