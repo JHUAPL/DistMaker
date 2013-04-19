@@ -153,13 +153,13 @@ public class DistMakerEngine
 				if (strLine == null)
 					break;
 
-				// Update the current instruction, if one specified
-				if (strLine.startsWith("-") == true)
-					currInstr = strLine;
 				// Skip empty lines / comments
-				else if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
+				if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
 					; // Nothing to do
-				// Process the name instruction
+				// Record the (current) instruction
+				else if (strLine.startsWith("-") == true)
+					currInstr = strLine;
+				// Process the instruction
 				else if (currInstr.equals("-name") == true)
 					appName = strLine;
 				else if (currInstr.equals("-version") == true)

@@ -25,6 +25,14 @@ def buildRelease(args, buildPath):
 	appName = args.name
 	version = args.version
 
+	# Bail if launch4j is not installed	
+	appInstallRoot = miscUtils.getInstallRoot()
+	appInstallRoot = os.path.dirname(appInstallRoot)
+	launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
+	if os.path.exists(launch4jExe) == False:
+		print('Launch4j is not installed. Windows releases will not be built.')
+		return
+
 	# Create a tmp (working) folder
 	tmpPath = tempfile.mkdtemp(dir=buildPath)
 
