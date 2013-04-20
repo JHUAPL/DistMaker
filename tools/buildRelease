@@ -24,74 +24,100 @@ def logAndPrint(message="", indent=0, showTime=False):
 
 
 def buildRelease():
+	# Retrieve the install path
+	installPath = getInstallRoot()
+	installPath = os.path.dirname(installPath)
+
+	# Check for distMaker.jar library prerequisite
+	testPath = os.path.join(installPath, 'lib', 'distMaker.jar')
+	if os.path.exists(testPath) == False:
+		logAndPrint('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
+		logAndPrint('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		exit(-1)
+
+	# Check for static jre prerequisites
+	isPass = True
+	for subPath in ['apple', 'linux', 'windows']:
+		isPass &= os.path.exists(os.path.join(installPath, 'jre', subPath))
+	if isPass == False:
+		logAndPrint('Aborting DistMaker release build. The jre path is not properly configured.', indent=1)
+		logAndPrint('Please setup the jre path properly. A quick fix is to copy the jre tree from a previous release of DistMaker.', indent=1)
+		exit(-1)
+
 	# Determine the workPath
-	workPath = "DistMaker-" + version
-	destFileGZ = "DistMaker-" + version + ".tar.gz"
+	workPath = os.path.join(installPath, 'release', 'DistMaker-' + version)
+	destFileGZ = os.path.join(installPath, 'release', 'DistMaker-' + version + '.tar.gz')
 
 	# Bail if the work folder for which we compose the release already exists
 	if os.path.exists(workPath) == True:
-		logAndPrint("Aborting DistMaker release build. Release folder already exists: " + workPath, indent=1)
+		logAndPrint('Aborting DistMaker release build. Release folder already exists: ' + workPath, indent=1)
 		exit(-1)
 
 	# Bail if the release already exists
-	if os.path.exists('release/' + destFileGZ) == True:
-		logAndPrint("Aborting DistMaker release build. Release already exists. File: release/" + destFileGZ, indent=1)
+	if os.path.exists(destFileGZ) == True:
+		logAndPrint('Aborting DistMaker release build. Release already exists. File: ' + destFileGZ, indent=1)
 		exit(-1)
 
 	# Laydown the structure, and let the user know of the version we are building
-	print("Building DistMaker release " + version + "...")
+	print('Building DistMaker release ' + version + '...')
 	os.mkdir(workPath)
 
 	# Copy the libraries
-	os.mkdir(workPath + "/lib")
-	shutil.copy2('lib/glum.jar', workPath + '/lib/')
-	shutil.copy2('lib/guava-13.0.1.jar', workPath + '/lib/')
-	shutil.copy2('bin/distMaker.jar', workPath + '/lib/')
+	dstPath = os.path.join(workPath, 'lib')
+	os.mkdir(dstPath)
+	for aLib in ['glum.jar', 'guava-13.0.1.jar', 'distMaker.jar']:
+		srcPath = os.path.join(installPath, 'lib', aLib)
+		shutil.copy2(srcPath, dstPath)
 
 	# Copy the scripts
-	os.mkdir(workPath + "/script")
-	shutil.copy2('script/appleUtils.py', workPath + '/script/')
-	shutil.copy2('script/linuxUtils.py', workPath + '/script/')
-	shutil.copy2('script/windowsUtils.py', workPath + '/script/')
-	shutil.copy2('script/buildDist.py', workPath + '/script/')
-	shutil.copy2('script/deployDist.py', workPath + '/script/')
-	shutil.copy2('script/miscUtils.py', workPath + '/script/')
-	
-	# Copy the jre tree
-	os.mkdir(workPath + "/jre")
-	shutil.copytree('jre/apple', workPath + '/jre/apple', symlinks=True)
-	shutil.copytree('jre/linux', workPath + '/jre/linux', symlinks=True)
-	shutil.copytree('jre/windows', workPath + '/jre/windows', symlinks=True)
+	dstPath = os.path.join(workPath, 'script')
+	os.mkdir(dstPath)
+	for aScript in ['appleUtils.py', 'linuxUtils.py', 'windowsUtils.py', 'buildDist.py', 'deployDist.py', 'miscUtils.py']:
+		srcPath = os.path.join(installPath, 'script', aScript)
+		shutil.copy2(srcPath, dstPath)
+
+	# Copy the jre tree for each supported platform
+	for aPlatform in ['apple', 'linux', 'windows']:
+		srcPath = os.path.join(installPath, 'jre', aPlatform)
+		dstPath = os.path.join(workPath, 'jre', aPlatform)
+		shutil.copytree(srcPath, dstPath, symlinks=True)
 
 	# Setup the template tree
-	os.mkdir(workPath + "/template")
-	shutil.copytree('template/apple', workPath + '/template/apple')
-	shutil.copytree('template/background', workPath + '/template/background')
-	shutil.copy2('template/.DS_Store', workPath + '/template/')
-	shutil.copy2('template/appLauncher.jar', workPath + '/template/')
-	
+	dstPath = os.path.join(workPath, 'template')
+	os.makedirs(dstPath + '/apple')
+	os.makedirs(dstPath + '/background')
+	for aFile in ['appLauncher.jar', '.DS_Store', 'apple/JavaAppLauncher', 'apple/JavaApplicationStub', 'background/background.png']:
+		srcPath = os.path.join(installPath, 'template', aFile)
+		shutil.copy2(srcPath, dstPath + '/' + aFile)
+
 	# Setup the launch4j tree
-	exeCmd = ['tar', '-C', workPath, '-xf', 'template/launch4j/launch4j-3.1.0-beta1-linux.tgz']
+	l4jPath = os.path.join(installPath, 'template', 'launch4j')
+	exeCmd = ['tar', '-C', workPath, '-xf', l4jPath + '/launch4j-3.1.0-beta1-linux.tgz']
 	retCode = subprocess.call(exeCmd)
 	if retCode != 0:
-		print("Failed to extract launch4j package...")
+		print('Failed to extract launch4j package...')
 		exit(-1)
-	shutil.copy2('template/launch4j/launch4j', workPath + '/launch4j/')
+	shutil.copy2(l4jPath + '/launch4j', workPath + '/launch4j/')
 
 	# Form the archive
-	exeCmd = ['tar', '-czf', destFileGZ, workPath]
+	exeCmd = ['tar', '-czf', destFileGZ, '-C', os.path.dirname(workPath), os.path.basename(workPath)]
 	retCode = subprocess.call(exeCmd)
 	if retCode != 0:
-		print("Failed to build tar.gz file: " + destFileGZ)
+		print('Failed to build tar.gz file: ' + destFileGZ)
 		exit(-1)
 
 	# Remove the workPath
 	shutil.rmtree(workPath)
 
-	# Move the release to the official release folder
-	shutil.move(destFileGZ, 'release/')
+	print('DistMaker release ' + version + ' built.')
 
-	print("DistMaker release " + version + " built.")
+
+def getInstallRoot():
+	"""Returns the root path where the running script is insalled."""
+	argv = sys.argv;
+	installRoot = os.path.dirname(argv[0])
+#	print('appInstallRoot: ' + appInstallRoot)
+	return installRoot
 
 
 def printUsage():
@@ -119,9 +145,6 @@ if __name__ == "__main__":
 
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, handleSignal)
-
-	#TODO: Add logic to check for a working environment
-	#validateEnvironment()
 
 	#TODO: Finish this functionality
 	if doFullBuild == True:
