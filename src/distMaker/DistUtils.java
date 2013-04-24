@@ -2,22 +2,35 @@ package distMaker;
 
 import glum.gui.GuiUtil;
 import glum.io.IoUtil;
-import glum.net.*;
+import glum.net.Credential;
+import glum.net.NetUtil;
+import glum.net.Result;
 import glum.reflect.ReflectUtil;
 import glum.task.ConsoleTask;
 import glum.task.Task;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
 
-import java.io.*;
-import java.net.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import distMaker.node.*;
+import distMaker.node.FileNode;
+import distMaker.node.Node;
+import distMaker.node.PathNode;
 
 public class DistUtils
 {
@@ -82,7 +95,8 @@ public class DistUtils
 	/**
 	 * Downloads the specified file from srcUrl to destFile. Returns true on success
 	 */
-	public static boolean downloadFile(Task aTask, URL aUrl, File aFile, Credential aCredential)
+	@SuppressWarnings("resource")
+   public static boolean downloadFile(Task aTask, URL aUrl, File aFile, Credential aCredential)
 	{
 		URLConnection connection;
 		InputStream inStream;
@@ -206,6 +220,7 @@ public class DistUtils
 		}
 		catch (IOException aExp)
 		{
+		   aExp.printStackTrace(); // debug
 			errMsg = getErrorCodeMessage(aUpdateUrl, connection, aExp, "releaseInfo.txt");
 		}
 		finally
