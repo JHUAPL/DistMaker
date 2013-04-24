@@ -31,7 +31,9 @@ import distMaker.Release;
 
 public class PickReleasePanel extends GlassPanel implements ActionListener, ZioRaw, ListSelectionListener
 {
-	// GUI vars
+   private static final long serialVersionUID = 1L;
+
+   // GUI vars
 	private JLabel titleL;
 	private JRadioButton newestRB, olderRB;
 	private ItemListPanel<Release> listPanel;
@@ -79,7 +81,8 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	{
 		LinkedList<Release> fullList;
 		DateUnit dateUnit;
-		String currBuildStr, lastBuildStr;
+		// String currBuildStr;
+		String lastBuildStr;
 		String currVerStr, lastVerStr;
 		String appName, infoMsg;
 
@@ -91,7 +94,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		// Retrieve vars of interest
 		appName = installedItem.getName();
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm");
-		currBuildStr = dateUnit.getString(installedItem.getBuildTime());
+		// currBuildStr = dateUnit.getString(installedItem.getBuildTime());
 		lastBuildStr = dateUnit.getString(newestItem.getBuildTime());
 		currVerStr = installedItem.getVersion();
 		lastVerStr = newestItem.getVersion();
@@ -103,11 +106,17 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		myItemProcessor.setItems(fullList);
 
 		// Update the infoTA
-		infoMsg = "The latest release of " + appName + ", " + lastVerStr + ", was built on " + lastBuildStr + ". ";
-		if (newestItem.equals(installedItem) == true)
-			infoMsg += "You have the latest release of " + appName + "!";
-		else
-			infoMsg += "Your current version is " + currVerStr + ", which was built on: " + currBuildStr;
+		if (newestItem.equals(installedItem) == true) {
+         titleL.setText(appName + " is up to date.");
+         infoMsg = "No update needed. You are running the latest release "
+               + " (" + lastVerStr + ") that was built on " + lastBuildStr + ". ";
+         infoMsg += "You may switch to an older release by choosing one of the versions below.";
+		} else {
+         titleL.setText(appName + " needs to be updated.");
+			infoMsg = "You are running version is " + currVerStr + ". ";
+         infoMsg += "You may update to the latest release or even to an "
+               + "older relase by choosing another version below. ";
+		}
 		infoMsg += "\n";
 
 		infoTA.setText(infoMsg);
@@ -160,7 +169,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		setLayout(new MigLayout("", "[left][grow][]", "[][][][]3[grow]10[]"));
 
 		// Title Area
-		titleL = new JLabel("Please select an update", JLabel.CENTER);
+		titleL = new JLabel("Please select an update", JLabel.CENTER); // this text gets replaced once the curent version status is known
 		add(titleL, "growx,span 2,wrap");
 
 		// Info area
@@ -253,11 +262,11 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		// Determine the warnMsg
 		warnMsg = null;
 		if (pickItem == null)
-			warnMsg = "Please select a version to deploy.";
+			warnMsg = "Select the version you want to switch to.";
 		else if (pickItem.equals(installedItem) == true)
-			warnMsg = "This is the currently deployed version. Please select a different version.";
+			warnMsg = "You cannot update to the same version you are running. You can dwitch to a different version.";
 		else if (pickItem.getBuildTime() < installedItem.getBuildTime())
-			warnMsg = "Please note, that the currently selected version is older than the currently installed version.";
+			warnMsg = "Please note that your current selection will revert back to an older version than the currently installed version.";
 
 		warnTA.setText(warnMsg);
 	}
