@@ -6,17 +6,28 @@ import glum.gui.action.ClickAction;
 import glum.gui.panel.GlassPanel;
 import glum.gui.panel.itemList.ItemListPanel;
 import glum.gui.panel.itemList.StaticItemProcessor;
-import glum.gui.panel.itemList.query.*;
+import glum.gui.panel.itemList.query.QueryComposer;
+import glum.gui.panel.itemList.query.QueryItemHandler;
+import glum.gui.panel.itemList.query.QueryTableCellRenderer;
 import glum.unit.ConstUnitProvider;
 import glum.unit.DateUnit;
 import glum.zio.raw.ZioRaw;
 
-import java.awt.*;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
-import javax.swing.*;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
@@ -108,7 +119,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		// Update the infoTA
 		if (newestItem.equals(installedItem) == true) {
          titleL.setText(appName + " is up to date.");
-         infoMsg = "No update needed. You are running the latest release "
+         infoMsg = "You are running the latest release "
                + " (" + lastVerStr + ") that was built on " + lastBuildStr + ". ";
          infoMsg += "You may switch to an older release by choosing one of the versions below.";
 		} else {
@@ -166,7 +177,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		JPanel tmpPanel;
 
 		// Form the layout
-		setLayout(new MigLayout("", "[left][grow][]", "[][][][]3[grow]10[]"));
+		setLayout(new MigLayout("", "[left][grow][]", "[]40[][][]3[grow]10[]"));
 
 		// Title Area
 		titleL = new JLabel("Please select an update", JLabel.CENTER); // this text gets replaced once the curent version status is known
