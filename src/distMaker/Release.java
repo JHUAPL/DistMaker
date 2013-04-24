@@ -67,7 +67,7 @@ public class Release implements Comparable<Release>, QueryItem<LookUp>
 	}
 
 	@Override
-	public void setValue(LookUp aEnum, Object aObj)
+	public void setValue(@SuppressWarnings("unused") LookUp aEnum, @SuppressWarnings("unused") Object aObj)
 	{
 		throw new RuntimeException("Unsupported operation");
 	}
