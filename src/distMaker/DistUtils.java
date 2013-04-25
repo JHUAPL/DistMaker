@@ -39,7 +39,10 @@ public class DistUtils
 	private static boolean isDevelopersEnvironment = true;
 	private static int updateCode = 0; // Static member to declare the update status, 0: None, 1: Pass, 2: Fail
 	private static String updateMsg = null;
-
+	
+	// Static field used only when developing DistMaker. Otherwise this field should always be null.
+	private static File developAppPath = null;
+	
 	/**
 	 * Utility method to determine the path where the application is installed.
 	 * <P>
@@ -48,6 +51,10 @@ public class DistUtils
 	public static File getAppPath()
 	{
 		File jarPath, currPath, testFile;
+		
+		// If we are in developer mode then return the developAppPath
+		if (developAppPath != null)
+			return developAppPath;
 
 		// Return the working directory if this is a developers build
 		if (isDevelopersEnvironment() == true)
@@ -146,7 +153,7 @@ public class DistUtils
 		}
 		catch (IOException aExp)
 		{
-			errMsg = getErrorCodeMessage(aUrl, connection, aExp, aFile.getName());
+			errMsg = getErrorCodeMessage(aUrl, connection, aExp);
 			aTask.infoAppendln(errMsg);
 			return false;
 		}
@@ -220,8 +227,7 @@ public class DistUtils
 		}
 		catch (IOException aExp)
 		{
-		   aExp.printStackTrace(); // debug
-			errMsg = getErrorCodeMessage(aUpdateUrl, connection, aExp, "releaseInfo.txt");
+			errMsg = getErrorCodeMessage(aUpdateUrl, connection, aExp);
 		}
 		finally
 		{
@@ -249,42 +255,48 @@ public class DistUtils
 
 	/**
 	 * Helper method that converts an IOException to an understandable message
-	 * 
-	 * @param remoteFileName
 	 */
-	private static String getErrorCodeMessage(URL aUpdateUrl, URLConnection aConnection, IOException aExp, String remoteFileName)
+	private static String getErrorCodeMessage(URL aUpdateUrl, URLConnection aConnection, IOException aExp)
 	{
+		URL fetchUrl;
 		Result result;
 		String errMsg;
-
+		
+		// Dump the stack trace
 		aExp.printStackTrace();
+
+		// Form a user friendly exception
 		errMsg = "The update site, " + aUpdateUrl + ", is not available.\n\t";
 
 		result = NetUtil.getResult(aExp, aConnection);
 		switch (result)
 		{
 			case BadCredentials:
-			errMsg += "The update site is password protected and bad credentials were provided.";
+			errMsg += "The update site is password protected and bad credentials were provided.\n";
 			break;
 
 			case ConnectFailure:
 			case UnreachableHost:
 			case UnsupportedConnection:
-			errMsg += "The update site appears to be unreachable.";
+			errMsg += "The update site appears to be unreachable.\n";
 			break;
 
 			case Interrupted:
-			errMsg += "The retrival of the remote file, " + remoteFileName + ", has been interrupted.";
+			errMsg += "The retrival of the remote file has been interrupted.\n";
 			break;
 
 			case InvalidResource:
-			errMsg += "The remote file, " + remoteFileName + ", does not appear to be valid.";
+			errMsg += "The remote file does not appear to be valid.\n";
 			break;
 
 			default:
-			errMsg += "An undefined error occurred while retrieving the remote file, " + remoteFileName + ".";
+			errMsg += "An undefined error occurred while retrieving the remote file.\n";
 			break;
 		}
+		
+		// Log the URL which we failed on 
+		fetchUrl = aConnection.getURL();
+		errMsg += "\tURL: " + fetchUrl + "\n";
 
 		return errMsg;
 	}
@@ -393,6 +405,35 @@ public class DistUtils
 		}
 
 		return retMap;
+	}
+
+	/**
+	 * Utility method to switch the DistMaker library into debug mode. You should never call this method unless you are
+	 * modifying the DistMaker library.
+	 * <P>
+	 * This functionality only exists to allow rapid development of DistMaker
+	 */
+	public static void setDebugDeveloperDetails(int aUpdateCode, String aUpdateMsg, File aDevelopAppPath)
+	{
+		// If we are not in developers mode, then the developer made a mistake, and their request will be ignored
+		if (isDevelopersEnvironment != true)
+		{
+			System.out.println("The DistMaker package is not running in a developers environment!");
+			System.out.println("   DistUtils.setDebugDeveloperDetails() method is being ignored...");
+			return;
+		}
+
+		// Switch the variables to developer debug mode
+		isDevelopersEnvironment = false;
+		updateCode = aUpdateCode;
+		updateMsg = aUpdateMsg;
+
+		developAppPath = aDevelopAppPath;
+
+		// Log to the console that DistMaker has been configured into developer debug mode
+		System.out.println("DistMaker has been forced into developer debug mode.");
+		System.out.println("  AppPath has been forced to: " + developAppPath);
+		System.out.println("  Regular users should never see this logic flow!");
 	}
 
 }
