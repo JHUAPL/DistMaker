@@ -49,10 +49,8 @@ def handleSignal(signal, frame):
 		sys.exit(0)
 
 
-def updateReleaseInfo(installPath, appName, version, buildDate):
+def addReleaseInfo(installPath, appName, version, buildDate):
 	verFile = os.path.join(installPath, 'releaseInfo.txt')
-	
-	releaseInfo = []
 	
 	# Create the release info file
 	if os.path.isfile(verFile) == False:
@@ -65,26 +63,86 @@ def updateReleaseInfo(installPath, appName, version, buildDate):
 	f.write(version + ',' + buildDate + '\n')
 	f.close()
 	
-#	# Read the file
-#	if os.path.isfile(verFile) == True:
-#		f = open(verFile, 'r')
-#		for line in f:
-#			tokens = line[:-1].split(',', 1);
-#			if len(tokens) == 2 and tokens[0] != 'name':
-#				releaseInfo.append((tokens[0], tokens[1]))
-#		f.close()
 
-#	# Add the new version		
-#	releaseInfo.append((version, buildDate))
+def delReleaseInfo(installPath, appName, version, buildDate):
+	verFile = os.path.join(installPath, 'releaseInfo.txt')
 	
-#	# Write the updated file
-#	f = open(verFile, 'w')
-#	f.write('name' + ',' + appName + '\n')
-#	for verTup in releaseInfo:
-#		f.write(verTup[0] + ',' + verTup[1] + '\n')
-#	f.close()
+	# Bail if the release info file does not exist
+	if os.path.isfile(verFile) == False:
+		print('Failed to locate deployment release info file: ' + verFile)
+		print('Aborting removal action for version: ' + version)
+		exit()
 
+	# Read the file
+	releaseInfo = []
+	f = open(verFile, 'r')
+	for line in f:
+		tokens = line[:-1].split(',', 1);
+		if len(tokens) == 2 and tokens[0] == version:
+			# By not adding the current record to the releaseInfo list, we are effectively removing the record 
+			print('Removing release record from info file. Version: ' + version)
+		elif len(tokens) == 2 and tokens[0] != 'name':
+			releaseInfo.append((tokens[0], tokens[1]))
+	f.close()
+
+	# Write the updated file
+	f = open(verFile, 'w')
+	f.write('name' + ',' + appName + '\n')
+	for verTup in releaseInfo:
+		f.write(verTup[0] + ',' + verTup[1] + '\n')
+	f.close()
+
+
+def addRelease(appName, version, buildDate):
+	# Check to see if the deployed location already exists
+	installPath = os.path.join(rootPath, appName)
+	if os.path.isdir(installPath) == False:
+		print('Application ' + appName + ' has never been deployed to the root location: ' + args.deployRoot)
+		print('Create a new release of the application at the specified location?')
+		input = raw_input('--> ').upper()
+		if input != 'Y' and input != 'YES':
+			print('Release will not be made for app ' + appName)
+			exit()
+			
+		# Build the deployed location
+		os.makedirs(installPath)
+			
+	# Check to see if the deploy version already exists
+	versionPath = os.path.join(installPath, version)
+	if os.path.isdir(versionPath) == True:
+		print('Application ' + appName + ' with version, ' + version + ', has already been deployed.')
+		print('Release will not be made for app ' + appName)
+		exit()
+
+	# Copy over the contents of the release folder to the deploy location
+	shutil.copytree(distPath, versionPath, symlinks=True) 
 	
+	# Update the version info
+	addReleaseInfo(installPath, appName, version, buildDate)
+
+
+def delRelease(appName, version, buildDate):
+	# Check to see if the deployed location already exists
+	installPath = os.path.join(rootPath, appName)
+	if os.path.isdir(installPath) == False:
+		print('Application ' + appName + ' has never been deployed to the root location: ' + args.deployRoot)
+		print('There are no releases to remove. ')
+		exit()
+		
+	# Check to see if the deploy version already exists
+	versionPath = os.path.join(installPath, version)
+	if os.path.isdir(versionPath) == False:
+		print('Application ' + appName + ' with version, ' + version + ', has not been deployed.')
+		print('Release will not be removed for app ' + appName)
+		exit()
+		
+	# Remove the release from the deployed location
+	shutil.rmtree(versionPath)
+	
+	# Update the version info
+	delReleaseInfo(installPath, appName, version, buildDate)
+
+
 if __name__ == "__main__":
 	argv = sys.argv;
 	argc = len(argv);
@@ -99,6 +157,7 @@ if __name__ == "__main__":
 	# Set up the argument parser	
 	parser = argparse.ArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@')
 	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
+	parser.add_argument('-remove', help='Remove the specified distribution.', action='store_true', default=False)
 	parser.add_argument('deployRoot', help='Root location to deploy the specified distribution.')
 	parser.add_argument('distLoc', nargs='?', default=scriptPath, help='The location of the distribution to deploy.')
 
@@ -123,29 +182,10 @@ if __name__ == "__main__":
 		
 	# Determine the appName, version, and buildDate of the distribution
 	(appName, version, buildDate) = getDistInfo(distPath)
-
-	# Check to see if the deployed location already exists
-	installPath = os.path.join(rootPath, appName)
-	if os.path.isdir(installPath) == False:
-		print('Application ' + appName + ' has never been deployed to the root location: ' + args.deployRoot)
-		print('Create a new release of the application at the specified location?')
-		input = raw_input('--> ').upper()
-		if input != 'Y' and input != 'YES':
-			print('Release will not be made for app ' + appName)
-			exit()
-			
-		# Build the deployed location
-		os.makedirs(installPath)
-			
-	# Check to see if the deploy version already exists
-	versionPath = os.path.join(installPath, version)
-	if os.path.isdir(versionPath) == True:
-			print('Application ' + appName + ' with version, ' + version + ', has already been deployed.')
-			print('Release will not be made for app ' + appName)
-			exit()
-
-	# Copy over the contents of the release folder to the deploy location
-	shutil.copytree(distPath, versionPath, symlinks=True) 
 	
-	# Update the version info
-	updateReleaseInfo(installPath, appName, version, buildDate)
+	# Uninstall the app, if remove argument is specified
+	if args.remove == True:
+		delRelease(appName, version, buildDate)
+	else:
+		addRelease(appName, version, buildDate)
+
