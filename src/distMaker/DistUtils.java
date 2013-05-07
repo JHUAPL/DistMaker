@@ -308,6 +308,13 @@ public class DistUtils
 	 */
 	public static boolean isFullyWriteable(File aPath)
 	{
+		// There is no known way to change, the write bit to true, in windows,
+		// so by default, assume the path is writable. This method is totally unreliable on 
+		// the Windows platform (Gives bogus results for files on CDs). 
+		// TODO: See if File.canWrite(), returns the proper value on Windows
+		if (System.getProperty("os.name").startsWith("Windows") == true)
+			return true;
+		
 		if (aPath.isDirectory() == false)
 			throw new RuntimeException("Specified path is not a folder: " + aPath);
 

@@ -23,9 +23,9 @@ import java.util.Map;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
-import distMaker.apple.PropFileUtil;
 import distMaker.gui.PickReleasePanel;
 import distMaker.node.Node;
+import distMaker.platform.AppleFileUtil;
 
 public class DistMakerEngine
 {
@@ -498,7 +498,7 @@ public class DistMakerEngine
 			errMsg = null;
 			if (pFile.setWritable(true) == false)
 				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (PropFileUtil.updateVersion(pFile, aRelease.getVersion()) == false)
+			else if (AppleFileUtil.updateVersion(pFile, aRelease.getVersion()) == false)
 				errMsg = "Failure. Failed to update file: " + pFile;
 
 			if (errMsg != null)
