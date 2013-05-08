@@ -177,7 +177,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		JPanel tmpPanel;
 
 		// Form the layout
-		setLayout(new MigLayout("", "[left][grow][]", "[]40[][][]3[grow]10[]"));
+		setLayout(new MigLayout("", "[left][grow][]", "[]25[][][]3[grow]10[]"));
 
 		// Title Area
 		titleL = new JLabel("Please select an update", JLabel.CENTER); // this text gets replaced once the curent version status is known
@@ -275,7 +275,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		if (pickItem == null)
 			warnMsg = "Select the version you want to switch to.";
 		else if (pickItem.equals(installedItem) == true)
-			warnMsg = "You cannot update to the same version you are running. You can dwitch to a different version.";
+			warnMsg = "You cannot update to the same version you are running. You can switch to a different version.";
 		else if (pickItem.getBuildTime() < installedItem.getBuildTime())
 			warnMsg = "Please note that your current selection will revert back to an older version than the currently installed version.";
 

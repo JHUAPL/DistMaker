@@ -7,7 +7,7 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 
-public class LinuxFileUtil
+public class LinuxUtils
 {
 
 	/**

@@ -78,7 +78,7 @@ public class MemUtils
 			errMsg = null;
 			if (pFile.setWritable(true) == false)
 				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (AppleFileUtil.updateMaxMem(pFile, maxMemSize) == false)
+			else if (AppleUtils.updateMaxMem(pFile, maxMemSize) == false)
 				errMsg = "Failure. Failed to update file: " + pFile;
 
 			if (errMsg != null)
@@ -99,7 +99,7 @@ public class MemUtils
 			errMsg = null;
 			if (scriptFile.setWritable(true) == false)
 				errMsg = "Failure. No writable permmisions for file: " + scriptFile;
-			else if (LinuxFileUtil.updateMaxMem(scriptFile, maxMemSize) == false)
+			else if (LinuxUtils.updateMaxMem(scriptFile, maxMemSize) == false)
 				errMsg = "Failure. Failed to update file: " + scriptFile;
 
 			if (errMsg != null)

@@ -16,7 +16,7 @@ import org.w3c.dom.*;
 /**
  * Utility class which contains a set of methods to interact with an Apple Info.plist file.
  */
-public class AppleFileUtil
+public class AppleUtils
 {
 	/**
 	 * Utility method to update the specified max memory (-Xmx) value in the plist file (aFile) to the specified

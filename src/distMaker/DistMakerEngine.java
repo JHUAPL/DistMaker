@@ -25,7 +25,7 @@ import javax.swing.SwingUtilities;
 
 import distMaker.gui.PickReleasePanel;
 import distMaker.node.Node;
-import distMaker.platform.AppleFileUtil;
+import distMaker.platform.AppleUtils;
 
 public class DistMakerEngine
 {
@@ -212,7 +212,7 @@ public class DistMakerEngine
 	 * This method will be called via reflection.
 	 */
 	@SuppressWarnings("unused")
-	private void checkForUpdatesWorker(Task aTask)
+	private void checkForUpdatesWorker(FullTaskPanel aTask)
 	{
 		List<Release> fullList;
 		Release chosenItem;
@@ -236,6 +236,9 @@ public class DistMakerEngine
 			aTask.abort();
 			return;
 		}
+		
+		// Hide the taskPanel
+		aTask.setVisible(false);
 
 		// Prompt the user for the Release
 		aTask.infoAppendln("Please select the release to install...");
@@ -259,6 +262,9 @@ public class DistMakerEngine
 		chosenItem = pickVersionPanel.getChosenItem();
 		if (chosenItem == null)
 			return;
+		
+		// Reshow the taskPanel
+		aTask.setVisible(true);
 
 		// Log the user chosen action
 		aTask.infoAppendln("\tRelease chosen: " + chosenItem.getVersion());
@@ -498,7 +504,7 @@ public class DistMakerEngine
 			errMsg = null;
 			if (pFile.setWritable(true) == false)
 				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (AppleFileUtil.updateVersion(pFile, aRelease.getVersion()) == false)
+			else if (AppleUtils.updateVersion(pFile, aRelease.getVersion()) == false)
 				errMsg = "Failure. Failed to update file: " + pFile;
 
 			if (errMsg != null)
