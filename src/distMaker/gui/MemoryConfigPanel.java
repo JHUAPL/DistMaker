@@ -3,7 +3,8 @@ package distMaker.gui;
 import glum.gui.FocusUtil;
 import glum.gui.GuiUtil;
 import glum.gui.action.ClickAction;
-import glum.gui.component.*;
+import glum.gui.component.GLabel;
+import glum.gui.component.GSlider;
 import glum.gui.panel.GlassPanel;
 import glum.gui.panel.generic.MessagePanel;
 import glum.unit.ByteUnit;
@@ -12,7 +13,6 @@ import glum.zio.raw.ZioRaw;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.List;
 
@@ -21,18 +21,15 @@ import javax.swing.border.BevelBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import distMaker.DistUtils;
-import distMaker.platform.AppleFileUtil;
-import distMaker.platform.LinuxFileUtil;
-
 import net.miginfocom.swing.MigLayout;
+import distMaker.platform.MemUtils;
+
+import static distMaker.platform.MemUtils.KB_SIZE;
+import static distMaker.platform.MemUtils.MB_SIZE;
+import static distMaker.platform.MemUtils.GB_SIZE;
 
 public class MemoryConfigPanel extends GlassPanel implements ActionListener, ZioRaw, ListSelectionListener
 {
-	private static final long KB_SIZE = 1024;
-	private static final long MB_SIZE = 1024 * 1024;
-	private static final long GB_SIZE = 1024 * 1024 * 1024;
-
 	// GUI vars
 	private JLabel titleL;
 	private GLabel maxMemL, currMemL, targMemL;
@@ -47,6 +44,13 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 	private long instMemSize;
 	private long targMemSize;
 
+	/**
+	 * Constructor where the developer specifies the max heap memory. Be careful about using this method, as if a value
+	 * is specified too large, then the program may become non operational on the next run.
+	 * <P>
+	 * Should the program become non operational then the end user would have to manually configure the config/script
+	 * files by hand or a reinstall would be required.
+	 */
 	public MemoryConfigPanel(Component aParent, long aMaxMemSize)
 	{
 		super(aParent);
@@ -65,6 +69,15 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 		// Set up some keyboard shortcuts
 		FocusUtil.addAncestorKeyBinding(this, "ESCAPE", new ClickAction(applyB));
 		updateGui();
+	}
+
+	/**
+	 * Constructor where the DistMaker framework attempts to determine the appropriate maxMexSize. Should, the DistMaker
+	 * framework fail to determine the installed system memory, then 4GB will be assumed as the installed system memory.
+	 */
+	public MemoryConfigPanel(Component aParent)
+	{
+		this(aParent, MemUtils.getInstalledSystemMemory());
 	}
 
 	@Override
@@ -104,74 +117,14 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 	 */
 	public void applyChanges()
 	{
-		File installPath, pFile, scriptFile;
-		String errMsg;
-		boolean isValidPlatform;
-
-		// Retrive the targMemSize
+		// Retrieve the targMemSize
 		targMemSize = (long)targMemS.getModelValue();
 		targMemSize = roundToMB(targMemSize);
-		
-		// Get the top level install path
-		installPath = DistUtils.getAppPath().getParentFile();
-		isValidPlatform = false;
 
-		// Apple specific platform files
-		pFile = new File(installPath, "Info.plist");
-		if (pFile.isFile() == false)
-			pFile = new File(installPath.getParentFile(), "Info.plist");
-
-		if (pFile.isFile() == true)
-		{
-			isValidPlatform = true;
-			
-			errMsg = null;
-			if (pFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (AppleFileUtil.updateMaxMem(pFile, targMemSize) == false)
-				errMsg = "Failure. Failed to update file: " + pFile;
-
-			if (errMsg != null)
-			{
-				warnPanel.setTitle("Failed setting Apple properties.");
-				warnPanel.setInfo(errMsg);
-				warnPanel.setVisible(true);
-				return;
-			}
-		}
-		
-		// Linux specific platform files
-		scriptFile = new File(installPath, "runEcho");
-		if (scriptFile.isFile() == true)
-		{
-			isValidPlatform = true;
-			
-			errMsg = null;
-			if (scriptFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permmisions for file: " + scriptFile;
-			else if (LinuxFileUtil.updateMaxMem(scriptFile, targMemSize) == false)
-				errMsg = "Failure. Failed to update file: " + scriptFile;
-
-			if (errMsg != null)
-			{
-				warnPanel.setTitle("Failed setting Linux configuration.");
-				warnPanel.setInfo(errMsg);
-				warnPanel.setVisible(true);
-				return;
-			}
-		}
-		
-		// Bail if no valid platform found
-		if (isValidPlatform == false)
-		{
-			errMsg = "This does not appear to be a valid DistMaker build. Memory changes will not take effect.";
-			
-			warnPanel.setTitle("No valid DistMaker platform located.");
-			warnPanel.setInfo(errMsg);
-			warnPanel.setVisible(true);
+		// Bail if we are not able to set the DistMaker max heap memory
+		if (MemUtils.setMaxHeapMem(warnPanel, targMemSize) == false)
 			return;
-		}
-		
+
 		// Update our state vars
 		instMemSize = targMemSize;
 	}

@@ -30,14 +30,11 @@ public class AppleFileUtil
 		DocumentBuilderFactory dbf;
 		Document dom;
 		Element doc;
-		String evalStr, memStr, oldStr;
-		String[] evalArr;
+		String evalStr, updateStr;
+		boolean isProcessed;
 
-		// Determine the memStr to use
-		if (numBytes % (1024 * 1024 * 1024) == 0)
-			memStr = "-Xmx" + (numBytes / (1024 * 1024 * 1024)) + "G";
-		else
-			memStr = "-Xmx" + (numBytes / (1024 * 1024)) + "M";
+		dom = null;
+		isProcessed = false;
 
 		// Make an instance of the DocumentBuilderFactory
 		dbf = DocumentBuilderFactory.newInstance();
@@ -60,44 +57,34 @@ public class AppleFileUtil
 				if (keyNode != null)
 				{
 					evalStr = keyNode.getNodeValue();
-					if (evalStr != null && evalStr.contains("-Xmx") == true)
+					updateStr = MemUtils.transformMaxMemHeapString(evalStr, numBytes);
+					if (updateStr != null)
 					{
-						evalArr = evalStr.split(" ");
-						for (int c2 = 0; c2 < evalArr.length; c2++)
-						{
-							oldStr = evalArr[c2];
-							if (oldStr.startsWith("-Xmx") == true)
-								evalArr[c2] = memStr;
-						}
-
-						System.out.println("Updating contents of file: " + aFile);
-						System.out.println("  Old Version: " + evalStr);
-
-						// Reconstitute the new evalStr
-						evalStr = "";
-						for (String aStr : evalArr)
-							evalStr += " " + aStr;
-						if (evalStr.length() > 0)
-							evalStr = evalStr.substring(1);
-
-						System.out.println("  New Version: " + evalStr);
-						keyNode.setNodeValue(evalStr);
+						isProcessed = true;
+						keyNode.setNodeValue(updateStr);
 						break;
 					}
 				}
 			}
-
-			// Update the file with the changed document
-			writeDoc(aFile, dom);
-
-			return true;
 		}
 		catch (Exception aExp)
 		{
 			aExp.printStackTrace();
+			return false;
 		}
 
-		return false;
+		// Bail if we did not find a line to change
+		if (isProcessed == false)
+		{
+			Exception aExp;
+			aExp = new Exception("Failed to locate -Xmx string!");
+			aExp.printStackTrace();
+			return false;
+		}
+
+		// Update the file with the changed document
+		System.out.println("Updating contents of file: " + aFile);
+		return writeDoc(aFile, dom);
 	}
 
 	/**
@@ -141,18 +128,15 @@ public class AppleFileUtil
 					System.out.println("  New Version: " + strNode.getNodeValue());
 				}
 			}
-
-			// Update the file with the changed document
-			writeDoc(aFile, dom);
-
-			return true;
 		}
 		catch (Exception aExp)
 		{
 			aExp.printStackTrace();
+			return false;
 		}
 
-		return false;
+		// Update the file with the changed document
+		return writeDoc(aFile, dom);
 	}
 
 	/**
