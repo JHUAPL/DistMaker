@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="MacRoman" standalone="no"?>
 <jardesc>
-    <jar path="distMaker/bin/distMaker.jar"/>
-    <options buildIfNeeded="true" compress="true" descriptionLocation="/distMaker/buildGlumBin.jardesc" exportErrors="false" exportWarnings="true" includeDirectoryEntries="false" overwrite="true" saveDescription="false" storeRefactorings="false" useSourceFolders="false"/>
+    <jar path="distMaker/lib/distMaker.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/distMaker/buildDistMakerBin.jardesc" exportErrors="false" exportWarnings="true" includeDirectoryEntries="false" overwrite="true" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
     <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
     <selectedProjects/>
     <manifest generateManifest="false" manifestLocation="/distMaker/src/Manifest.txt" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
@@ -12,7 +12,5 @@
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
         <javaElement handleIdentifier="=distMaker/src"/>
-        <folder path="/distMaker/build/doc"/>
-        <folder path="/distMaker/build/classes"/>
     </selectedElements>
 </jardesc>
