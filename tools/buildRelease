@@ -13,7 +13,6 @@ import time
 version = '0.36'
 
 
-
 def logAndPrint(message="", indent=0, showTime=False):
 	while indent > 0:
 		indent -= 1
@@ -30,7 +29,7 @@ def buildRelease():
 	installPath = os.path.dirname(installPath)
 
 	# Check for distMaker.jar library prerequisite
-	testPath = os.path.join(installPath, 'release', 'distMaker.jar')
+	testPath = os.path.join(installPath, 'lib', 'distMaker.jar')
 	if os.path.exists(testPath) == False:
 		logAndPrint('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
 		logAndPrint('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
@@ -66,13 +65,9 @@ def buildRelease():
 	# Copy the libraries
 	dstPath = os.path.join(workPath, 'lib')
 	os.mkdir(dstPath)
-	for aLib in ['glum.jar', 'guava-13.0.1.jar']:
+	for aLib in ['glum.jar', 'guava-13.0.1.jar', 'distMaker.jar']:
 		srcPath = os.path.join(installPath, 'lib', aLib)
 		shutil.copy2(srcPath, dstPath)
-	
-	#Copy the distMaker jar
-	srcPath = os.path.join(installPath, 'release', 'distMaker.jar')
-	shutil.copy2(srcPath, dstPath)	
 
 	# Copy the scripts
 	dstPath = os.path.join(workPath, 'script')
