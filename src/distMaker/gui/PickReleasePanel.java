@@ -90,7 +90,6 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	 */
 	public void setConfiguration(List<Release> itemList)
 	{
-		LinkedList<Release> fullList;
 		DateUnit dateUnit;
 		// String currBuildStr;
 		String lastBuildStr;
@@ -98,9 +97,11 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		String appName, infoMsg;
 
 		// Sort the items, and isolate the newest item
-		fullList = Lists.newLinkedList(itemList);
-		Collections.sort(fullList);
-		newestItem = fullList.removeLast();
+      LinkedList<Release> linkedList;
+		linkedList = Lists.newLinkedList(itemList);
+		Collections.sort(linkedList);
+		Collections.reverse(linkedList);  // reverse the list to show most recent versions on top
+		newestItem = linkedList.removeFirst();
 
 		// Retrieve vars of interest
 		appName = installedItem.getName();
@@ -114,7 +115,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		newestRB.setText("Latest: " + lastVerStr + " (" + lastBuildStr + ")");
 
 		// Update the list of available items
-		myItemProcessor.setItems(fullList);
+		myItemProcessor.setItems(linkedList);
 
 		// Update the infoTA
 		if (newestItem.equals(installedItem) == true) {
@@ -124,8 +125,8 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
          infoMsg += "You may switch to an older release by choosing one of the versions below.";
 		} else {
          titleL.setText(appName + " needs to be updated.");
-			infoMsg = "You are running version is " + currVerStr + ". ";
-         infoMsg += "You may update to the latest release or even to an "
+			infoMsg = "You are running version " + currVerStr + ". ";
+         infoMsg += "You may update to the latest release. You may also switch to an "
                + "older relase by choosing another version below. ";
 		}
 		infoMsg += "\n";

@@ -17,11 +17,16 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 
 import distMaker.gui.PickReleasePanel;
 import distMaker.node.Node;
@@ -48,9 +53,9 @@ public class DistMakerEngine
 
 		parentFrame = aParentFrame;
 		msgPanel = new MessagePanel(parentFrame);
-		msgPanel.setSize(450, 250);
+		msgPanel.setSize(700, 400);
 		promptPanel = new PromptPanel(parentFrame);
-		promptPanel.setSize(400, 200);
+		promptPanel.setSize(500, 300);
 
 		initialize();
 	}
@@ -58,7 +63,7 @@ public class DistMakerEngine
 	/**
 	 * Method that will notify the user that updates are being checked for
 	 */
-	public void checkForUpdates()
+	public void checkForUpdates(UpdateCheckListener listener)
 	{
 		FullTaskPanel taskPanel;
 		File installPath;
@@ -94,9 +99,34 @@ public class DistMakerEngine
 		taskPanel.setVisible(true);
 
 		// Launch the actual checking of updates in a separate worker thread
-		ThreadUtil.launchRunnable(new FunctionRunnable(this, "checkForUpdatesWorker", taskPanel), "thread-checkForUpdates");
+		ThreadUtil.launchRunnable(new FunctionRunnable(this, "checkForUpdatesWorker", taskPanel, listener), "thread-checkForUpdates");
 	}
 
+	/**
+	 * returns 
+	 * @return
+	 */
+	public UpdateStatus isUpToDate()
+	{
+	   LoggingTask task = new LoggingTask();
+	   String appName = currRelease.getName();
+	   List<Release> unsortedReleaseList = DistUtils.getAvailableReleases(task, updateSiteUrl, appName, refCredential);
+
+	   if (unsortedReleaseList == null) {
+	      // The update check failed, so return a status of false with a message about the problem
+	      String msg = Joiner.on("; ").join(task.getMessages());
+	      return new UpdateStatus(msg);
+	   }
+      // Sort the items, and isolate the newest item
+      LinkedList<Release> fullList = Lists.newLinkedList(unsortedReleaseList);
+      Collections.sort(fullList);
+      Release newestRelease = fullList.removeLast();
+
+      // The check succeeded, so return wether or not the app is up to date.
+      return new UpdateStatus(newestRelease.equals(currRelease));
+	}
+	
+	
 	/**
 	 * Sets in the credentials used to access the update site. If either argument is null, then the credentials will be
 	 * cleared out.
@@ -203,7 +233,7 @@ public class DistMakerEngine
 
 		// Form the PickReleasePanel
 		pickVersionPanel = new PickReleasePanel(parentFrame, currRelease);
-		pickVersionPanel.setSize(320, 350);
+		pickVersionPanel.setSize(550, 500); // 320, 350);
 	}
 
 	/**
@@ -212,7 +242,7 @@ public class DistMakerEngine
 	 * This method will be called via reflection.
 	 */
 	@SuppressWarnings("unused")
-	private void checkForUpdatesWorker(FullTaskPanel aTask)
+	private void checkForUpdatesWorker(FullTaskPanel aTask, UpdateCheckListener listener)
 	{
 		List<Release> fullList;
 		Release chosenItem;
@@ -236,6 +266,9 @@ public class DistMakerEngine
 			aTask.abort();
 			return;
 		}
+		
+		// a successful test has been done, so notify the listener
+		listener.checkForNewVersionsPerformed();
 		
 		// Hide the taskPanel
 		aTask.setVisible(false);
