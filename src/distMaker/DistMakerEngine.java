@@ -267,8 +267,26 @@ public class DistMakerEngine
 			return;
 		}
 		
-		// a successful test has been done, so notify the listener
-		listener.checkForNewVersionsPerformed();
+      // a successful test has been done, so notify the listener
+      listener.checkForNewVersionsPerformed();
+
+      // In case there is only the current version, don't show the update selection panel.
+      // Just show a short message that everything is up to date, and abort.
+      // (This check used to be in the getAvailableReleases() call above, but I needed
+      // that to not throw an error for the case of only one release, so I moved that
+      // check here.)
+      if (fullList.size() == 1) {
+         if (fullList.get(0).equals(currRelease)) {
+            // There is only one release out there, and its the same
+            // as the one being run, so there is nothing to update.
+            String msg = "There are no updates of " + appName + ". Only one release has been made.";
+            aTask.infoAppendln(msg);
+            aTask.abort();
+            return;
+         }
+      }
+
+		
 		
 		// Hide the taskPanel
 		aTask.setVisible(false);

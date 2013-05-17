@@ -240,8 +240,6 @@ public class DistUtils
 			; // Nothing to do, as an earlier error has occured
 		else if (fullList.size() == 0)
 			errMsg = "The update URL appears to be invalid.";
-		else if (fullList.size() == 1)
-			errMsg = "There are no updates of " + appName + ". Only one release has been made.";
 
 		// Bail if there were issues
 		if (errMsg != null)
