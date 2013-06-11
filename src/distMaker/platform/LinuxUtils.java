@@ -11,7 +11,7 @@ public class LinuxUtils
 {
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the plist file (aFile) to the specified
+	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified
 	 * maxMemVal.
 	 * <P>
 	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in
@@ -77,7 +77,7 @@ public class LinuxUtils
 	/**
 	 * Helper method to output the specified strings to aFile
 	 */
-	private static boolean writeDoc(File aFile, List<String> strList)
+	public static boolean writeDoc(File aFile, List<String> strList)
 	{
 		BufferedWriter bw;
 

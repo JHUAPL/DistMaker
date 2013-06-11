@@ -58,7 +58,7 @@ public class MemUtils
 	 */
 	public static boolean setMaxHeapMem(MessagePanel warnPanel, long maxMemSize)
 	{
-		File installPath, pFile, scriptFile;
+		File installPath, pFile, configFile, scriptFile;
 		String errMsg;
 		boolean isValidPlatform;
 
@@ -105,6 +105,25 @@ public class MemUtils
 			if (errMsg != null)
 			{
 				warnPanel.setTitle("Failed setting Linux configuration.");
+				warnPanel.setInfo(errMsg);
+				warnPanel.setVisible(true);
+				return false;
+			}
+		}
+
+		// Windows specific platform files
+		configFile = WindowsUtils.getConfigFile();
+		if (configFile != null && configFile.isFile() == true)
+		{
+			isValidPlatform = true;
+
+			errMsg = null;
+			if (WindowsUtils.updateMaxMem(configFile, maxMemSize) == false)
+				errMsg = "Failure. Failed to update file: " + configFile;
+
+			if (errMsg != null)
+			{
+				warnPanel.setTitle("Failed setting Windows configuration.");
 				warnPanel.setInfo(errMsg);
 				warnPanel.setVisible(true);
 				return false;
