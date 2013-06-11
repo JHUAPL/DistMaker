@@ -10,7 +10,7 @@ import time
 
 # Globals
 # The version of DistMaker
-version = '0.37'
+version = '0.38'
 
 
 def logAndPrint(message="", indent=0, showTime=False):
