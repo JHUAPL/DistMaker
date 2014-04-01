@@ -10,13 +10,14 @@ import subprocess
 import sys
 import tempfile
 import time
+import glob
 
 import miscUtils
 
 # Globals
 # The global var jre is a pointer to a full jre release for an Apple system
 # There should be a release located at <installpath>/jre/apple/jreRelease
-jreRelease='jdk1.7.0_06'
+jreRelease='jre1.7.0_51'
 
 
 
@@ -146,6 +147,7 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
 		shutil.copy(srcPath, dstPath)
 	
+	
 	# Write out the PkgInfo file	
 	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', "PkgInfo")
 	f = open(dstPath, 'wb')
@@ -161,6 +163,23 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	srcPath = os.path.join(buildPath, "delta")
 	dstPath = os.path.join(payloadPath, 'app')
 	shutil.copytree(srcPath, dstPath, symlinks=True)
+
+	#Link dlls to the MacOS directory so they can be found at launch
+	jarDir = os.path.join(rootPath, appName + '.app', 'Contents', 'app', 'code','osx')
+	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
+	for jniPath in glob.iglob(os.path.join(jarDir,"*.jnilib")):
+		jniFileName = os.path.basename(jniPath)
+		srcPath = os.path.join('..','app','code','osx',jniFileName)
+		linkPath = os.path.join(dstPath,jniFileName)
+		os.symlink(srcPath,linkPath)
+	for dylPath in glob.iglob(os.path.join(jarDir,"*.dylib")):
+		dylFileName = os.path.basename(dylPath)
+		srcPath = os.path.join('..','app','code','osx',dylFileName)
+		linkPath = os.path.join(dstPath,dylFileName)
+		os.symlink(srcPath,linkPath)
+
+
+
 	
 	# Setup the launcher contents
 	exePath = os.path.join(payloadPath, 'Java')

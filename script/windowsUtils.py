@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import glob
 
 import miscUtils
 
@@ -70,6 +71,19 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	srcPath = os.path.join(buildPath, "delta")
 	dstPath = os.path.join(rootPath, "app")
 	shutil.copytree(srcPath, dstPath, symlinks=True)
+
+	#Copy dlls to the app directory so they can be found at launch
+	dllDir = os.path.join(rootPath,'app', 'code','win')
+	for libPath in glob.iglob(os.path.join(dllDir,"*.lib")):
+		libFileName = os.path.basename(libPath)
+		srcPath = os.path.join(dllDir,libFileName)
+		linkPath = os.path.join(dstPath,libFileName)
+		shutil.copy(srcPath,linkPath)
+	for dllPath in glob.iglob(os.path.join(dllDir,"*.dll")):
+		dllFileName = os.path.basename(dllPath)
+		srcPath = os.path.join(dllDir,dllFileName)
+		linkPath = os.path.join(dstPath,dllFileName)
+		shutil.copy(srcPath,linkPath)
 
 	# Setup the launcher contents
 	exePath = os.path.join(rootPath, "launcher")
