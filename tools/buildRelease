@@ -9,8 +9,8 @@ import sys
 import time
 
 # Globals
-# The version of DistMaker
-version = '0.38'
+# The default version of DistMaker
+version = '0.41'
 
 
 def logAndPrint(message="", indent=0, showTime=False):
@@ -23,7 +23,7 @@ def logAndPrint(message="", indent=0, showTime=False):
 	print(message)
 
 
-def buildRelease():
+def buildRelease(version, doNotClean=False):
 	# Retrieve the install path
 	installPath = getInstallRoot()
 	installPath = os.path.dirname(installPath)
@@ -65,14 +65,14 @@ def buildRelease():
 	# Copy the libraries
 	dstPath = os.path.join(workPath, 'lib')
 	os.mkdir(dstPath)
-	for aLib in ['glum.jar', 'guava-13.0.1.jar', 'distMaker.jar']:
+	for aLib in ['glum.jar', 'guava-18.0.jar', 'distMaker.jar']:
 		srcPath = os.path.join(installPath, 'lib', aLib)
 		shutil.copy2(srcPath, dstPath)
 
 	# Copy the scripts
 	dstPath = os.path.join(workPath, 'script')
 	os.mkdir(dstPath)
-	for aScript in ['appleUtils.py', 'linuxUtils.py', 'windowsUtils.py', 'buildDist.py', 'deployDist.py', 'miscUtils.py']:
+	for aScript in ['appleUtils.py', 'linuxUtils.py', 'windowsUtils.py', 'buildDist.py', 'deployDist.py', 'jreUtils.py', 'logUtils.py', 'miscUtils.py']:
 		srcPath = os.path.join(installPath, 'script', aScript)
 		shutil.copy2(srcPath, dstPath)
 
@@ -86,7 +86,7 @@ def buildRelease():
 	dstPath = os.path.join(workPath, 'template')
 	os.makedirs(dstPath + '/apple')
 	os.makedirs(dstPath + '/background')
-	for aFile in ['appLauncher.jar', '.DS_Store', 'apple/JavaAppLauncher', 'apple/JavaApplicationStub', 'background/background.png']:
+	for aFile in ['appLauncher.jar', '.DS_Store.template', 'apple/JavaAppLauncher', 'apple/JavaApplicationStub', 'background/background.png']:
 		srcPath = os.path.join(installPath, 'template', aFile)
 		shutil.copy2(srcPath, dstPath + '/' + aFile)
 
@@ -107,13 +107,14 @@ def buildRelease():
 		exit(-1)
 
 	# Remove the workPath
-	shutil.rmtree(workPath)
+	if doNotClean == False:
+		shutil.rmtree(workPath)
 
 	print('DistMaker release ' + version + ' built.')
 
 
 def getInstallRoot():
-	"""Returns the root path where the running script is insalled."""
+	"""Returns the root path where the running script is installed."""
 	argv = sys.argv;
 	installRoot = os.path.dirname(argv[0])
 #	print('appInstallRoot: ' + appInstallRoot)
@@ -122,26 +123,52 @@ def getInstallRoot():
 
 def printUsage():
 	scriptName = os.path.split(sys.argv[0])[1]
-	print(scriptName + ' [-full]')
-	print('      -full:     Force a full build of the main jar file.')
+	print(scriptName + ' [-help,-doNotClean,-full],[-version <aVersion>]')
+	print('      -help:       Show this help message and exit.')
+	print('      -version:    Version to build. Default is: ' + version)
+	print('      -doNotClean: Do NOT remove temporary work folder created while generating release.')
+	print('      -full:       Force a full build of the main jar file. (Unsupported action)')
 	exit(-1)
 
 
 def handleSignal(signal, frame):
-		print('You pressed Ctrl+C!')
+		"""Signal handler, typically used to capture ctrl-c."""
+		print('User aborted processing!')
 		sys.exit(0)
 
 
 if __name__ == "__main__":
-	argv = sys.argv;
-	argc = len(argv);
+	argv = sys.argv
+	argc = len(argv)
+
+	# Intercept any request for a  help message and bail
+	for aArg in argv:
+		if aArg == '-h' or aArg == '-help':
+			printUsage()
+			exit()
 
 	doFullBuild = False
-	if argc == 2 and argv[1] == "-full":
-		doFullBuild = True
-	elif argc != 1:
-		print('   Invalid num args. Num Args:' + str(argc))
-		printUsage()
+	doNotClean = False
+	skipNext = False;
+	for currIdx in xrange(1, len(argv)):
+		aArg = argv[currIdx]
+		if skipNext == True:
+			skipNext = False
+			continue
+		if aArg == '-full':
+			doFullBuild = True
+		elif aArg == '-doNotClean':
+			doNotClean = True
+		elif aArg == '-version':
+			if currIdx == argc - 1:
+				print('\tPlease specify an actual version when using -version')
+				exit(-1)
+			else:
+				version = argv[currIdx + 1]
+				skipNext = True
+		else:
+			print('   Unrecognized argument: ' + aArg)
+			printUsage()
 
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, handleSignal)
@@ -150,4 +177,4 @@ if __name__ == "__main__":
 	if doFullBuild == True:
 		print("Unsupported action: [-full]. Skipping...")
 
-	buildRelease()
+	buildRelease(version, doNotClean)
