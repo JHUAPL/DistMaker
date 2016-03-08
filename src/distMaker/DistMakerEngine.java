@@ -6,7 +6,7 @@ import glum.gui.panel.task.FullTaskPanel;
 import glum.io.IoUtil;
 import glum.net.Credential;
 import glum.reflect.FunctionRunnable;
-import glum.task.Task;
+import glum.task.*;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
 
@@ -26,9 +26,9 @@ import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 
 import distMaker.gui.PickReleasePanel;
+import distMaker.node.FileNode;
 import distMaker.node.Node;
 import distMaker.platform.AppleUtils;
 
@@ -118,15 +118,14 @@ public class DistMakerEngine
 	      return new UpdateStatus(msg);
 	   }
       // Sort the items, and isolate the newest item
-      LinkedList<Release> fullList = Lists.newLinkedList(unsortedReleaseList);
+      LinkedList<Release> fullList = new LinkedList<>(unsortedReleaseList);
       Collections.sort(fullList);
       Release newestRelease = fullList.removeLast();
 
       // The check succeeded, so return wether or not the app is up to date.
       return new UpdateStatus(newestRelease.equals(currRelease));
 	}
-	
-	
+
 	/**
 	 * Sets in the credentials used to access the update site. If either argument is null, then the credentials will be
 	 * cleared out.
@@ -266,9 +265,9 @@ public class DistMakerEngine
 			aTask.abort();
 			return;
 		}
-		
-      // a successful test has been done, so notify the listener
-      listener.checkForNewVersionsPerformed();
+
+		// a successful test has been done, so notify the listener
+		listener.checkForNewVersionsPerformed();
 
       // In case there is only the current version, don't show the update selection panel.
       // Just show a short message that everything is up to date, and abort.
@@ -286,8 +285,6 @@ public class DistMakerEngine
          }
       }
 
-		
-		
 		// Hide the taskPanel
 		aTask.setVisible(false);
 
@@ -313,7 +310,7 @@ public class DistMakerEngine
 		chosenItem = pickVersionPanel.getChosenItem();
 		if (chosenItem == null)
 			return;
-		
+
 		// Reshow the taskPanel
 		aTask.setVisible(true);
 
@@ -379,6 +376,8 @@ public class DistMakerEngine
 		Node staleNode, updateNode;
 		URL catUrl, staleUrl, updateUrl;
 		File catalogFile;
+		Task mainTask, tmpTask;
+		long nodeFileLen;
 		boolean isPass;
 
 		try
@@ -393,10 +392,10 @@ public class DistMakerEngine
 			return false;
 		}
 
-		// Download the update catalog to the (local) delta location
+		// Download the update catalog to the (local) delta location (Progress -> [0% - 1%])
 		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
 		catalogFile = new File(destPath, "catalog.txt");
-		if (DistUtils.downloadFile(aTask, catUrl, catalogFile, refCredential) == false)
+		if (DistUtils.downloadFile(new PartialTask(aTask, 0.00, 0.01), catUrl, catalogFile, refCredential, -1L) == false)
 			return false;
 
 		// Load the map of stale nodes
@@ -411,43 +410,62 @@ public class DistMakerEngine
 		if (updateMap == null)
 			return false;
 
-		// Download the individual files
-		aTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Nodes: " + updateMap.size());
+		// Determine the total number of bytes to be transferred
+		long releaseSizeFull = 0L, releaseSizeCurr = 0L;
+		for (Node aNode : updateMap.values())
+		{
+			if (aNode instanceof FileNode)
+				releaseSizeFull += ((FileNode)aNode).getFileLen();
+		}
+
+		// Download the individual files (Progress -> [1% - 95%])
+		double progressVal = 0.00;
+		mainTask = new PartialTask(aTask, 0.01, 0.94);
+		mainTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Nodes: " + updateMap.size());
 		for (String aFileName : updateMap.keySet())
 		{
 			// Bail if we have been aborted
-			if (aTask.isActive() == false)
+			if (mainTask.isActive() == false)
 				return false;
 
 			updateNode = updateMap.get(aFileName);
 			staleNode = staleMap.get(aFileName);
+			nodeFileLen = 0L;
+			if (updateNode instanceof FileNode)
+				nodeFileLen = ((FileNode)updateNode).getFileLen();
+			tmpTask = new PartialTask(mainTask, mainTask.getProgress(), nodeFileLen / (releaseSizeFull + 0.00));
 
 			// Attempt to use the local copy
 			isPass = false;
 			if (staleNode != null && updateNode.areContentsEqual(staleNode) == true)
 			{
-				isPass = staleNode.transferContentTo(aTask, refCredential, destPath);
+				isPass = staleNode.transferContentTo(tmpTask, refCredential, destPath);
 				if (isPass == true)
-					aTask.infoAppendln("\t(L) " + staleNode.getFileName());
+					mainTask.infoAppendln("\t(L) " + staleNode.getFileName());
 			}
 
 			// Use the remote update copy, if we were not able to use a local stale copy
-			if (isPass == false && aTask.isActive() == true)
+			if (isPass == false && mainTask.isActive() == true)
 			{
-				isPass = updateNode.transferContentTo(aTask, refCredential, destPath);
+				isPass = updateNode.transferContentTo(tmpTask, refCredential, destPath);
 				if (isPass == true)
-					aTask.infoAppendln("\t(R) " + updateNode.getFileName());
+					mainTask.infoAppendln("\t(R) " + updateNode.getFileName());
 			}
 
 			// Log the failure and bail
-			if (isPass == false && aTask.isActive() == true)
+			if (isPass == false && mainTask.isActive() == true)
 			{
-				aTask.infoAppendln("Failed to download from update site.");
-				aTask.infoAppendln("\tSite: " + updateUrl);
-				aTask.infoAppendln("\tFile: " + updateNode.getFileName());
-				aTask.infoAppendln("\tDest: " + destPath);
+				mainTask.infoAppendln("Failed to download from update site.");
+				mainTask.infoAppendln("\tSite: " + updateUrl);
+				mainTask.infoAppendln("\tFile: " + updateNode.getFileName());
+				mainTask.infoAppendln("\tDest: " + destPath);
 				return false;
 			}
+
+			// Update the progress
+			releaseSizeCurr += nodeFileLen;
+			progressVal = releaseSizeCurr / (releaseSizeFull + 0.00);
+			mainTask.setProgress(progressVal);
 		}
 
 		// Update the platform configuration files

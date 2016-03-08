@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import argparse
+import copy
 import getpass
 import math
 import os
@@ -12,28 +13,39 @@ import tempfile
 import time
 import glob
 
+import jreUtils
 import miscUtils
-
-# Globals
-# The global var jre is a pointer to a full jre release for an Apple system
-# There should be a release located at <installpath>/jre/apple/jreRelease
-jreRelease='jre1.7.0_51'
-
 
 
 def buildRelease(args, buildPath):
+	# We may mutate args - thus make a custom copy  
+	args = copy.copy(args)
+	
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
+	jreRelease = args.jreRelease
 	
+	# Attempt to locate a default JRE if none is specified in the args.
+	if jreRelease == None:
+		jreRelease = jreUtils.getDefaultJreRelease('apple')
+	# Let the user know if the 'user' specified JRE is not available and locate an alternative
+	elif jreUtils.isJreAvailable('apple', jreRelease) == False:
+		print('[Warning] User specified JRE (' + jreRelease + ') is not available for Apple platform. Searching for alternative...')
+		jreRelease = jreUtils.getDefaultJreRelease('apple')
+	args.jreRelease = jreRelease
+
 	# Form the list of distributions to build
 	distList = [(appName + '-' + version, False)]
-	if miscUtils.isJreAvailable('apple', jreRelease) == True:
+	if jreUtils.isJreAvailable('apple', jreRelease) == True:
 		distList.append((appName + '-' + version + '-jre', True))
 
 	# Create the various Apple distributions	
 	for (distName, isStaticRelease) in distList:
 		print('Building Apple distribution: ' + distName)
+		# Let the user know of the JRE release we are going to build with
+		if isStaticRelease == True:
+			print('\tUtilizing jreRelease: ' + jreRelease)
 		
 		# Create a tmp folder and build the static release to the tmp folder 
 		tmpPath = tempfile.mkdtemp(dir=buildPath)
@@ -45,10 +57,14 @@ def buildRelease(args, buildPath):
 		dmgFile = os.path.join(buildPath, distName + '.dmg')
 #		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
 		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
-		subprocess.call(cmd, stderr=subprocess.STDOUT)
-	
+		print('\tForming DMG image. File: ' + dmgFile)
+		proc = miscUtils.executeAndLog(cmd, "\t\tgenisoimage: ")
+		if proc.returncode != 0:
+			print('\tError: Failed to form DMG image. Return code: ' + str(proc.returncode))
+
 		# Perform cleanup: Remove the tmp folder
 		shutil.rmtree(tmpPath)
+		print('\tFinished building release: ' + os.path.basename(dmgFile))
 	
 	
 	
@@ -117,6 +133,7 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	appName = args.name
 	bgFile = args.bgFile
 	icnsFile = args.icnsFile
+	jreRelease = args.jreRelease
 	
 	# Form the symbolic link which points to /Applications 
 	srcPath = '/Applications'
@@ -146,7 +163,6 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 		srcPath = os.path.join(appTemplatePath, 'apple', 'JavaApplicationStub')
 		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
 		shutil.copy(srcPath, dstPath)
-	
 	
 	# Write out the PkgInfo file	
 	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', "PkgInfo")
@@ -212,15 +228,18 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	shutil.copy(srcPath, dstPath)
 	
 	# Copy over the .DS_Store
-	srcPath = os.path.join(appTemplatePath, '.DS_Store')
-	dstPath = rootPath
+	srcPath = os.path.join(appTemplatePath, '.DS_Store.template')
+	dstPath = os.path.join(rootPath, '.DS_Store')
 	shutil.copy(srcPath, dstPath)
 	
 	# Update the .DS_Store file to reflect the new volume name
 	srcPath = os.path.join(rootPath, '.DS_Store')
-	classPath = appInstallRoot + '/lib/glum.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-13.0.1.jar'
+	classPath = appInstallRoot + '/lib/glum.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
 	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
-	subprocess.check_call(cmd, stderr=None, stdout=None)
+	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
+	if proc.returncode != 0:
+		print('\tError: Failed to update .DS_Store. Return code: ' + str(proc.returncode))
+
 	
 
 
@@ -368,7 +387,7 @@ def buildPListInfoStatic(destFile, args):
 	tupList.append(('CFBundleSignature', '????'))
 	tupList.append(('CFBundleVersion', args.version))
 	tupList.append(('NSHumanReadableCopyright', ''))
-	tupList.append(('JVMRuntime', jreRelease))
+	tupList.append(('JVMRuntime', args.jreRelease))
 	
 	tupList.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
 	

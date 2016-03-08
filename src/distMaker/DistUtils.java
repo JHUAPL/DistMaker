@@ -2,35 +2,19 @@ package distMaker;
 
 import glum.gui.GuiUtil;
 import glum.io.IoUtil;
-import glum.net.Credential;
-import glum.net.NetUtil;
-import glum.net.Result;
+import glum.net.*;
 import glum.reflect.ReflectUtil;
 import glum.task.ConsoleTask;
 import glum.task.Task;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
-import distMaker.node.FileNode;
-import distMaker.node.Node;
-import distMaker.node.PathNode;
+import distMaker.node.*;
 
 public class DistUtils
 {
@@ -39,10 +23,10 @@ public class DistUtils
 	private static boolean isDevelopersEnvironment = true;
 	private static int updateCode = 0; // Static member to declare the update status, 0: None, 1: Pass, 2: Fail
 	private static String updateMsg = null;
-	
+
 	// Static field used only when developing DistMaker. Otherwise this field should always be null.
 	private static File developAppPath = null;
-	
+
 	/**
 	 * Utility method to determine the path where the application is installed.
 	 * <P>
@@ -51,7 +35,7 @@ public class DistUtils
 	public static File getAppPath()
 	{
 		File jarPath, currPath, testFile;
-		
+
 		// If we are in developer mode then return the developAppPath
 		if (developAppPath != null)
 			return developAppPath;
@@ -101,15 +85,21 @@ public class DistUtils
 
 	/**
 	 * Downloads the specified file from srcUrl to destFile. Returns true on success
+	 * <P>
+	 * Note the passed in task's progress will be updated from 0% to 100% at file download completion, If the specified
+	 * file size is invalid (aFileSize <= 0) or the download turns out to be bigger than the specified size then there
+	 * will be no progress update while the file is being downloaded - only at completion.
 	 */
 	@SuppressWarnings("resource")
-   public static boolean downloadFile(Task aTask, URL aUrl, File aFile, Credential aCredential)
+	public static boolean downloadFile(Task aTask, URL aUrl, File aFile, Credential aCredential, long aFileSize)
 	{
 		URLConnection connection;
 		InputStream inStream;
 		OutputStream outStream;
 		String errMsg;
 		byte[] byteArr;
+		double progressVal;
+		long cntByteFull, cntByteCurr;
 		int numBytes;
 
 		// Ensure we have a valid aTask
@@ -135,21 +125,42 @@ public class DistUtils
 			outStream = new FileOutputStream(aFile);
 
 			// Copy the bytes from the instream to the outstream
+			cntByteFull = aFileSize;
+			cntByteCurr = 0;
 			numBytes = 0;
 			while (numBytes != -1)
 			{
 				numBytes = inStream.read(byteArr);
 				if (numBytes > 0)
+				{
 					outStream.write(byteArr, 0, numBytes);
+					cntByteCurr += numBytes;
+				}
+
+				// Update the progressVal to reflect the download progress. Note however that we do update the
+				// progress to 100% since that would change the task to be flagged as inactive and thus cause
+				// the download to be aborted prematurely.
+				// TODO: In the future Tasks should not be marked as inactive based on progress values
+				progressVal = 0;
+				if (cntByteFull > 0)
+				{
+					progressVal = (cntByteCurr + 0.0) / cntByteFull;
+					if (progressVal >= 1.0)
+						progressVal = 0.99;
+				}
+				aTask.setProgress(progressVal);
 
 				// Bail if aTask is aborted
 				if (aTask.isActive() == false)
 				{
 					aTask.infoAppendln("File transfer request has been aborted...");
-					aTask.infoAppendln("\tFile: " + aFile);
+					aTask.infoAppendln("\tFile: " + aFile + " Bytes transferred: " + cntByteCurr);
 					return false;
 				}
 			}
+
+			// Mark aTask's progress as complete since the file was downloaded.
+			aTask.setProgress(1.0);
 		}
 		catch (IOException aExp)
 		{
@@ -180,7 +191,7 @@ public class DistUtils
 		String errMsg;
 
 		errMsg = null;
-		fullList = Lists.newArrayList();
+		fullList = new ArrayList<>();
 		catUrl = IoUtil.createURL(aUpdateUrl.toString() + "/" + appName + "/" + "releaseInfo.txt");
 
 		connection = null;
@@ -259,7 +270,7 @@ public class DistUtils
 		URL fetchUrl;
 		Result result;
 		String errMsg;
-		
+
 		// Dump the stack trace
 		aExp.printStackTrace();
 
@@ -291,8 +302,8 @@ public class DistUtils
 			errMsg += "An undefined error occurred while retrieving the remote file.\n";
 			break;
 		}
-		
-		// Log the URL which we failed on 
+
+		// Log the URL which we failed on
 		fetchUrl = aConnection.getURL();
 		errMsg += "\tURL: " + fetchUrl + "\n";
 
@@ -307,12 +318,12 @@ public class DistUtils
 	public static boolean isFullyWriteable(File aPath)
 	{
 		// There is no known way to change, the write bit to true, in windows,
-		// so by default, assume the path is writable. This method is totally unreliable on 
-		// the Windows platform (Gives bogus results for files on CDs). 
+		// so by default, assume the path is writable. This method is totally unreliable on
+		// the Windows platform (Gives bogus results for files on CDs).
 		// TODO: See if File.canWrite(), returns the proper value on Windows
 		if (System.getProperty("os.name").startsWith("Windows") == true)
 			return true;
-		
+
 		if (aPath.isDirectory() == false)
 			throw new RuntimeException("Specified path is not a folder: " + aPath);
 
@@ -342,7 +353,7 @@ public class DistUtils
 		String errMsg;
 
 		errMsg = null;
-		retMap = Maps.newLinkedHashMap();
+		retMap = new LinkedHashMap<>();
 
 		inStream = null;
 		bufReader = null;

@@ -30,6 +30,9 @@ import static distMaker.platform.MemUtils.GB_SIZE;
 
 public class MemoryConfigPanel extends GlassPanel implements ActionListener, ZioRaw, ListSelectionListener
 {
+	/** Unused - but added to eliminate warning due to poorly designed java.io.Serializable interface. */
+	private static final long serialVersionUID = 1L;
+
 	// GUI vars
 	private JLabel titleL;
 	private GLabel maxMemL, currMemL, targMemL;

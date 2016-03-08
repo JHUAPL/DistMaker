@@ -1,9 +1,8 @@
 package dsstore;
 
 import java.nio.ByteBuffer;
+import java.util.LinkedHashMap;
 import java.util.Map;
-
-import com.google.common.collect.Maps;
 
 import dsstore.ext.*;
 
@@ -67,7 +66,7 @@ public class AliasRecord
 
 	public AliasRecord()
 	{
-		extMap = Maps.newLinkedHashMap();
+		extMap = new LinkedHashMap<>();
 	}
 
 	/**
@@ -204,12 +203,10 @@ public class AliasRecord
 		tmpStr = "/Volumes/" + aVolName;
 		extMap.put(19, new StrExtInfo(19, tmpStr));
 
-
 // TODO:		
 		// Remove the (unknown) ExtInfo type == 20
 //		extMap.remove(20);
 //System.out.println("Will not remove unknown type: 20\n\t" + extMap.get(20));
-
 
 		// Update the internal copy of the record size
 		recSize = size();

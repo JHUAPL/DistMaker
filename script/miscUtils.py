@@ -2,18 +2,77 @@
 import hashlib
 import os
 import time
+import subprocess
 import sys
 
-def handleSignal(signal, frame):
-		"""Signal handler, typically used to capture ctrl-c."""
-		print('User aborted processing!')
-		sys.exit(0)
+import logUtils
 
 
+def checkRoot():
+	"""Determines if the script is running with root priveleges."""
+	# This logic will may break on SELinux systems
+	if os.geteuid() != 0:
+		msg = '   You need to have root privileges to run this script.\n'
+		msg += '   Please run this script with sudo!\n'
+		msg += '   Exiting...\n'
+		exit(msg)
+
+
+# Source: http://stackoverflow.com/questions/1131220/get-md5-hash-of-a-files-without-open-it-in-python
+def computeMd5ForFile(evalFile, block_size=2**20):
+	f = open(evalFile, 'rb')
+	md5 = hashlib.md5()
+	while True:
+		data = f.read(block_size)
+		if not data:
+			break
+		md5.update(data)
+	f.close()
+	return md5.hexdigest()
+
+
+def getInstallRoot():
+	"""Returns the root path where the running script is installed."""
+	argv = sys.argv;
+	installRoot = os.path.dirname(argv[0])
+#	print('appInstallRoot: ' + appInstallRoot)
+	return installRoot
+
+
+def executeAndLog(command, indentStr=""):
+	"""Executes the specified command via subprocess and logs all (stderr,stdout) output to the console"""
+#	proc = subprocess.
+#	proc.returncode = -1
+	try:
+		proc = subprocess.Popen(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+		proc.wait()
+		outStr = proc.stdout.read()
+		if outStr != "":
+			outStr = logUtils.appendLogOutputWithText(outStr, indentStr)
+			print(outStr)
+	except Exception as aExp:
+		print(indentStr + 'Failed to execute command: ' + str(command))
+		outStr = logUtils.appendLogOutputWithText(str(aExp), indentStr)
+		print(outStr)
+		print(indentStr + 'Stack Trace:')
+		outStr = logUtils.appendLogOutputWithText(aExp.child_traceback, indentStr + '\t')
+		print(outStr)
+		
+		class Proc:
+			returncode = None
+		proc = Proc
+		
+#		proc = None
+	
+	return proc
+#		if proc.returncode != 0:
+#			print('\tError: Failed to build executable. Return code: ' + proc.returncode)
+	
+	
 def getPathSize(aRoot):
 	"""Computes the total disk space used by the specified path.
 	Note if aRoot does not exist or is None then this will return 0"""
-	# Check for existance
+	# Check for existence
 	if aRoot == None or os.path.exists(aRoot) == False:
 		return 0
 	
@@ -32,31 +91,10 @@ def getPathSize(aRoot):
 	return numBytes
 
 
-def checkRoot():
-	"""
-	Determines if the scrip ist running with root priveleges."""
-	# This logic will may break on SELinux systems
-	if os.geteuid() != 0:
-		msg = '   You need to have root privileges to run this script.\n'
-		msg += '   Please run this script with sudo!\n'
-		msg += '   Exiting...\n'
-		exit(msg)
-
-
-def getInstallRoot():
-	"""Returns the root path where the running script is insalled."""
-	argv = sys.argv;
-	installRoot = os.path.dirname(argv[0])
-#	print('appInstallRoot: ' + appInstallRoot)
-	return installRoot
-
-
-def isJreAvailable(systemName, jreRelease):
-	appInstallRoot = getInstallRoot()
-	appInstallRoot = os.path.dirname(appInstallRoot)
-
-	srcPath = os.path.join(appInstallRoot, 'jre', systemName, jreRelease)
-	return os.path.isdir(srcPath)
+def handleSignal(signal, frame):
+	"""Signal handler, typically used to capture ctrl-c."""
+	print('User aborted processing!')
+	sys.exit(0)
 
 
 def buildAppLauncherConfig(destFile, args):
@@ -114,15 +152,3 @@ def buildAppLauncherConfig(destFile, args):
 
 	f.close()
 
-
-# Source: http://stackoverflow.com/questions/1131220/get-md5-hash-of-a-files-without-open-it-in-python
-def computeMd5ForFile(evalFile, block_size=2**20):
-	f = open(evalFile, 'rb')
-	md5 = hashlib.md5()
-	while True:
-		data = f.read(block_size)
-		if not data:
-			break
-		md5.update(data)
-	f.close()
-	return md5.hexdigest()

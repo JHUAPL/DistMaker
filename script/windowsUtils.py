@@ -1,30 +1,38 @@
 #! /usr/bin/env python
 
 import argparse
+import copy
 import getpass
 import math
 import os
 import shutil
 import signal
-import subprocess
 import sys
 import tempfile
 import time
 import glob
 
+import jreUtils
 import miscUtils
-
-# Globals
-# The global var jre is a pointer to a full jre release for a Windows system
-# There should be a release located at <installpath>/jre/windows/jreRelease
-jreRelease = 'jre1.7.0_15'
-
 
 
 def buildRelease(args, buildPath):
+	# We mutate args - thus make a custom copy  
+	args = copy.copy(args)
+	
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
+	jreRelease = args.jreRelease
+	
+	# Attempt to locate a default JRE if none is specified in the args.
+	if jreRelease == None:
+		jreRelease = jreUtils.getDefaultJreRelease('windows')
+	# Let the user know if the 'user' specified JRE is not available and locate an alternative
+	elif jreUtils.isJreAvailable('windows', jreRelease) == False:
+		print('[Warning] User specified JRE (' + jreRelease + ') is not available for Windows platform. Searching for alternative...')
+		jreRelease = jreUtils.getDefaultJreRelease('windows')
+	args.jreRelease = jreRelease
 
 	# Bail if launch4j is not installed	
 	appInstallRoot = miscUtils.getInstallRoot()
@@ -39,12 +47,15 @@ def buildRelease(args, buildPath):
 
 	# Form the list of distributions to build
 	distList = [(appName + '-' + version, False)]
-	if miscUtils.isJreAvailable('windows', jreRelease) == True:
+	if jreUtils.isJreAvailable('windows', jreRelease) == True:
 		distList.append((appName + '-' + version + '-jre', True))
 
 	# Create the various Windows distributions	
 	for (distName, isStaticRelease) in distList:
 		print('Building Windows distribution: ' + distName)
+		# Let the user know of the JRE release we are going to build with
+		if isStaticRelease == True:
+			print('\tUtilizing jreRelease: ' + jreRelease)
 
 		# Create the (top level) distribution folder
 		dstPath = os.path.join(tmpPath, distName)
@@ -55,7 +66,14 @@ def buildRelease(args, buildPath):
 
 		# Create the zip file
 		zipFile = os.path.join(buildPath, distName + ".zip")
-		subprocess.check_call(["jar", "-cMf", zipFile, "-C", dstPath, '.'], stderr=subprocess.STDOUT)
+		cmd = ["jar", "-cMf", zipFile, "-C", dstPath, '.']
+		print('\tForming zip file: ' + zipFile)
+		proc = miscUtils.executeAndLog(cmd, "\t\tjar: ")
+		if proc.returncode != 0:
+			print('\tError: Failed to form zip file. Return code: ' + str(proc.returncode))
+			print('\tAborting build of release: ' + os.path.basename(zipFile))
+		else:
+			print('\tFinished building release: ' + os.path.basename(zipFile))
 
 	# Perform cleanup
 	shutil.rmtree(tmpPath)
@@ -66,6 +84,7 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appName = args.name
+	jreRelease = args.jreRelease
 
 	# Form the app contents folder
 	srcPath = os.path.join(buildPath, "delta")
@@ -104,11 +123,14 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 		origIconFile = args.iconFile
 		if origIconFile != None:
 			winIconFile = os.path.join(rootPath, os.path.basename(origIconFile) + ".ico")
-			eCode = subprocess.call(["convert", origIconFile, winIconFile], stderr=subprocess.STDOUT)
-			if eCode != 0:
-				print('ImageMagick convert failed with eCode: ' + str(eCode))
-				print('There will be no windows icon file. System call:')
-				print('   convert ' + origIconFile + ' ' + winIconFile)
+			cmd = ['convert', origIconFile, winIconFile]
+			proc = miscUtils.executeAndLog(cmd, "\t\t(ImageMagick) convert: ")
+			if proc.returncode != 0:
+				if proc.returncode == None:
+					print('\t\tImageMagick convert does not appear to be properly installed.')
+				else:
+					print('\t\tImageMagick convert failed with eCode: ' + str(proc.returncode))
+				print('\t\tThere will be no windows icon file.')
 				winIconFile = None
 
 		# Form the launch4j config file
@@ -117,8 +139,11 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 
 		# Build the windows executable 
 		launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
-		subprocess.check_call([launch4jExe, configFile], stderr=subprocess.STDOUT)
-#		print(launch4jExe + ' ' + configFile)
+		cmd = [launch4jExe, configFile]
+		print('\tBuilding windows executable via launch4j')
+		proc = miscUtils.executeAndLog(cmd, "\t\t")
+		if proc.returncode != 0:
+			print('\tError: Failed to build executable. Return code: ' + str(proc.returncode))
 
 		# Perform cleanup
 		os.remove(configFile)
@@ -162,9 +187,11 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	writeln(f, 0, "");
 	writeln(f, 1, "<jre>");
 	if isStaticRelease == True:
-		writeln(f, 2, "<path>" + jreRelease + "</path>");
+		writeln(f, 2, "<path>" + args.jreRelease + "</path>");
 	else:
-		writeln(f, 2, "<minVersion>" + "1.7.0" + "</minVersion>");
+		jreVer = jreUtils.getJreMajorVersion(args.jreRelease)
+#		writeln(f, 2, "<minVersion>" + "1.7.0" + "</minVersion>");
+		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");
 #	writeln(f, 2, "<jdkPreference>jreOnly|preferJre|preferJdk|jdkOnly</jdkPreference>");
 	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");
 	for aJvmArg in args.jvmArgs:

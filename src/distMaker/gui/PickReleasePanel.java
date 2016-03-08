@@ -6,37 +6,24 @@ import glum.gui.action.ClickAction;
 import glum.gui.panel.GlassPanel;
 import glum.gui.panel.itemList.ItemListPanel;
 import glum.gui.panel.itemList.StaticItemProcessor;
-import glum.gui.panel.itemList.query.QueryComposer;
-import glum.gui.panel.itemList.query.QueryItemHandler;
-import glum.gui.panel.itemList.query.QueryTableCellRenderer;
+import glum.gui.panel.itemList.query.*;
 import glum.unit.ConstUnitProvider;
 import glum.unit.DateUnit;
 import glum.zio.raw.ZioRaw;
 
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Font;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Collections;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
 
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JRadioButton;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
+import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
-
-import com.google.common.collect.Lists;
-
 import distMaker.LookUp;
 import distMaker.Release;
 
@@ -97,8 +84,8 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		String appName, infoMsg;
 
 		// Sort the items, and isolate the newest item
-      LinkedList<Release> linkedList;
-		linkedList = Lists.newLinkedList(itemList);
+		LinkedList<Release> linkedList;
+		linkedList = new LinkedList<>(itemList);
 		Collections.sort(linkedList);
 		Collections.reverse(linkedList);  // reverse the list to show most recent versions on top
 		newestItem = linkedList.removeFirst();

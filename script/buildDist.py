@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import argparse
+import distutils.spawn
 import getpass
 import math
 import os
@@ -90,6 +91,42 @@ def buildCatalogFile(deltaPath):
 			f.write(aRecord[0] + ',' + aRecord[1] + ',' + aRecord[2] + ',' + aRecord[3] + '\n')
 	f.close()
 
+def checkForRequiredApplications():
+	"""Method to ensure we have all of the required applications installed to support building of distributions
+	The current set of applications required are:
+	java, jar, genisoimage, ImageMagick:convert"""
+	evalPath = distutils.spawn.find_executable('java')
+	errList = []
+	warnList = []
+	if evalPath == None:
+		errList.append('Failed while trying to locate java. Please install Java')
+	evalPath = distutils.spawn.find_executable('jar')
+	if evalPath == None:
+		errList.append('Failed while trying to locate jar. Please install jar (typically included with Java)')
+	evalPath = distutils.spawn.find_executable('genisoimage')
+	if evalPath == None:
+		errList.append('Failed while trying to locate genisoimage. Please install genisoimage')
+	evalPath = distutils.spawn.find_executable('convert')
+	if evalPath == None:
+		warnList.append('Application \'convert\' was not found. Please install (ImageMagick) convert')
+		warnList.append('\tWindows icons will not be supported when using argument: -iconFile.')
+	if len(errList) > 0:
+		print('There are configuration errors with the environment or system.')
+#		print('System Path:' + str(sys.path))
+		print('Please correct the following:')
+		for aError in errList:
+			print('\t' + aError)
+		if len(warnList) > 0:
+			print('Please correct the following for full program functionality:')
+			for aWarn in warnList:
+				print('\t' + aWarn)
+		sys.exit(0)
+	if len(warnList) > 0:
+		print('There are configuration issues with the environment or system.')
+		print('Please correct the following for full program functionality:')
+		for aWarn in warnList:
+			print('\t' + aWarn)
+
 
 def getClassPath(javaCodePath):
 	retList = []
@@ -102,6 +139,7 @@ def getClassPath(javaCodePath):
 
 	# Form the default list of all jar files
 	for path, dirs, files in os.walk(javaCodePath):
+		files.sort()
 		for file in files:
 			if len(file) > 4 and file[-4:] == '.jar':
 				filePath = os.path.join(path, file)
@@ -125,9 +163,10 @@ if __name__ == "__main__":
 	parser.add_argument('-name', help='The name of the application.')
 	parser.add_argument('-version', default='0.0.1', help='The version of the application.')
 	parser.add_argument('-mainClass', help='Application main entry point.')
-	parser.add_argument('-appArgs', help='Application arguments.', nargs='+', default=[])
+	parser.add_argument('-appArgs', help='Application arguments. Note that this argument must ALWAYS be the last specified!', nargs=argparse.REMAINDER, default=[])
 	parser.add_argument('-dataCode', '-dc', help='A list of supporting folders for the application.', nargs='+', default=[])
 	parser.add_argument('-javaCode', '-jc', help='A folder which contains the Java build.')
+	parser.add_argument('-jreRelease', help='JRE release to utilize. Note there should be a corresponding folder in ~/jre/<platform>/', default=None)
 	parser.add_argument('-jvmArgs', help='JVM arguments.', nargs='+', default=[])
 	parser.add_argument('-classPath', help='Class path listing of jar files relative to javaCode. Leave blank for auto determination.', nargs='+', default=[])
 	parser.add_argument('-debug', help='Turn on debug options for built applications.', action='store_true', default=False)
@@ -144,20 +183,30 @@ if __name__ == "__main__":
 			parser.print_help()
 			exit()
 
+	# Check to ensure all of the required applications are installed
+	checkForRequiredApplications()
+
 	# Parse the args		
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
 #	print args
 
 	# Ensure we are getting the bare minimum options
+	errList = [];
 	if args.name == None:
-		print('At a minimum the application name must be specified. Exiting...')
+		errList.append('-name')
+	if args.javaCode == None:
+		errList.append('-javaCode')
+	if args.mainClass == None:
+		errList.append('-mainClass')
+	if len(errList) != 0:
+		print('At a minimum the following must be specified: ' + str(errList) +  '.\nExiting...')
 		exit();
-
-	# Ensure java options are specified properly
-	if (args.javaCode == None and args.mainClass != None) or (args.javaCode != None and args.mainClass == None):
-		print('Both javaCode and mainClass must be specified, if either are specified. Exiting...')
-		exit();
+#
+#	# Ensure java options are specified properly
+#	if (args.javaCode == None and args.mainClass != None) or (args.javaCode != None and args.mainClass == None):
+#		print('Both javaCode and mainClass must be specified, if either are specified. Exiting...')
+#		exit();
 
 	# Form the classPath if none specified
 	if args.javaCode != None and len(args.classPath) == 0:
@@ -175,7 +224,6 @@ if __name__ == "__main__":
 		else:
 			newJvmArgs.append(aJvmArg)
 	args.jvmArgs = newJvmArgs
-
 
 	# Bail if the release has already been built
 	buildPath = os.path.abspath(args.name + '-' + args.version)
@@ -195,6 +243,10 @@ if __name__ == "__main__":
 	os.makedirs(deltaDataPath)
 	for aPath in args.dataCode:
 		srcPath = aPath
+		if os.path.isdir(srcPath) == False:
+			print('   [ERROR] The dataCode path does not exist. Path: ' + srcPath)
+			shutil.rmtree(buildPath)
+			exit(-1)
 		dstPath = os.path.join(deltaDataPath, os.path.basename(aPath))
 		shutil.copytree(srcPath, dstPath, symlinks=False)
 
@@ -202,6 +254,10 @@ if __name__ == "__main__":
 	if args.javaCode != None:
 		# Copy the javaCode to the proper location
 		srcPath = args.javaCode
+		if os.path.isdir(srcPath) == False:
+			print('   [ERROR] The javaCode path does not exist. Path: ' + srcPath)
+			shutil.rmtree(buildPath)
+			exit(-1)
 		dstPath = deltaCodePath;
 		shutil.copytree(srcPath, dstPath, symlinks=False)
 

@@ -43,6 +43,14 @@ public class FileNode implements Node
 		return true;
 	}
 
+	/**
+	 * Returns the length of the associated file
+	 */
+	public long getFileLen()
+	{
+		return fileLen;
+	}
+
 	@Override
 	public String getFileName()
 	{
@@ -57,10 +65,10 @@ public class FileNode implements Node
 
 		// Determine the source URL to copy the contents from
 		srcUrl = IoUtil.createURL(rootUrl.toString() + "/" + fileName);
-		
+
 		// Determine the file to transfer the contents to
 		dstFile = new File(dstPath, fileName);
 
-		return DistUtils.downloadFile(aTask, srcUrl, dstFile, aCredential);
+		return DistUtils.downloadFile(aTask, srcUrl, dstFile, aCredential, fileLen);
 	}
 }

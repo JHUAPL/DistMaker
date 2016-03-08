@@ -1,10 +1,13 @@
 package distMaker.platform;
 
 import glum.gui.panel.generic.MessagePanel;
+import glum.reflect.ReflectUtil;
 import glum.unit.ByteUnit;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
+import java.lang.reflect.Method;
 
 import distMaker.DistUtils;
 
@@ -19,22 +22,33 @@ public class MemUtils
 	 * Utility method that attempts to compute the installed system memory (ram). If the installed system ram can not be
 	 * computed, then the system is assumed to have 4 GB.
 	 */
-	@SuppressWarnings("restriction")
 	public static long getInstalledSystemMemory()
 	{
 		ByteUnit byteUnit;
 		long systemMem;
 
-		// Attempt to interogate the system memory using the Sun/Oracle JVM specific method
+		// Attempt to interrogate the system memory using the Sun/Oracle JVM specific method
 		try
 		{
-			systemMem = ((com.sun.management.OperatingSystemMXBean)ManagementFactory.getOperatingSystemMXBean()).getTotalPhysicalMemorySize();
+			OperatingSystemMXBean osBean;
+			Class<?> tmpClass;
+			Method tmpMethod;
+
+			// Note we gather the available memory via reflection to avoid Eclipse/IDE compilation errors due
+			// to restricted com.sun.management package. The commented out single line of code is equivalent to
+			// the next block (4 lines) of code.
+			// Retrieve the OS available memory via reflection equivalent to the commented method below:
+//			systemMem = ((com.sun.management.OperatingSystemMXBean)ManagementFactory.getOperatingSystemMXBean()).getTotalPhysicalMemorySize();
+			osBean = ManagementFactory.getOperatingSystemMXBean();
+			tmpClass = Class.forName("com.sun.management.OperatingSystemMXBean");
+			tmpMethod = ReflectUtil.locateMatchingMethod(tmpClass, "getTotalPhysicalMemorySize");
+			systemMem = (Long)tmpMethod.invoke(osBean);
 
 			byteUnit = new ByteUnit(2);
 			System.out.println("Max memory on the system: " + byteUnit.getString(systemMem));
 			return systemMem;
 		}
-		catch (Throwable aThrowable)
+		catch(Throwable aThrowable)
 		{
 			System.out.println("Failed to query the installed system memory! Assume system memory is 4 GB.");
 			System.out.println("Exception: " + aThrowable.getLocalizedMessage());
@@ -91,8 +105,8 @@ public class MemUtils
 		}
 
 		// Linux specific platform files
-		scriptFile = new File(installPath, "runEcho");
-		if (scriptFile.isFile() == true)
+		scriptFile = LinuxUtils.getScriptFile();
+		if (scriptFile != null && scriptFile.isFile() == true)
 		{
 			isValidPlatform = true;
 

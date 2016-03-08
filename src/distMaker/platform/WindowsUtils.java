@@ -3,9 +3,8 @@ package distMaker.platform;
 import glum.io.IoUtil;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
-
-import com.google.common.collect.Lists;
 
 import distMaker.DistUtils;
 
@@ -25,7 +24,7 @@ public class WindowsUtils
 		String strLine, updateStr;
 		boolean isProcessed;
 
-		inputList = Lists.newArrayList();
+		inputList = new ArrayList<>();
 		isProcessed = false;
 
 		// Process our input
@@ -50,7 +49,7 @@ public class WindowsUtils
 
 				inputList.add(strLine);
 			}
-			
+
 			// Create a new max heap input config line if one is not specified
 			if (isProcessed == false)
 			{
@@ -60,7 +59,7 @@ public class WindowsUtils
 				isProcessed = true;
 			}
 		}
-		catch (Exception aExp)
+		catch(Exception aExp)
 		{
 			aExp.printStackTrace();
 			return false;
@@ -80,8 +79,9 @@ public class WindowsUtils
 	 * <P>
 	 * If the configuration file is determined but does not exist, then an empty configuration file will be created.
 	 * <P>
-	 * Note this method looks for a file that ends in .l4j.cfg, or an exe file and creates the corresponding config file. 
-	 * <P> If there are multiple .exe or .l4j.cfg files, then this method may grab the wrong file and fail. 
+	 * Note this method looks for a file that ends in .l4j.cfg, or an exe file and creates the corresponding config file.
+	 * <P>
+	 * If there are multiple .exe or .l4j.cfg files, then this method may grab the wrong file and fail.
 	 */
 	public static File getConfigFile()
 	{
@@ -89,10 +89,9 @@ public class WindowsUtils
 		File installPath;
 		File retFile;
 
-		
 		installPath = DistUtils.getAppPath().getParentFile();
 		fileArr = installPath.listFiles();
-		
+
 		// Attempt to locate the <appExe>.l4j.ini file
 		retFile = null;
 		for (File aFile : fileArr)
@@ -100,7 +99,7 @@ public class WindowsUtils
 			if (aFile.getName().endsWith(".l4j.ini") == true)
 				retFile = aFile;
 		}
-		
+
 		if (retFile == null)
 		{
 			for (File aFile : fileArr)
@@ -109,10 +108,10 @@ public class WindowsUtils
 					retFile = new File(aFile.getParentFile(), aFile.getName().substring(0, aFile.getName().length() - 4) + ".l4j.ini");
 			}
 		}
-		
+
 		if (retFile == null)
 			return null;
-		
+
 		if (retFile.isFile() == false)
 		{
 			try

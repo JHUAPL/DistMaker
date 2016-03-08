@@ -6,10 +6,9 @@ import glum.zio.*;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import com.google.common.collect.Lists;
 
 import dsstore.record.*;
 
@@ -21,7 +20,7 @@ import dsstore.record.*;
 public class MainApp
 {
 	// Constants
-	public static final String DT_long = "long";//convertStringToInt("long");  // An integer (4 bytes)
+	public static final String DT_long = "long"; //convertStringToInt("long");  // An integer (4 bytes)
 	public static final String DT_shor = "shor"; //convertStringToInt("shor");  // A short integer? Still stored as four bytes, but the first two are always zero.
 	public static final String DT_bool = "bool"; //convertStringToInt("bool");  // A boolean value, stored as one byte.
 	public static final String DT_blob = "blob"; //convertStringToInt("blob");  // An arbitrary block of bytes, stored as an integer followed by that many bytes of data.
@@ -32,7 +31,7 @@ public class MainApp
 	private Task refTask;
 	private ByteBuffer dataBuf;
 	private String volumeName;
-	
+
 	public MainApp(String aVolumeName)
 	{
 		// Only output verbose info if we are not updating a store
@@ -43,52 +42,55 @@ public class MainApp
 		dataBuf = null;
 		volumeName = aVolumeName;
 	}
-	
+
 	
 	public void writeStore(File aFile)
 	{
 		FileZoutStream aStream;
 		int fileMagicKey;
-		
+
 		// Ensure we have a valid dataBuf
 		if (dataBuf == null)
 			return;
-	
+
 		aStream = null;
 		try
 		{
 			aStream = new FileZoutStream(aFile);
-			
+
 			// Write the file's MagicKey
 			fileMagicKey = 0x0001;
 			aStream.writeInt(fileMagicKey);
 
 			// Dump the contents of aBytBuff
 			aStream.writeFully(dataBuf.array());
-			
+
 			aStream.close();
 		}
-		catch (IOException aExp)
+		catch(IOException aExp)
 		{
 			IoUtil.forceClose(aStream);
 
 			aExp.printStackTrace();
 		}
-		
-	}
-		
 
-	
-	
-	public ByteBuffer readStore(File aFile)
+	}
+
+	/**
+	 * Method to read the actual store contents.
+	 * 
+	 * @return True if we successfully read the store
+	 */
+	public boolean readStore(File aFile)
 	{
 		ZinStream aStream;
 		int fileSize;
 		
+		// Bail if the file is not valid
 		if (aFile.isFile() == false)
 		{
-			refTask.infoAppendln("File does note exist: " + aFile);
-			return null;
+			System.err.println("File does note exist: " + aFile);
+			return false;
 		}
 		
 		dataBuf = null;
@@ -168,7 +170,7 @@ refTask.infoAppendln("BlockAddr[" + c1 + "] -> Size: " + blkLen + "  Offset: " +
 			dirCnt = dataBuf.getInt();
 refTask.infoAppendln("Block directory count: " + dirCnt);
 			
-			blockDirList = Lists.newLinkedList();
+			blockDirList = new ArrayList<>(dirCnt);
 			for (int c1 = 0; c1 < dirCnt; c1++)
 				blockDirList.add(new BlockDir(dataBuf));
 			
@@ -208,9 +210,10 @@ refTask.infoAppendln("Reading freelists...");
 		{
 			aExp.printStackTrace();
 			IoUtil.forceClose(aStream);
+			return false;
 		}
 		
-		return dataBuf;
+		return true;
 		
 	}
 	
@@ -230,7 +233,7 @@ refTask.infoAppendln("Reading freelists...");
 		numRecords = aBuf.getInt();
 		
 		bkgdRecord = null;
-		recordList = Lists.newLinkedList();
+		recordList = new ArrayList<>(numRecords);
 		for (int c1 = 0; c1 < numRecords; c1++)
 		{
 			BufUtils.seek(aBuf, 2); // empty
@@ -317,7 +320,7 @@ refTask.infoAppendln("Reading freelists...");
 		int numRecords;
 		int numNodes;
 		int valConst;
-		
+
 		// Read the DSDB header
 		// 0: The block number of the root node of the B-tree
 		// 1: The number of levels of internal nodes (tree height minus one --- that is, for a tree containing only a single, leaf, node this will be zero)
@@ -329,14 +332,13 @@ refTask.infoAppendln("Reading freelists...");
 		numRecords = srcBuf.getInt();
 		numNodes = srcBuf.getInt();
 		valConst = srcBuf.getInt();
-		
+
 		refTask.infoAppendln("rootBlockNum: " + rootBlockNum);
 		refTask.infoAppendln("numLevels: " + numLevels);
 		refTask.infoAppendln("rootRecords: " + numRecords);
 		refTask.infoAppendln("rootNodes: " + numNodes);
 		refTask.infoAppendln("valConst: " + valConst);
 	}
-	
 	
 	
 	/**
@@ -347,13 +349,14 @@ refTask.infoAppendln("Reading freelists...");
 		MainApp aMainApp;
 		File aFile;
 		String storeFileName, newVolName;
-		
+
 		storeFileName = null;
 		newVolName = null;
-		
+
 		if (args.length == 0)
 		{
 			System.out.println("Usage: dsStoreUtil <fileName> <newVolumeName>");
+			System.exit(-1);
 			return;
 		}
 		if (args.length >= 1)
@@ -364,13 +367,16 @@ refTask.infoAppendln("Reading freelists...");
 		{
 			newVolName = args[1];
 		}
-					
+
 		aFile = new File(storeFileName);
-		System.out.println("\tUpdating store: " + aFile);
-		
+		System.out.println("Updating store: " + aFile);
+
 		aMainApp = new MainApp(newVolName);
-		aMainApp.readStore(aFile);
-		
+
+		// Bail if we failed to read the store
+		if (aMainApp.readStore(aFile) == false)
+			System.exit(-1);
+
 		// Save the ds_store if there was a request for a new name
 		if (newVolName != null)
 			aMainApp.writeStore(aFile);

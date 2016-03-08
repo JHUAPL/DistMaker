@@ -1,14 +1,13 @@
 package distMaker;
 
-import java.util.List;
-
-import com.google.common.collect.Lists;
-
 import glum.task.SilentTask;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class LoggingTask extends SilentTask
 {
-   private final List<String> messages = Lists.newArrayList();
+   private final List<String> messages = new ArrayList<>();
 
    @Override
    public void infoAppend(String aMsg)

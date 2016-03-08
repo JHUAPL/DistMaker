@@ -9,7 +9,6 @@ public class BlockDir
 	private String name;
 	private int index;
 
-	
 	public BlockDir()
 	{
 		name = null;
@@ -26,26 +25,24 @@ public class BlockDir
 	{
 		return index;
 	}
-	
+
 	public void readData(ByteBuffer srcBuf)
 	{
 		int numBytes;
 		byte[] byteArr;
-		
+
 		numBytes = srcBuf.get() & 0xFF;
-		
+
 		// Directories name
 		byteArr = new byte[numBytes];
 		srcBuf.get(byteArr);
 		name = new String(byteArr, Charsets.US_ASCII);
-		
+
 		// Block's address
 		index = srcBuf.getInt();
-		
+
 		// Debug output
 //		System.out.println("[BlockDir] Name: " + name + " index: " + index);
 	}
-	
-	
-	
+
 }
