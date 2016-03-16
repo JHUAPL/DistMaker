@@ -2,11 +2,14 @@ package distMaker;
 
 import glum.database.QueryItem;
 
+/**
+ * Immutable object that has information relevant to the packaged software.
+ */
 public class Release implements Comparable<Release>, QueryItem<LookUp>
 {
-	private String appName;
-	private String version;
-	private long buildTime;
+	private final String appName;
+	private final String version;
+	private final long buildTime;
 
 	public Release(String aAppName, String aVersion, long aBuildTime)
 	{

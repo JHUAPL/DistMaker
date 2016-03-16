@@ -101,6 +101,18 @@ public class DistMakerEngine
 		// Launch the actual checking of updates in a separate worker thread
 		ThreadUtil.launchRunnable(new FunctionRunnable(this, "checkForUpdatesWorker", taskPanel, listener), "thread-checkForUpdates");
 	}
+	
+	/**
+	 * Returns the currently running release of this software package.
+	 * <P>
+	 * Note this method may return null if we are:
+	 * <LI>running from a developers environment (Ex: Eclipse IDE)
+	 * <LI>If the software application was not properly packaged (or has become corrupt) with DistMaker.
+	 */
+	public Release getCurrentRelease()
+	{
+		return currRelease;
+	}
 
 	/**
 	 * returns 
@@ -573,8 +585,8 @@ public class DistMakerEngine
 			errMsg = null;
 			if (pFile.setWritable(true) == false)
 				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (AppleUtils.updateVersion(pFile, aRelease.getVersion()) == false)
-				errMsg = "Failure. Failed to update file: " + pFile;
+			else
+				errMsg = AppleUtils.updateVersion(pFile, aRelease.getVersion());
 
 			if (errMsg != null)
 			{

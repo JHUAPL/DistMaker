@@ -302,8 +302,6 @@ def buildPListInfoShared(destFile, args):
 		
 	jvmArgsStr = ''
 	for aStr in args.jvmArgs:
-		if len(aStr) > 2 and aStr[0:1] == '\\':
-			aStr = aStr[1:]
 		jvmArgsStr += aStr + ' '
 	jvmArgsStr += '-Djava.system.class.loader=appLauncher.RootClassLoader'
 
@@ -334,7 +332,7 @@ def buildPListInfoShared(destFile, args):
 	writeln(f, 2, '<dict>')
 	
 	tupList = []
-	tupList.append(('JVMVersion', '1.6+'))
+	tupList.append(('JVMVersion', '1.7+'))
 	tupList.append(('MainClass', 'appLauncher.AppLauncher'))
 	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/app'))
 	tupList.append(('ClassPath', classPathStr))
@@ -399,18 +397,18 @@ def buildPListInfoStatic(destFile, args):
 		
 	# JVM options
 	writeln(f, 2, '<key>JVMOptions</key>')
-	writeln(f, 3, '<array>')
+	writeln(f, 2, '<array>')
 	for aStr in args.jvmArgs:
-		writeln(f, 4, '<string>' + aStr + '</string>')
+		writeln(f, 3, '<string>' + aStr + '</string>')
 #	if icnsStr != None:
-#		writeln(f, 4, '<string>-Xdock:icon=Contents/Resources/' + icnsStr + '</string>')
-	writeln(f, 4, '<string>-Dapple.laf.useScreenMenuBar=true</string>')
-	writeln(f, 4, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
-	writeln(f, 4, '<string>-Dcom.apple.macos.useScreenMenuBar=true</string>')
-	writeln(f, 4, '<string>-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name + '</string>')
-	writeln(f, 4, '<string>-Dapple.awt.application.name=' + args.name + '</string>')
-	writeln(f, 4, '<string>-Djava.system.class.loader=appLauncher.RootClassLoader</string>')
-	writeln(f, 3, '</array>')
+#		writeln(f, 3, '<string>-Xdock:icon=Contents/Resources/' + icnsStr + '</string>')
+	writeln(f, 3, '<string>-Dapple.laf.useScreenMenuBar=true</string>')
+	writeln(f, 3, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
+	writeln(f, 3, '<string>-Dcom.apple.macos.useScreenMenuBar=true</string>')
+	writeln(f, 3, '<string>-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name + '</string>')
+	writeln(f, 3, '<string>-Dapple.awt.application.name=' + args.name + '</string>')
+	writeln(f, 3, '<string>-Djava.system.class.loader=appLauncher.RootClassLoader</string>')
+	writeln(f, 2, '</array>')
 	
 #	# App arguments
 #	writeln(f, 2, '<key>JVMArguments</key>')

@@ -112,11 +112,15 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 
 
 def buildBashScript(destFile, args, isStaticRelease):
+	# Form the jvmArgStr but strip away the -Xmx* component if it is specified
+	# since the JVM maxMem is dynamically configurable (via DistMaker) 
+	maxMem = None
 	jvmArgsStr = ''
 	for aStr in args.jvmArgs:
-		if len(aStr) > 2 and aStr[0:1] == '\\':
-			aStr = aStr[1:]
-		jvmArgsStr += aStr + ' '
+		if aStr.startswith('-Xmx'):
+			maxMem = aStr[4:]
+		else:
+			jvmArgsStr += aStr + ' '
 
 	f = open(destFile, 'wb')
 	f.write('#!/bin/bash\n')
@@ -125,7 +129,10 @@ def buildBashScript(destFile, args, isStaticRelease):
 	f.write('{    # Do not remove this bracket! \n\n')
 	
 	f.write('# Define the maximum memory to allow the application to utilize\n')
-	f.write('#maxMem=512m # Uncomment out this line to change from defaults.\n\n')
+	if maxMem == None:
+		f.write('#maxMem=512m # Uncomment out this line to change from defaults.\n\n')
+	else:
+		f.write('maxMem=' + maxMem + '\n\n')
 
 	f.write('# Get the instalation path\n')
 	f.write('installPath=$(readlink -f "$BASH_SOURCE")\n')
@@ -144,7 +151,7 @@ def buildBashScript(destFile, args, isStaticRelease):
 	exeCmd = 'java ' + jvmArgsStr + '$xmxStr '
 	if isStaticRelease == True:
 		exeCmd = '../' + args.jreRelease + '/bin/java ' + jvmArgsStr + '$xmxStr '
-	exeCmd = exeCmd + '-Djava.system.class.loader=appLauncher.RootClassLoader -cp ../launcher/appLauncher.jar appLauncher.AppLauncher app.cfg '
+	exeCmd = exeCmd + '-Djava.system.class.loader=appLauncher.RootClassLoader -cp ../launcher/appLauncher.jar appLauncher.AppLauncher $*'
 	f.write('# Run the application\n')
 	f.write(exeCmd + '\n\n')
 	

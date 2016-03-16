@@ -65,7 +65,6 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 
 		// Build the actual GUI
 		buildGuiArea();
-		setPreferredSize(new Dimension(325, getPreferredSize().height));
 		warnPanel = new MessagePanel(this);
 		warnPanel.setSize(400, 150);
 
@@ -188,7 +187,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 
 		// Warn Area
 		warnTA = GuiUtil.createUneditableTextArea(0, 0);
-		add(warnTA, "w 0::,growx,span,wrap");
+		add(warnTA, "w 0:325:,growx,span,wrap");
 
 		// Action area
 		applyB = GuiUtil.createJButton("Apply", this, smallFont);

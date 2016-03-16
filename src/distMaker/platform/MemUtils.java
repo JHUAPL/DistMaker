@@ -91,12 +91,13 @@ public class MemUtils
 
 			errMsg = null;
 			if (pFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else if (AppleUtils.updateMaxMem(pFile, maxMemSize) == false)
-				errMsg = "Failure. Failed to update file: " + pFile;
+				errMsg = "Failure. No writable permissions.";
+			else 
+				errMsg = AppleUtils.updateMaxMem(pFile, maxMemSize); 
 
 			if (errMsg != null)
 			{
+				errMsg = "File: " + pFile + "\n   " + errMsg;
 				warnPanel.setTitle("Failed setting Apple properties.");
 				warnPanel.setInfo(errMsg);
 				warnPanel.setVisible(true);
