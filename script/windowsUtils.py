@@ -1,15 +1,9 @@
 #! /usr/bin/env python
 
-import argparse
 import copy
-import getpass
-import math
 import os
 import shutil
-import signal
-import sys
 import tempfile
-import time
 import glob
 
 import jreUtils
@@ -17,55 +11,53 @@ import miscUtils
 
 
 def buildRelease(args, buildPath):
-	# We mutate args - thus make a custom copy  
+	# We mutate args - thus make a custom copy
 	args = copy.copy(args)
-	
+
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
 	jreRelease = args.jreRelease
-	
-	# Attempt to locate a default JRE if none is specified in the args.
-	if jreRelease == None:
-		jreRelease = jreUtils.getDefaultJreRelease('windows')
-	# Let the user know if the 'user' specified JRE is not available and locate an alternative
-	elif jreUtils.isJreAvailable('windows', jreRelease) == False:
-		print('[Warning] User specified JRE (' + jreRelease + ') is not available for Windows platform. Searching for alternative...')
-		jreRelease = jreUtils.getDefaultJreRelease('windows')
-	args.jreRelease = jreRelease
+	platformStr = 'windows'
 
-	# Bail if launch4j is not installed	
-	appInstallRoot = miscUtils.getInstallRoot()
-	appInstallRoot = os.path.dirname(appInstallRoot)
-	launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
-	if os.path.exists(launch4jExe) == False:
-		print('Launch4j is not installed. Windows releases will not be built.')
+	# Check our system environment before proceeding
+	if checkSystemEnvironment() == False:
 		return
 
+	# Attempt to locate a default JRE if none is specified in the args.
+	if jreRelease == None:
+		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
+	# Let the user know if the 'user' specified JRE is not available and locate an alternative
+	elif jreUtils.getJreTarGzFile(platformStr, jreRelease) == None:
+		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreRelease, platformStr.capitalize()))
+		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
+	args.jreRelease = jreRelease
+
+	# Form the list of distributions to build (dynamic and static JREs)
+	distList = [(appName + '-' + version, None)]
+	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreRelease)
+	if jreTarGzFile != None:
+		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
+
 	# Create a tmp (working) folder
-	tmpPath = tempfile.mkdtemp(dir=buildPath)
+	tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
 
-	# Form the list of distributions to build
-	distList = [(appName + '-' + version, False)]
-	if jreUtils.isJreAvailable('windows', jreRelease) == True:
-		distList.append((appName + '-' + version + '-jre', True))
-
-	# Create the various Windows distributions	
-	for (distName, isStaticRelease) in distList:
-		print('Building Windows distribution: ' + distName)
-		# Let the user know of the JRE release we are going to build with
-		if isStaticRelease == True:
-			print('\tUtilizing jreRelease: ' + jreRelease)
+	# Create the various distributions
+	for (aDistName, aJreTarGzFile) in distList:
+		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
+		# Let the user know of the JRE tar.gz  we are going to build with
+		if aJreTarGzFile != None:
+			print('\tUtilizing jreRelease: ' + aJreTarGzFile)
 
 		# Create the (top level) distribution folder
-		dstPath = os.path.join(tmpPath, distName)
+		dstPath = os.path.join(tmpPath, aDistName)
 		os.mkdir(dstPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(buildPath, dstPath, args, isStaticRelease)
+		buildDistTree(buildPath, dstPath, args, aJreTarGzFile)
 
 		# Create the zip file
-		zipFile = os.path.join(buildPath, distName + ".zip")
+		zipFile = os.path.join(buildPath, aDistName + ".zip")
 		cmd = ["jar", "-cMf", zipFile, "-C", dstPath, '.']
 		print('\tForming zip file: ' + zipFile)
 		proc = miscUtils.executeAndLog(cmd, "\t\tjar: ")
@@ -79,7 +71,7 @@ def buildRelease(args, buildPath):
 	shutil.rmtree(tmpPath)
 
 
-def buildDistTree(buildPath, rootPath, args, isStaticRelease):
+def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
@@ -91,18 +83,18 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 	dstPath = os.path.join(rootPath, "app")
 	shutil.copytree(srcPath, dstPath, symlinks=True)
 
-	#Copy dlls to the app directory so they can be found at launch
-	dllDir = os.path.join(rootPath,'app', 'code','win')
-	for libPath in glob.iglob(os.path.join(dllDir,"*.lib")):
+	# Copy dlls to the app directory so they can be found at launch
+	dllDir = os.path.join(rootPath, 'app', 'code', 'win')
+	for libPath in glob.iglob(os.path.join(dllDir, "*.lib")):
 		libFileName = os.path.basename(libPath)
-		srcPath = os.path.join(dllDir,libFileName)
-		linkPath = os.path.join(dstPath,libFileName)
-		shutil.copy(srcPath,linkPath)
-	for dllPath in glob.iglob(os.path.join(dllDir,"*.dll")):
+		srcPath = os.path.join(dllDir, libFileName)
+		linkPath = os.path.join(dstPath, libFileName)
+		shutil.copy(srcPath, linkPath)
+	for dllPath in glob.iglob(os.path.join(dllDir, "*.dll")):
 		dllFileName = os.path.basename(dllPath)
-		srcPath = os.path.join(dllDir,dllFileName)
-		linkPath = os.path.join(dstPath,dllFileName)
-		shutil.copy(srcPath,linkPath)
+		srcPath = os.path.join(dllDir, dllFileName)
+		linkPath = os.path.join(dstPath, dllFileName)
+		shutil.copy(srcPath, linkPath)
 
 	# Setup the launcher contents
 	exePath = os.path.join(rootPath, "launcher")
@@ -112,12 +104,6 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 
 	# Build the java component of the distribution
 	if args.javaCode != None:
-		# Copy over the jre
-		if isStaticRelease == True:
-			srcPath = os.path.join(appInstallRoot, 'jre', 'windows', jreRelease)
-			dstPath = os.path.join(rootPath, os.path.basename(srcPath))
-			shutil.copytree(srcPath, dstPath, symlinks=True)
- 
 		# Generate the iconFile
 		winIconFile = None
 		origIconFile = args.iconFile
@@ -135,9 +121,9 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 
 		# Form the launch4j config file
 		configFile = os.path.join(rootPath, appName + ".xml")
-		buildLaunch4JConfig(configFile, args, isStaticRelease, winIconFile)
+		buildLaunch4JConfig(configFile, args, jreTarGzFile, winIconFile)
 
-		# Build the windows executable 
+		# Build the Windows executable
 		launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
 		cmd = [launch4jExe, configFile]
 		print('\tBuilding windows executable via launch4j')
@@ -145,12 +131,16 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 		if proc.returncode != 0:
 			print('\tError: Failed to build executable. Return code: ' + str(proc.returncode))
 
+	# Unpack the JRE and set up the JRE tree
+	if jreTarGzFile != None:
+		jreUtils.unpackAndRenameToStandard(jreTarGzFile, rootPath)
+
 		# Perform cleanup
 		os.remove(configFile)
 		if winIconFile != None:
 			os.remove(winIconFile)
 
-def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
+def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 	f = open(destFile, 'wb')
 
 	writeln(f, 0, "<launch4jConfig>")
@@ -162,7 +152,7 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	writeln(f, 1, "<dontWrapJar>true</dontWrapJar>");
 	writeln(f, 1, "<errTitle>" + args.name + "</errTitle>");
 	writeln(f, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
-#	writeln(f, 1, "<supportUrl>url</supportUrl>");
+# 	writeln(f, 1, "<supportUrl>url</supportUrl>");
 
 	writeln(f, 1, "<cmdLine>app.cfg</cmdLine>");
 	writeln(f, 1, "<chdir>app/</chdir>");
@@ -186,14 +176,13 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 
 	writeln(f, 0, "");
 	writeln(f, 1, "<jre>");
-	if isStaticRelease == True:
-		writeln(f, 2, "<path>" + args.jreRelease + "</path>");
+	if jreTarGzFile != None:
+		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
+		writeln(f, 2, "<path>" + jrePath + "</path>");
 	else:
-		jreVer = jreUtils.getJreMajorVersion(args.jreRelease)
-#		writeln(f, 2, "<minVersion>" + "1.7.0" + "</minVersion>");
-		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");
-#	writeln(f, 2, "<jdkPreference>jreOnly|preferJre|preferJdk|jdkOnly</jdkPreference>");
-	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");
+		jreVer = getJreMajorVersion(args.jreRelease)
+		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");  # Valid values: '1.7.0' or '1.8.0' ...
+	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");  # Valid values: jreOnlyjdkOnly|preferJre|preferJdk
 	for aJvmArg in args.jvmArgs:
 		writeln(f, 2, "<opt>" + aJvmArg + "</opt>");
 	writeln(f, 2, "<opt>-Djava.system.class.loader=appLauncher.RootClassLoader</opt>");
@@ -211,6 +200,37 @@ def buildLaunch4JConfig(destFile, args, isStaticRelease, iconFile):
 	writeln(f, 0, "</launch4jConfig>")
 	f.write('\n')
 	f.close()
+
+
+def checkSystemEnvironment():
+	"""Checks to ensure that all system application / environment variables needed to build a Windows distribution are installed
+	and properly configured. Returns False if the system environment is insufficient"""
+	# Bail if launch4j is not installed
+	appInstallRoot = miscUtils.getInstallRoot()
+	appInstallRoot = os.path.dirname(appInstallRoot)
+	launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
+	if os.path.exists(launch4jExe) == False:
+		print('Launch4j is not installed. Windows releases will not be built.')
+		return False
+
+	return True
+
+
+def getJreMajorVersion(aJreRelease):
+	"""Returns the minimum version of the JRE to utilize based on the passed in JRE release. 
+	The passed in value should be of the form X.X.X ---> example: 1.8.73 would result in 1.8.0 
+	If aJreRelease is invalid then returns the default value of: 1.8.0"""
+	if aJreRelease == None: return '1.8.0'
+	verList = aJreRelease.split('.')
+	if len(verList) == 2: verList.append('0')
+	if len(verList) == 3 and verList[2] == '': verList[2] = '0'
+	if len(verList) != 3: return '1.8.0'
+	try:
+		[int(y) for y in verList]
+	except:
+		return '1.8.0'
+	verList[2] = '0'
+	return ".".join(verList)
 
 
 def writeln(f, tabL, aStr, tabStr='\t'):

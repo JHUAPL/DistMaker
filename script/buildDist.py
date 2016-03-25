@@ -268,7 +268,7 @@ if __name__ == "__main__":
 	# Build the delta md5sum catalog
 	buildCatalogFile(deltaPath)
 
-	# Build the Apple release	
+	# Build the Apple release
 	appleUtils.buildRelease(args, buildPath)
 
 	# Build the Linux release

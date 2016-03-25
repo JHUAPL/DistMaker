@@ -1,16 +1,10 @@
 #! /usr/bin/env python
 
-import argparse
 import copy
-import getpass
-import math
 import os
 import shutil
-import signal
 import subprocess
-import sys
 import tempfile
-import time
 import glob
 
 import jreUtils
@@ -25,52 +19,56 @@ def buildRelease(args, buildPath):
 	appName = args.name
 	version = args.version
 	jreRelease = args.jreRelease
+	platformStr = 'linux'
 
-	# Attempt to locate a default JRE if none is specified in the args.
+	# Check our system environment before proceeding
+	if checkSystemEnvironment() == False:
+		return
+
+	# Attempt to locate a default JRE if None is specified in the args.
 	if jreRelease == None:
-		jreRelease = jreUtils.getDefaultJreRelease('linux')
+		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
 	# Let the user know if the 'user' specified JRE is not available and locate an alternative
-	elif jreUtils.isJreAvailable('linux', jreRelease) == False:
-		print('[Warning] User specified JRE (' + jreRelease + ') is not available for Linux platform. Searching for alternative...')
-		jreRelease = jreUtils.getDefaultJreRelease('linux')
+	elif jreUtils.getJreTarGzFile(platformStr, jreRelease) == None:
+		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreRelease, platformStr.capitalize()))
+		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
 	args.jreRelease = jreRelease
 
+	# Form the list of distributions to build (dynamic and static JREs)
+	distList = [(appName + '-' + version, None)]
+	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreRelease)
+	if jreTarGzFile != None:
+		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
+
 	# Create a tmp (working) folder
-	tmpPath = tempfile.mkdtemp(dir=buildPath)
+	tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
 
-	# Form the list of distributions to build
-	distList = [(appName + '-' + version, False)]
-	if jreUtils.isJreAvailable('linux', jreRelease) == True:
-		distList.append((appName + '-' + version + '-jre', True))
-
-	# Create the various Linux distributions
-	for (distName, isStaticRelease) in distList:
-		print('Building Linux distribution: ' + distName)
+	# Create the various distributions
+	for (aDistName, aJreTarGzFile) in distList:
+		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
 		# Let the user know of the JRE release we are going to build with
-		if isStaticRelease == True:
+		if aJreTarGzFile != None:
 			print('\tUtilizing jreRelease: ' + jreRelease)
 
 		# Create the (top level) distribution folder
-		dstPath = os.path.join(tmpPath, distName)
+		dstPath = os.path.join(tmpPath, aDistName)
 		os.mkdir(dstPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(buildPath, dstPath, args, isStaticRelease)
+		buildDistTree(buildPath, dstPath, args, aJreTarGzFile)
 
 		# Create the tar.gz archive
-		tarFile = os.path.join(buildPath, distName + '.tar.gz')
+		tarFile = os.path.join(buildPath, aDistName + '.tar.gz')
 		print('\tForming tar.gz file: ' + tarFile)
-		childPath = distName
-#		print '[' + getCurrTimeStr() + '] Building tar archive: ' + tarFile
+		childPath = aDistName
 		subprocess.check_call(["tar", "-czf", tarFile, "-C", tmpPath, childPath], stderr=subprocess.STDOUT)
-#		subprocess.check_call(["gzip", tarFile], stderr=subprocess.STDOUT)
 		print('\tFinished building release: ' + os.path.basename(tarFile))
 
 	# Perform cleanup
 	shutil.rmtree(tmpPath)
 
 
-def buildDistTree(buildPath, rootPath, args, isStaticRelease):
+def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
@@ -90,8 +88,6 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 		linkPath = os.path.join(dstPath, libFileName)
 		shutil.copy(srcPath, linkPath)
 
-
-
 	# Setup the launcher contents
 	exePath = os.path.join(rootPath, "launcher")
 	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
@@ -100,20 +96,18 @@ def buildDistTree(buildPath, rootPath, args, isStaticRelease):
 
 	# Build the java component of the distribution
 	if args.javaCode != None:
-		# Copy over the jre
-		if isStaticRelease == True:
-			srcPath = os.path.join(appInstallRoot, 'jre', 'linux', jreRelease)
-			dstPath = os.path.join(rootPath, os.path.basename(srcPath))
-			shutil.copytree(srcPath, dstPath, symlinks=True)
-
 		# Form the executable bash script
 		dstPath = os.path.join(rootPath, 'run' + appName)
-		buildBashScript(dstPath, args, isStaticRelease)
+		buildBashScript(dstPath, args, jreTarGzFile)
+
+	# Unpack the JRE and set up the JRE tree
+	if jreTarGzFile != None:
+		jreUtils.unpackAndRenameToStandard(jreTarGzFile, rootPath)
 
 
-def buildBashScript(destFile, args, isStaticRelease):
+def buildBashScript(destFile, args, jreTarGzFile):
 	# Form the jvmArgStr but strip away the -Xmx* component if it is specified
-	# since the JVM maxMem is dynamically configurable (via DistMaker) 
+	# since the JVM maxMem is dynamically configurable (via DistMaker)
 	maxMem = None
 	jvmArgsStr = ''
 	for aStr in args.jvmArgs:
@@ -127,7 +121,7 @@ def buildBashScript(destFile, args, isStaticRelease):
 	f.write('# Do not remove the opening or closing brackets: {}. This enables safe inline\n')
 	f.write('# mutations to this script while it is running\n')
 	f.write('{    # Do not remove this bracket! \n\n')
-	
+
 	f.write('# Define the maximum memory to allow the application to utilize\n')
 	if maxMem == None:
 		f.write('#maxMem=512m # Uncomment out this line to change from defaults.\n\n')
@@ -149,12 +143,13 @@ def buildBashScript(destFile, args, isStaticRelease):
 	f.write('fi\n\n')
 
 	exeCmd = 'java ' + jvmArgsStr + '$xmxStr '
-	if isStaticRelease == True:
-		exeCmd = '../' + args.jreRelease + '/bin/java ' + jvmArgsStr + '$xmxStr '
+	if jreTarGzFile != None:
+		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
+		exeCmd = '../' + jrePath + '/bin/java ' + jvmArgsStr + '$xmxStr '
 	exeCmd = exeCmd + '-Djava.system.class.loader=appLauncher.RootClassLoader -cp ../launcher/appLauncher.jar appLauncher.AppLauncher $*'
 	f.write('# Run the application\n')
 	f.write(exeCmd + '\n\n')
-	
+
 	f.write('exit # Do not remove this exit! (just before the bracket)\n')
 	f.write('}    # Do not remove this bracket! \n\n')
 
@@ -163,3 +158,8 @@ def buildBashScript(destFile, args, isStaticRelease):
 	# Make the script executable
 	os.chmod(destFile, 00755)
 
+
+def checkSystemEnvironment():
+	"""Checks to ensure that all system application / environment variables needed to build a Linux distribution are installed
+	and properly configured. Returns False if the system environment is insufficient"""
+	return True
