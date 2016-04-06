@@ -25,7 +25,7 @@ import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
 import distMaker.LookUp;
-import distMaker.Release;
+import distMaker.node.AppRelease;
 
 public class PickReleasePanel extends GlassPanel implements ActionListener, ZioRaw, ListSelectionListener
 {
@@ -34,19 +34,19 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
    // GUI vars
 	private JLabel titleL;
 	private JRadioButton newestRB, olderRB;
-	private ItemListPanel<Release> listPanel;
+	private ItemListPanel<AppRelease> listPanel;
 	private QueryTableCellRenderer col0Renderer, col1Renderer;
 	private JButton abortB, proceedB;
 	private JTextArea infoTA, warnTA;
 	private Font smallFont;
 
 	// State vars
-	private StaticItemProcessor<Release> myItemProcessor;
-	private Release chosenItem;
-	private Release installedItem;
-	private Release newestItem;
+	private StaticItemProcessor<AppRelease> myItemProcessor;
+	private AppRelease chosenItem;
+	private AppRelease installedItem;
+	private AppRelease newestItem;
 
-	public PickReleasePanel(Component aParent, Release aInstalledItem)
+	public PickReleasePanel(Component aParent, AppRelease aInstalledItem)
 	{
 		super(aParent);
 
@@ -67,7 +67,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	/**
 	 * Returns the Release selected by the user. This will be null if the user aborted the action.
 	 */
-	public Release getChosenItem()
+	public AppRelease getChosenItem()
 	{
 		return chosenItem;
 	}
@@ -75,7 +75,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	/**
 	 * Sets in the configuration of available versions
 	 */
-	public void setConfiguration(List<Release> itemList)
+	public void setConfiguration(List<AppRelease> itemList)
 	{
 		DateUnit dateUnit;
 		// String currBuildStr;
@@ -84,7 +84,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		String appName, infoMsg;
 
 		// Sort the items, and isolate the newest item
-		LinkedList<Release> linkedList;
+		LinkedList<AppRelease> linkedList;
 		linkedList = new LinkedList<>(itemList);
 		Collections.sort(linkedList);
 		Collections.reverse(linkedList);  // reverse the list to show most recent versions on top
@@ -210,7 +210,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	private JPanel buildItemListTablePanel()
 	{
 		QueryComposer<LookUp> aComposer;
-		QueryItemHandler<Release> aItemHandler;
+		QueryItemHandler<AppRelease> aItemHandler;
 		DateUnit dateUnit;
 
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm");
@@ -225,10 +225,10 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 		aComposer.setRenderer(LookUp.Version, col0Renderer);
 		aComposer.setRenderer(LookUp.BuildTime, col1Renderer);
 
-		aItemHandler = new QueryItemHandler<Release>(aComposer);
-		myItemProcessor = new StaticItemProcessor<Release>();
+		aItemHandler = new QueryItemHandler<AppRelease>(aComposer);
+		myItemProcessor = new StaticItemProcessor<AppRelease>();
 
-		listPanel = new ItemListPanel<Release>(aItemHandler, myItemProcessor, false, false);
+		listPanel = new ItemListPanel<AppRelease>(aItemHandler, myItemProcessor, false, false);
 		listPanel.setSortingEnabled(false);
 		listPanel.addListSelectionListener(this);
 		return listPanel;
@@ -239,7 +239,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
 	 */
 	private void updateGui()
 	{
-		Release pickItem;
+		AppRelease pickItem;
 		String warnMsg;
 		boolean isEnabled;
 

@@ -19,16 +19,25 @@ def checkRoot():
 
 
 # Source: http://stackoverflow.com/questions/1131220/get-md5-hash-of-a-files-without-open-it-in-python
-def computeMd5ForFile(evalFile, block_size=2**20):
+def computeDigestForFile(evalFile, digest, block_size=2**20):
+	# Select the proper hash algorithm
+	if digest == 'md5':
+		hash = hashlib.md5()
+	elif digest == 'sha256':
+		hash = hashlib.sha256()
+	elif digest == 'sha512':
+		hash = hashlib.sha512()
+	else:
+		raise Exception('Unrecognized hash function: ' + digest);
+
 	f = open(evalFile, 'rb')
-	md5 = hashlib.md5()
 	while True:
 		data = f.read(block_size)
 		if not data:
 			break
-		md5.update(data)
+		hash.update(data)
 	f.close()
-	return md5.hexdigest()
+	return hash.hexdigest()
 
 
 def getInstallRoot():
@@ -75,12 +84,12 @@ def getPathSize(aRoot):
 	# Check for existence
 	if aRoot == None or os.path.exists(aRoot) == False:
 		return 0
-	
+
 	# Return the file size of aRoot if just a file
 	aRoot = os.path.abspath(aRoot)
 	if os.path.isfile(aRoot) == True:
 		return os.path.getsize(aRoot)
-	
+
 	# Add in all of the file sizes in the directory
 	numBytes = 0
 	for path, dirs, files in os.walk(aRoot):
@@ -113,9 +122,9 @@ def buildAppLauncherConfig(destFile, args):
 	appArgsStr = ''
 	for aStr in args.appArgs:
 		appArgsStr += ' ' + aStr
-		
+
 	f = open(destFile, 'wb')
-	
+
 	# App name section
 	f.write('-name\n')
 	f.write(args.name + '\n')

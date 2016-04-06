@@ -17,7 +17,7 @@ def buildRelease(args, buildPath):
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
-	jreRelease = args.jreRelease
+	jreRelease = args.jreVersion
 	platformStr = 'windows'
 
 	# Check our system environment before proceeding

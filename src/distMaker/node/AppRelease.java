@@ -1,17 +1,18 @@
-package distMaker;
+package distMaker.node;
 
+import distMaker.LookUp;
 import glum.database.QueryItem;
 
 /**
  * Immutable object that has information relevant to the packaged software.
  */
-public class Release implements Comparable<Release>, QueryItem<LookUp>
+public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 {
 	private final String appName;
 	private final String version;
 	private final long buildTime;
 
-	public Release(String aAppName, String aVersion, long aBuildTime)
+	public AppRelease(String aAppName, String aVersion, long aBuildTime)
 	{
 		appName = aAppName;
 		version = aVersion;
@@ -43,7 +44,7 @@ public class Release implements Comparable<Release>, QueryItem<LookUp>
 	}
 
 	@Override
-	public int compareTo(Release o)
+	public int compareTo(AppRelease o)
 	{
 		if (buildTime < o.buildTime)
 			return -1;
@@ -95,7 +96,7 @@ public class Release implements Comparable<Release>, QueryItem<LookUp>
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		Release other = (Release)obj;
+		AppRelease other = (AppRelease)obj;
 		if (appName == null)
 		{
 			if (other.appName != null)

@@ -1,7 +1,5 @@
 package distMaker.platform;
 
-import glum.io.IoUtil;
-
 import java.io.File;
 import java.io.FileOutputStream;
 
@@ -13,11 +11,47 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.*;
 
+import distMaker.DistUtils;
+
 /**
  * Utility class which contains a set of methods to interact with an Apple Info.plist file.
  */
 public class AppleUtils
 {
+	/**
+	 * Utility method to update the JRE to reflect the specified path.
+	 * <P>
+	 * TODO: Complete this comment and method.
+	 */
+	public static boolean updateJrePath(File aPath)
+	{
+		int zios_finish;
+		return false;
+	}
+
+	/**
+	 * Returns the plist file used to configure apple applications.
+	 * <P>
+	 * Two locations will be searched.... TODO: Add more details of those locations.
+	 */
+	private static File getPlistFile()
+	{
+		File installPath;
+		File pFile;
+
+		// Get the top level install path
+		installPath = DistUtils.getAppPath().getParentFile();
+
+		// Attempt to locate the pList file
+		pFile = new File(installPath, "Info.plist");
+		if (pFile.isFile() == false)
+			pFile = new File(installPath.getParentFile(), "Info.plist");
+		if (pFile.isFile() == false)
+			pFile = null;
+
+		return pFile;
+	}
+
 	/**
 	 * Utility method to update the specified max memory (-Xmx) value in the plist file (aFile) to the specified maxMemVal.
 	 * <P>
@@ -26,7 +60,21 @@ public class AppleUtils
 	 * 
 	 * @return Returns null on success or an error message describing the issue.
 	 */
-	public static String updateMaxMem(File aFile, long numBytes)
+	public static String updateMaxMem(long numBytes)
+	{
+		// Utilize the system pList file and delegate.
+		return updateMaxMem(numBytes, getPlistFile());
+	}
+
+	/**
+	 * Utility method to update the specified max memory (-Xmx) value in the plist file (aFile) to the specified maxMemVal.
+	 * <P>
+	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
+	 * may be empty but must be specified.
+	 * 
+	 * @return Returns null on success or an error message describing the issue.
+	 */
+	public static String updateMaxMem(long numBytes, File pFile)
 	{
 		Document doc;
 		Element docElement;
@@ -37,22 +85,32 @@ public class AppleUtils
 		String tagStr, valStr, currKeyVal;
 		int zios_Clean;
 
+		// Bail if we failed to locate the pList file.
+		if (pFile == null)
+			return "The plist file could not be located.";
+		// Bail if the plist file is not a regular file.
+		if (pFile.isFile() == false)
+			return "The plist file does not appear to be a regular file: " + pFile;
+		// Bail if the plist file is not writeable.
+		if (pFile.setWritable(true) == false)
+			return "The plist file is not writeable: " + pFile;
+
 		// Load the XML document via the javax.xml.parsers.* package
 		try
 		{
-			doc = loadDoc(aFile);
+			doc = loadDoc(pFile);
 			docElement = doc.getDocumentElement();
 		}
 		catch(Exception aExp)
 		{
 			aExp.printStackTrace();
-			return "Failed to parse XML document. File: " + aFile;
+			return "Failed to parse XML document. File: " + pFile;
 		}
 
 		// Locate the <dict> element
 		dictList = docElement.getElementsByTagName("dict");
 		if (dictList.getLength() == 0)
-			return "No <dict> element found!";
+			return "No <dict> element found! File: " + pFile;
 
 		arrE = null;
 		currKeyVal = null;
@@ -90,7 +148,7 @@ public class AppleUtils
 
 		// Bail if we failed to locate the array element
 		if (arrE == null)
-			return "Failed to locate the element <array> following the element: <key>JVMOptions</key>";
+			return "Failed to locate the element <array> following the element: <key>JVMOptions</key>\nFile: " + pFile;
 
 		memE = null;
 		childList = arrE.getChildNodes();
@@ -134,12 +192,12 @@ public class AppleUtils
 		evalStr = targNode.getNodeValue();
 		updateStr = MemUtils.transformMaxMemHeapString(evalStr, numBytes);
 		if (updateStr == null)
-			return "Failed to transform the memory spec value. Original value: " + evalStr;
+			return "Failed to transform the memory spec value. Original value: " + evalStr + "\nFile: " + pFile;
 		targNode.setNodeValue(updateStr);
 
 		// Update the file with the changed document
-		System.out.println("Updating contents of file: " + aFile);
-		return saveDoc(aFile, doc);
+		System.out.println("Updating contents of file: " + pFile);
+		return saveDoc(pFile, doc);
 	}
 
 	/**
@@ -209,10 +267,7 @@ public class AppleUtils
 	 */
 	private static String saveDoc(File aFile, Document aDoc)
 	{
-		FileOutputStream oStream;
-
-		oStream = null;
-		try
+		try (FileOutputStream oStream = new FileOutputStream(aFile);)
 		{
 			Transformer tr = TransformerFactory.newInstance().newTransformer();
 			tr.setOutputProperty(OutputKeys.INDENT, "yes");
@@ -223,17 +278,12 @@ public class AppleUtils
 //			tr.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "roles.dtd");
 
 			// Serialize the Document
-			oStream = new FileOutputStream(aFile);
 			tr.transform(new DOMSource(aDoc), new StreamResult(oStream));
 		}
 		catch(Exception aExp)
 		{
 			aExp.printStackTrace();
 			return "Failed to write the file: " + aFile;
-		}
-		finally
-		{
-			IoUtil.forceClose(oStream);
 		}
 
 		return null;

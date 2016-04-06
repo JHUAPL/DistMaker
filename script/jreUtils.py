@@ -9,7 +9,7 @@ import tempfile
 import miscUtils
 
 # Globals
-# The global variable defaultJreRelease is a hint for which (tar.gz) JRE release to
+# The global variable defaultJreVersion is a hint for which (tar.gz) JRE release to
 # default to. Note if this variable is not specified then the latest JRE release
 # located in the appropriate <installPath>/jre directory will be utilized.
 #
@@ -19,16 +19,16 @@ import miscUtils
 # where VERSION  is something like: 8u73
 # For example the Linux JRE 1.8.73 tar.gz release would be:
 #      <installpath>/jre/jre-8u73-linux-x64.tar.gz
-defaultJreRelease = '1.8'
+defaultJreVersion = '1.8'
 
 
 def getDefaultJreRelease(aPlatform):
 	"""Utility method to locate the default JRE to utilize. The returned value will be a string such as 1.8.73"""
 	# Return the default if it is hard wired (and is available)
-	if 'defaultJreRelease' in globals():
-		jreTarGzFile = getJreTarGzFile(aPlatform, defaultJreRelease)
+	if 'defaultJreVersion' in globals():
+		jreTarGzFile = getJreTarGzFile(aPlatform, defaultJreVersion)
 		if jreTarGzFile == None:
-			print('[WARNING] The specified default JRE for the ' + aPlatform.capitalize() + ' platform is: ' + defaultJreRelease + '. However this JRE is not installed! <---')
+			print('[WARNING] The specified default JRE for the ' + aPlatform.capitalize() + ' platform is: ' + defaultJreVersion + '. However this JRE is not installed! <---')
 		else:
 			return '1.' + '.'.join(getJreTarGzVersion(jreTarGzFile))
 
@@ -36,6 +36,14 @@ def getDefaultJreRelease(aPlatform):
 	if jreTarGzFile == None:
 		return None
 	return '1.' + '.'.join(getJreTarGzVersion(jreTarGzFile))
+
+
+def getDefaultJreVersion():
+	"""Returns the default JRE version. This will return None if a default JRE version has not been specified
+	and one can not be determined."""
+	if 'defaultJreVersion' in globals():
+		return defaultJreVersion;
+	return None
 
 
 def doesJreVersionMatch(aRequestVer, aEvaluateVer):
@@ -125,7 +133,7 @@ def getJreTarGzVersion(aFile):
 	"""Returns the version corresponding to the passed in JRE tar.gz file.
 	The returned value will be a list consisting of the (major, minor) components of the version.
 	 
-	 The file naming convenition is expected to be:
+	 The file naming convention is expected to be:
 	jre-<A>u<B>-*.tar.gz
 	where:
 		A ---> The major version
@@ -159,7 +167,7 @@ def unpackAndRenameToStandard(aJreTarGzFile, aDestPath):
 	if os.path.isdir(aDestPath) == False:
 		os.makedirs(aDestPath)
 
-	# Unpack to a tempory folder at aDestPath
+	# Unpack to a temporary folder at aDestPath
 	tmpPath = tempfile.mkdtemp(dir=aDestPath)
 	subprocess.check_call(["tar", "-xf", aJreTarGzFile, "-C", tmpPath], stderr=subprocess.STDOUT)
 
@@ -174,6 +182,6 @@ def unpackAndRenameToStandard(aJreTarGzFile, aDestPath):
 	targPath = os.path.join(aDestPath, jreBasePath)
 	os.rename(fileList[0], targPath)
 
-	# Remove the the tempory path
+	# Remove the the temporary path
 	os.rmdir(tmpPath)
 

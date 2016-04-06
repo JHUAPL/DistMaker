@@ -1,16 +1,26 @@
 package distMaker.platform;
 
-import glum.io.IoUtil;
-
 import java.io.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
 import distMaker.DistUtils;
+import distMaker.MiscUtils;
 
 public class LinuxUtils
 {
+	/**
+	 * Utility method to update the JRE to reflect the specified path.
+	 * <P>
+	 * TODO: Complete this comment and method.
+	 */
+	public static boolean updateJrePath(File aPath)
+	{
+		int zios_finish;
+		return false;
+	}
+
 	/**
 	 * Utility method to update the specified maxMem var in the script (aFile) to the requested number of bytes.
 	 * <P>
@@ -20,22 +30,28 @@ public class LinuxUtils
 	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method will (silently) fail to configure the
 	 * value needed to launch the JVM.
 	 */
-	public static boolean updateMaxMem(File aFile, long numBytes)
+	public static String updateMaxMem(long numBytes)
 	{
-		BufferedReader br;
 		List<String> inputList;
+		File scriptFile;
 		String evalStr, memStr, tmpStr;
 		int currLineNum, injectLineNum, targLineNum;
 
-		inputList = new ArrayList<>();
-		int zios_clean;
+		// Bail if we fail to locate the scriptFile.
+		scriptFile = getScriptFile();
+		if (scriptFile == null)
+			return "The script file could not be located.";
+		// Bail if the script file is not a regular file.
+		if (scriptFile.isFile() == false)
+			return "The script file does not appear to be a regular file: " + scriptFile;
+		// Bail if the script file is not writeable.
+		if (scriptFile.setWritable(true) == false)
+			return "The script file is not writeable: " + scriptFile;
 
 		// Process our input
-		br = null;
-		try
+		inputList = new ArrayList<>();
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(scriptFile)));)
 		{
-			br = new BufferedReader(new InputStreamReader(new FileInputStream(aFile)));
-
 			// Read the lines
 			currLineNum = 0;
 			targLineNum = -1;
@@ -60,11 +76,7 @@ public class LinuxUtils
 		catch(Exception aExp)
 		{
 			aExp.printStackTrace();
-			return false;
-		}
-		finally
-		{
-			IoUtil.forceClose(br);
+			return "Failed while processing the script file: " + scriptFile;
 		}
 
 		// Determine the memStr to use
@@ -85,8 +97,12 @@ public class LinuxUtils
 		}
 
 		// Update the script
-		System.out.println("Updating contents of file: " + aFile);
-		return writeDoc(aFile, inputList);
+		System.out.println("Updating contents of file: " + scriptFile);
+		if (MiscUtils.writeDoc(scriptFile, inputList) == false)
+			return "Failed to write the script file: " + scriptFile;
+
+		// On success return null
+		return null;
 	}
 
 	/**
@@ -97,7 +113,7 @@ public class LinuxUtils
 	 * TODO: In the future the launch script should pass itself as an argument to the JVM and DistMaker should keep track of that. If the script is significantly
 	 * manipulated from the original the launch file may be improperly detected.
 	 */
-	public static File getScriptFile()
+	private static File getScriptFile()
 	{
 		File[] fileArr;
 		File installPath;
@@ -122,36 +138,6 @@ public class LinuxUtils
 
 		System.out.println("Linux launch file: " + retFile);
 		return retFile;
-	}
-
-	/**
-	 * Helper method to output the specified strings to aFile
-	 */
-	public static boolean writeDoc(File aFile, List<String> strList)
-	{
-		BufferedWriter bw;
-
-		// Output the strList
-		bw = null;
-		try
-		{
-			bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(aFile)));
-
-			// Write the lines
-			for (String aStr : strList)
-				bw.write(aStr + '\n');
-		}
-		catch(Exception aExp)
-		{
-			aExp.printStackTrace();
-			return false;
-		}
-		finally
-		{
-			IoUtil.forceClose(bw);
-		}
-
-		return true;
 	}
 
 }

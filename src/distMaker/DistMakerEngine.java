@@ -10,33 +10,31 @@ import glum.task.*;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.util.*;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
 import com.google.common.base.Joiner;
 
+import distMaker.digest.Digest;
+import distMaker.digest.DigestUtils;
 import distMaker.gui.PickReleasePanel;
-import distMaker.node.FileNode;
-import distMaker.node.Node;
+import distMaker.jre.*;
+import distMaker.node.*;
 import distMaker.platform.AppleUtils;
+import distMaker.platform.PlatformUtils;
 
 public class DistMakerEngine
 {
 	// State vars
 	private URL updateSiteUrl;
-	private Release currRelease;
+	private AppRelease currRelease;
 	private Credential refCredential;
 
 	// Gui vars
@@ -52,10 +50,8 @@ public class DistMakerEngine
 		refCredential = null;
 
 		parentFrame = aParentFrame;
-		msgPanel = new MessagePanel(parentFrame);
-		msgPanel.setSize(700, 400);
-		promptPanel = new PromptPanel(parentFrame);
-		promptPanel.setSize(500, 300);
+		msgPanel = new MessagePanel(parentFrame, "Untitled", 700, 400);
+		promptPanel = new PromptPanel(parentFrame, "Untitled", 500, 300);
 
 		initialize();
 	}
@@ -101,7 +97,7 @@ public class DistMakerEngine
 		// Launch the actual checking of updates in a separate worker thread
 		ThreadUtil.launchRunnable(new FunctionRunnable(this, "checkForUpdatesWorker", taskPanel, listener), "thread-checkForUpdates");
 	}
-	
+
 	/**
 	 * Returns the currently running release of this software package.
 	 * <P>
@@ -109,38 +105,39 @@ public class DistMakerEngine
 	 * <LI>running from a developers environment (Ex: Eclipse IDE)
 	 * <LI>If the software application was not properly packaged (or has become corrupt) with DistMaker.
 	 */
-	public Release getCurrentRelease()
+	public AppRelease getCurrentRelease()
 	{
 		return currRelease;
 	}
 
 	/**
-	 * returns 
+	 * returns
+	 * 
 	 * @return
 	 */
 	public UpdateStatus isUpToDate()
 	{
-	   LoggingTask task = new LoggingTask();
-	   String appName = currRelease.getName();
-	   List<Release> unsortedReleaseList = DistUtils.getAvailableReleases(task, updateSiteUrl, appName, refCredential);
+		LoggingTask task = new LoggingTask();
+		String appName = currRelease.getName();
+		List<AppRelease> unsortedReleaseList = DistUtils.getAvailableAppReleases(task, updateSiteUrl, appName, refCredential);
 
-	   if (unsortedReleaseList == null) {
-	      // The update check failed, so return a status of false with a message about the problem
-	      String msg = Joiner.on("; ").join(task.getMessages());
-	      return new UpdateStatus(msg);
-	   }
-      // Sort the items, and isolate the newest item
-      LinkedList<Release> fullList = new LinkedList<>(unsortedReleaseList);
-      Collections.sort(fullList);
-      Release newestRelease = fullList.removeLast();
+		if (unsortedReleaseList == null)
+		{
+			// The update check failed, so return a status of false with a message about the problem
+			String msg = Joiner.on("; ").join(task.getMessages());
+			return new UpdateStatus(msg);
+		}
+		// Sort the items, and isolate the newest item
+		LinkedList<AppRelease> fullList = new LinkedList<>(unsortedReleaseList);
+		Collections.sort(fullList);
+		AppRelease newestRelease = fullList.removeLast();
 
-      // The check succeeded, so return wether or not the app is up to date.
-      return new UpdateStatus(newestRelease.equals(currRelease));
+		// The check succeeded, so return whether or not the app is up to date.
+		return new UpdateStatus(newestRelease.equals(currRelease));
 	}
 
 	/**
-	 * Sets in the credentials used to access the update site. If either argument is null, then the credentials will be
-	 * cleared out.
+	 * Sets in the credentials used to access the update site. If either argument is null, then the credentials will be cleared out.
 	 */
 	public void setCredentials(String aUsername, char[] aPassword)
 	{
@@ -214,7 +211,7 @@ public class DistMakerEngine
 			}
 
 		}
-		catch (IOException aExp)
+		catch(IOException aExp)
 		{
 			aExp.printStackTrace();
 		}
@@ -226,7 +223,7 @@ public class DistMakerEngine
 		if (appName == null || verName == null)
 		{
 			displayNotice(null);
-			System.out.println("Failed to properly parse DistMaker config file: " + cfgFile);
+			System.err.println("Failed to properly parse DistMaker config file: " + cfgFile);
 			return;
 		}
 
@@ -237,7 +234,7 @@ public class DistMakerEngine
 		if (buildStr != null)
 			buildTime = dateUnit.parseString(buildStr, 0);
 
-		currRelease = new Release(appName, verName, buildTime);
+		currRelease = new AppRelease(appName, verName, buildTime);
 
 		// Notify the user, if the application has been successfully updated
 		markSystemFullyStarted();
@@ -255,8 +252,8 @@ public class DistMakerEngine
 	@SuppressWarnings("unused")
 	private void checkForUpdatesWorker(FullTaskPanel aTask, UpdateCheckListener listener)
 	{
-		List<Release> fullList;
-		Release chosenItem;
+		List<AppRelease> fullList;
+		AppRelease chosenItem;
 		File installPath, deltaPath;
 		String appName;
 		boolean isPass;
@@ -271,7 +268,7 @@ public class DistMakerEngine
 
 		// Retrieve the list of available releases
 		aTask.infoAppendln("Checking for updates...\n");
-		fullList = DistUtils.getAvailableReleases(aTask, updateSiteUrl, appName, refCredential);
+		fullList = DistUtils.getAvailableAppReleases(aTask, updateSiteUrl, appName, refCredential);
 		if (fullList == null)
 		{
 			aTask.abort();
@@ -281,21 +278,23 @@ public class DistMakerEngine
 		// a successful test has been done, so notify the listener
 		listener.checkForNewVersionsPerformed();
 
-      // In case there is only the current version, don't show the update selection panel.
-      // Just show a short message that everything is up to date, and abort.
-      // (This check used to be in the getAvailableReleases() call above, but I needed
-      // that to not throw an error for the case of only one release, so I moved that
-      // check here.)
-      if (fullList.size() == 1) {
-         if (fullList.get(0).equals(currRelease)) {
-            // There is only one release out there, and its the same
-            // as the one being run, so there is nothing to update.
-            String msg = "There are no updates of " + appName + ". Only one release has been made.";
-            aTask.infoAppendln(msg);
-            aTask.abort();
-            return;
-         }
-      }
+		// In case there is only the current version, don't show the update selection panel.
+		// Just show a short message that everything is up to date, and abort.
+		// (This check used to be in the getAvailableReleases() call above, but I needed
+		// that to not throw an error for the case of only one release, so I moved that
+		// check here.)
+		if (fullList.size() == 1)
+		{
+			if (fullList.get(0).equals(currRelease))
+			{
+				// There is only one release out there, and its the same
+				// as the one being run, so there is nothing to update.
+				String msg = "There are no updates of " + appName + ". Only one release has been made.";
+				aTask.infoAppendln(msg);
+				aTask.abort();
+				return;
+			}
+		}
 
 		// Hide the taskPanel
 		aTask.setVisible(false);
@@ -309,7 +308,7 @@ public class DistMakerEngine
 			aFuncRunnable = new FunctionRunnable(this, "queryUserForInput", aTask, deltaPath, fullList);
 			SwingUtilities.invokeAndWait(aFuncRunnable);
 		}
-		catch (Exception aExp)
+		catch(Exception aExp)
 		{
 			aExp.printStackTrace();
 		}
@@ -382,14 +381,15 @@ public class DistMakerEngine
 	 * <P>
 	 * Returns true if the release was downloaded properly.
 	 */
-	private boolean downloadRelease(Task aTask, Release aRelease, File destPath)
+	private boolean downloadRelease(Task aTask, AppRelease aRelease, File destPath)
 	{
-		Map<String, Node> staleMap, updateMap;
+		AppCatalog staleCat, updateCat;
 		Node staleNode, updateNode;
 		URL catUrl, staleUrl, updateUrl;
 		File catalogFile;
 		Task mainTask, tmpTask;
-		long nodeFileLen;
+		double progressVal;
+		long tmpFileLen;
 		boolean isPass;
 
 		try
@@ -397,7 +397,7 @@ public class DistMakerEngine
 			staleUrl = DistUtils.getAppPath().toURI().toURL();
 			updateUrl = IoUtil.createURL(updateSiteUrl.toString() + "/" + aRelease.getName() + "/" + aRelease.getVersion() + "/delta");
 		}
-		catch (MalformedURLException aExp)
+		catch(MalformedURLException aExp)
 		{
 			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
 			aExp.printStackTrace();
@@ -407,51 +407,182 @@ public class DistMakerEngine
 		// Download the update catalog to the (local) delta location (Progress -> [0% - 1%])
 		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
 		catalogFile = new File(destPath, "catalog.txt");
-		if (DistUtils.downloadFile(new PartialTask(aTask, 0.00, 0.01), catUrl, catalogFile, refCredential, -1L) == false)
+		if (DistUtils.downloadFile(new PartialTask(aTask, 0.00, 0.01), catUrl, catalogFile, refCredential, -1L, null) == false)
 			return false;
 
-		// Load the map of stale nodes
+		// Load the stale catalog
 		catalogFile = new File(DistUtils.getAppPath(), "catalog.txt");
-		staleMap = DistUtils.readCatalog(aTask, catalogFile, staleUrl);
-		if (staleMap == null)
+		staleCat = DistUtils.readAppCatalog(aTask, catalogFile, staleUrl);
+		if (staleCat == null)
 			return false;
 
-		// Load the map of update nodes
+		// Load the update catalog
 		catalogFile = new File(destPath, "catalog.txt");
-		updateMap = DistUtils.readCatalog(aTask, catalogFile, updateUrl);
-		if (updateMap == null)
+		updateCat = DistUtils.readAppCatalog(aTask, catalogFile, updateUrl);
+		if (updateCat == null)
 			return false;
 
-		// Determine the total number of bytes to be transferred
+		// Determine the total number of bytes to be transferred and set up the mainTask
 		long releaseSizeFull = 0L, releaseSizeCurr = 0L;
-		for (Node aNode : updateMap.values())
+		for (Node aNode : updateCat.getAllNodesList())
 		{
 			if (aNode instanceof FileNode)
 				releaseSizeFull += ((FileNode)aNode).getFileLen();
 		}
 
-		// Download the individual files (Progress -> [1% - 95%])
-		double progressVal = 0.00;
+		// Set up the mainTask for downloading of remote content (Progress -> [1% - 95%])
 		mainTask = new PartialTask(aTask, 0.01, 0.94);
-		mainTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Nodes: " + updateMap.size());
-		for (String aFileName : updateMap.keySet())
+
+		// Ensure our JRE version is sufficient for this release
+		JreVersion currJreVer = DistUtils.getJreVersion();
+		JreVersion targJreVer = updateCat.getJreVersion();
+		if (targJreVer != null && JreVersion.getBetterVersion(targJreVer, currJreVer) != currJreVer)
+		{
+			List<JreRelease> jreList;
+
+			aTask.infoAppendln("Your current JRE is too old. It will need to be updated!");
+			aTask.infoAppendln("\tCurrent  JRE: " + currJreVer.getLabel());
+			aTask.infoAppendln("\tMinimun  JRE: " + targJreVer.getLabel() + "\n");
+
+			// Get list of all available JREs
+			jreList = JreUtils.getAvailableJreReleases(aTask, updateSiteUrl, refCredential);
+			if (jreList == null)
+			{
+				aTask.infoAppendln("The update site has not had any JREs deployed.");
+				aTask.infoAppendln("Please contact the update site adminstartor.");
+				return false;
+			}
+			if (jreList.size() == 0)
+			{
+				aTask.infoAppendln("No JRE releases found!");
+				aTask.infoAppendln("Please contact the update site adminstartor.");
+				return false;
+			}
+
+			// Retrieve the latest appropriate JreRelease
+			String platform = DistUtils.getPlatform();
+			jreList = JreUtils.getMatchingPlatforms(jreList, platform);
+			if (jreList.size() == 0)
+			{
+				aTask.infoAppendln("There are no JRE releases available for the platform: " + platform + "!");
+				return false;
+			}
+
+			JreRelease pickJre = jreList.get(0);
+			JreVersion pickJreVer = pickJre.getVersion();
+
+			if (JreVersion.getBetterVersion(pickJreVer, targJreVer) == currJreVer)
+			{
+				aTask.infoAppendln("The latest available JRE on the update site is not recent enought!");
+				aTask.infoAppendln("Minimun required JRE: " + targJreVer.getLabel());
+				aTask.infoAppendln("Latest available JRE: " + pickJreVer.getLabel());
+				return false;
+			}
+
+			// Update the number of bytes to be retrieved to take into account the JRE which we will be downloading
+			// and form the appropriate tmpTask
+			tmpFileLen = pickJre.getFileLen();
+			releaseSizeFull += tmpFileLen;
+			tmpTask = new PartialTask(mainTask, mainTask.getProgress(), tmpFileLen / (releaseSizeFull + 0.00));
+
+			// Download the JRE
+			Digest targDigest, testDigest;
+			targDigest = pickJre.getDigest();
+			MessageDigest msgDigest;
+			msgDigest = DigestUtils.getDigest(targDigest.getType());
+			mainTask.infoAppendln("Downloading JRE... Version: " + pickJre.getVersion().getLabel());
+			URL srcUrl = IoUtil.createURL(updateSiteUrl.toString() + "/jre/" + pickJre.getFileName());
+			File dstFile = new File(new File(destPath, "jre"), pickJre.getFileName());
+			DistUtils.downloadFile(tmpTask, srcUrl, dstFile, refCredential, tmpFileLen, msgDigest);
+
+			// Validate that the JRE was downloaded successfully
+			testDigest = new Digest(targDigest.getType(), msgDigest.digest());
+			if (targDigest.equals(testDigest) == false)
+			{
+				aTask.infoAppendln("The download of the JRE appears to be corrupted.");
+				aTask.infoAppendln("\tFile: " + dstFile);
+				aTask.infoAppendln("\t\tExpected " + targDigest.getDescr());
+				aTask.infoAppendln("\t\tRecieved " + testDigest.getDescr() + "\n");
+				return false;
+			}
+			releaseSizeCurr += tmpFileLen;
+			progressVal = releaseSizeCurr / (releaseSizeFull + 0.00);
+			mainTask.setProgress(progressVal);
+
+			// TODO: Unpack the JRE at the proper location and then delete it
+			File jrePath = PlatformUtils.getJreLocation(pickJre);
+			try
+			{
+				int finish_me_and_clean_me;
+//				Files.createTempDirectory(dstFile, prefix, attrs)
+//				Files.createTempDir();
+				
+				
+				File unpackPath;
+				unpackPath = new File(destPath, "jre/unpack");
+				unpackPath.mkdirs();
+				MiscUtils.unTar(dstFile, unpackPath);
+				
+				File[] fileArr;
+				fileArr = unpackPath.listFiles();
+				if (fileArr.length != 1 && fileArr[0].isDirectory() == false)
+					throw new Exception("Expected only one (top level) folder to be unpacked. Items extracted: " + fileArr.length + "   Path: " + unpackPath);
+				
+				File jreUnpackedPath;
+				jreUnpackedPath = fileArr[0];
+				
+				// Moved the unpacked file to the "standardized" jrePath
+				jreUnpackedPath.renameTo(jrePath);
+//				MiscUtils.unTar(dstFile, jrePath);
+				
+				// TODO: Remove the unpacked folder...
+			}
+			catch(Exception aExp)
+			{
+				aTask.infoAppendln("Failed to untar archive. The update has been aborted.");
+				aTask.infoAppendln("\tTar File: " + dstFile);
+				aTask.infoAppendln("\tDestination: " + jrePath);
+				return false;
+			}
+
+			// TODO: Update the launch script or launch config file to point to the proper JRE
+			if (PlatformUtils.setJreLocation(jrePath) == false)
+			{
+				aTask.infoAppendln("Failed to update the configuration to point to the updated JRE!");
+				aTask.infoAppendln("\tCurrent JRE: " + currJreVer.getLabel());
+				aTask.infoAppendln("\t Chosen JRE: " + pickJreVer.getLabel());
+				return false;
+			}
+
+			return true;
+
+			// TODO: Eventually remove the old JRE - perhaps from the app launcher
+		}
+
+		// Download the individual application files
+		mainTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Nodes: " + updateCat.getAllNodesList().size());
+		for (Node aNode : updateCat.getAllNodesList())
 		{
 			// Bail if we have been aborted
 			if (mainTask.isActive() == false)
 				return false;
 
-			updateNode = updateMap.get(aFileName);
-			staleNode = staleMap.get(aFileName);
-			nodeFileLen = 0L;
+			updateNode = aNode;
+			staleNode = staleCat.getNode(updateNode.getFileName());
+			tmpFileLen = 0L;
 			if (updateNode instanceof FileNode)
-				nodeFileLen = ((FileNode)updateNode).getFileLen();
-			tmpTask = new PartialTask(mainTask, mainTask.getProgress(), nodeFileLen / (releaseSizeFull + 0.00));
+				tmpFileLen = ((FileNode)updateNode).getFileLen();
+			tmpTask = new PartialTask(mainTask, mainTask.getProgress(), tmpFileLen / (releaseSizeFull + 0.00));
 
 			// Attempt to use the local copy
 			isPass = false;
 			if (staleNode != null && updateNode.areContentsEqual(staleNode) == true)
 			{
-				isPass = staleNode.transferContentTo(tmpTask, refCredential, destPath);
+				// Note we pass the SilentTask since
+				// - This should be fairly fast since this should result in a local disk copy
+				// - This may fail, (but the failuer is recoverable and this serves just as an optimization)
+//				isPass = staleNode.transferContentTo(tmpTask, refCredential, destPath);
+				isPass = staleNode.transferContentTo(new SilentTask(), refCredential, destPath);
 				if (isPass == true)
 					mainTask.infoAppendln("\t(L) " + staleNode.getFileName());
 			}
@@ -475,7 +606,7 @@ public class DistMakerEngine
 			}
 
 			// Update the progress
-			releaseSizeCurr += nodeFileLen;
+			releaseSizeCurr += tmpFileLen;
 			progressVal = releaseSizeCurr / (releaseSizeFull + 0.00);
 			mainTask.setProgress(progressVal);
 		}
@@ -487,8 +618,7 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Notification that the corresponding application has been fully initialized. This helper method will notify the
-	 * user on the status of any update.
+	 * Notification that the corresponding application has been fully initialized. This helper method will notify the user on the status of any update.
 	 */
 	private void markSystemFullyStarted()
 	{
@@ -528,9 +658,9 @@ public class DistMakerEngine
 	 * This method will be called via reflection.
 	 */
 	@SuppressWarnings("unused")
-	private void queryUserForInput(Task aTask, File deltaPath, List<Release> fullList)
+	private void queryUserForInput(Task aTask, File deltaPath, List<AppRelease> fullList)
 	{
-		Release chosenItem;
+		AppRelease chosenItem;
 
 		// Query the user, if the wish to destroy the old update
 		if (deltaPath.isDirectory() == true)
@@ -567,7 +697,7 @@ public class DistMakerEngine
 	/**
 	 * Helper method to update platform specific configuration files
 	 */
-	private boolean updatePlatformConfigFiles(Task aTask, Release aRelease)
+	private boolean updatePlatformConfigFiles(Task aTask, AppRelease aRelease)
 	{
 		File installPath, pFile;
 		String errMsg;

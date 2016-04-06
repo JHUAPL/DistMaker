@@ -1,38 +1,49 @@
 package distMaker.platform;
 
-import glum.io.IoUtil;
-
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
 import distMaker.DistUtils;
+import distMaker.MiscUtils;
 
 public class WindowsUtils
 {
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified
-	 * maxMemVal.
+	 * Utility method to update the JRE to reflect the specified path.
 	 * <P>
-	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in
-	 * the script. It assumes this string will be surrounded by a single space character on each side.
+	 * TODO: Complete this comment and method.
 	 */
-	public static boolean updateMaxMem(File aFile, long numBytes)
+	public static boolean updateJrePath(File aPath)
 	{
-		BufferedReader br;
+		int zios_finish;
+		return false;
+	}
+
+	/**
+	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified maxMemVal.
+	 * <P>
+	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in the script. It assumes this string will
+	 * be surrounded by a single space character on each side.
+	 */
+	public static String updateMaxMem(long numBytes)
+	{
+		File configFile;
 		List<String> inputList;
 		String strLine, updateStr;
 		boolean isProcessed;
 
-		inputList = new ArrayList<>();
+		// Bail if we fail to locate the configFile.
+		configFile = getConfigFile();
+		if (configFile != null && configFile.isFile() == true)
+			return "The config file could not be located.";
+
 		isProcessed = false;
+		inputList = new ArrayList<>();
 
 		// Process our input
-		br = null;
-		try
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(configFile))))
 		{
-			br = new BufferedReader(new InputStreamReader(new FileInputStream(aFile)));
-
 			// Read the lines
 			while (true)
 			{
@@ -62,16 +73,16 @@ public class WindowsUtils
 		catch(Exception aExp)
 		{
 			aExp.printStackTrace();
-			return false;
-		}
-		finally
-		{
-			IoUtil.forceClose(br);
+			return "Failed while processing the config file: " + configFile;
 		}
 
 		// Update the script
-		System.out.println("Updating contents of file: " + aFile);
-		return LinuxUtils.writeDoc(aFile, inputList);
+		System.out.println("Updating contents of file: " + configFile);
+		if (MiscUtils.writeDoc(configFile, inputList) == false)
+			return "Failed to write the config file: " + configFile;
+
+		// On success return null
+		return null;
 	}
 
 	/**

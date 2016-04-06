@@ -18,7 +18,7 @@ def buildRelease(args, buildPath):
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
-	jreRelease = args.jreRelease
+	jreRelease = args.jreVersion
 	platformStr = 'linux'
 
 	# Check our system environment before proceeding
@@ -122,6 +122,13 @@ def buildBashScript(destFile, args, jreTarGzFile):
 	f.write('# mutations to this script while it is running\n')
 	f.write('{    # Do not remove this bracket! \n\n')
 
+	f.write('# Define where the Java executable is located\n')
+	if jreTarGzFile == None:
+		f.write('javaExe=java\n\n')
+	else:
+		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
+		f.write('javaExe=../' + jrePath + '/bin/java\n\n')
+
 	f.write('# Define the maximum memory to allow the application to utilize\n')
 	if maxMem == None:
 		f.write('#maxMem=512m # Uncomment out this line to change from defaults.\n\n')
@@ -142,10 +149,7 @@ def buildBashScript(destFile, args, jreTarGzFile):
 	f.write('  xmxStr=\'-Xmx\'$maxMem\n')
 	f.write('fi\n\n')
 
-	exeCmd = 'java ' + jvmArgsStr + '$xmxStr '
-	if jreTarGzFile != None:
-		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
-		exeCmd = '../' + jrePath + '/bin/java ' + jvmArgsStr + '$xmxStr '
+	exeCmd = '$javaExe ' + jvmArgsStr + '$xmxStr '
 	exeCmd = exeCmd + '-Djava.system.class.loader=appLauncher.RootClassLoader -cp ../launcher/appLauncher.jar appLauncher.AppLauncher $*'
 	f.write('# Run the application\n')
 	f.write(exeCmd + '\n\n')

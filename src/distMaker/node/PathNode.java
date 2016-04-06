@@ -8,12 +8,15 @@ import java.net.URL;
 
 public class PathNode implements Node
 {
-	protected URL rootUrl;
-	protected String fileName;
+//	private final URL rootUrl;
+	private final String fileName;
 
+	/**
+	 * Immutable node describing a File.
+	 */
 	public PathNode(URL aRootUrl, String aFileName)
 	{
-		rootUrl = aRootUrl;
+//		rootUrl = aRootUrl;
 		fileName = aFileName;
 	}
 

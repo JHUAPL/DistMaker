@@ -20,7 +20,7 @@ def buildRelease(args, buildPath):
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
-	jreRelease = args.jreRelease
+	jreRelease = args.jreVersion
 	platformStr = 'apple'
 
 	# Check our system environment before proceeding
@@ -384,6 +384,7 @@ def buildPListInfoStatic(destFile, args):
 	tupList.append(('CFBundlePackageType', 'APPL'))
 	tupList.append(('CFBundleSignature', '????'))
 	tupList.append(('CFBundleVersion', args.version))
+	tupList.append(('NSHighResolutionCapable', 'true'))
 	tupList.append(('NSHumanReadableCopyright', ''))
 	jrePath = 'jre' + args.jreRelease
 	tupList.append(('JVMRuntime', jrePath))

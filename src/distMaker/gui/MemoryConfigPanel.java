@@ -23,7 +23,7 @@ import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
 import distMaker.platform.MemUtils;
-
+import distMaker.platform.PlatformUtils;
 import static distMaker.platform.MemUtils.KB_SIZE;
 import static distMaker.platform.MemUtils.MB_SIZE;
 import static distMaker.platform.MemUtils.GB_SIZE;
@@ -48,11 +48,11 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 	private long targMemSize;
 
 	/**
-	 * Constructor where the developer specifies the max heap memory. Be careful about using this method, as if a value
-	 * is specified too large, then the program may become non operational on the next run.
+	 * Constructor where the developer specifies the max heap memory. Be careful about using this method, as if a value is specified too large, then the program
+	 * may become non operational on the next run.
 	 * <P>
-	 * Should the program become non operational then the end user would have to manually configure the config/script
-	 * files by hand or a reinstall would be required.
+	 * Should the program become non operational then the end user would have to manually configure the config/script files by hand or a reinstall would be
+	 * required.
 	 */
 	public MemoryConfigPanel(Component aParent, long aMaxMemSize)
 	{
@@ -74,8 +74,8 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 	}
 
 	/**
-	 * Constructor where the DistMaker framework attempts to determine the appropriate maxMexSize. Should, the DistMaker
-	 * framework fail to determine the installed system memory, then 4GB will be assumed as the installed system memory.
+	 * Constructor where the DistMaker framework attempts to determine the appropriate maxMexSize. Should, the DistMaker framework fail to determine the
+	 * installed system memory, then 4GB will be assumed as the installed system memory.
 	 */
 	public MemoryConfigPanel(Component aParent)
 	{
@@ -124,7 +124,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 		targMemSize = roundToMB(targMemSize);
 
 		// Bail if we are not able to set the DistMaker max heap memory
-		if (MemUtils.setMaxHeapMem(warnPanel, targMemSize) == false)
+		if (PlatformUtils.setMaxHeapMem(warnPanel, targMemSize) == false)
 			return;
 
 		// Update our state vars
@@ -242,8 +242,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 	}
 
 	/**
-	 * Utility method to round (floor) values to the nearest megabyte. The returned value is guaranteed to be at least 1
-	 * megabyte.
+	 * Utility method to round (floor) values to the nearest megabyte. The returned value is guaranteed to be at least 1 megabyte.
 	 * <P>
 	 * The input value, aSize, should be specified in bytes, and the returned value will be specified in bytes.
 	 */

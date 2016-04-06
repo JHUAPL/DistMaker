@@ -1,15 +1,11 @@
 package distMaker.platform;
 
-import glum.gui.panel.generic.MessagePanel;
 import glum.reflect.ReflectUtil;
 import glum.unit.ByteUnit;
 
-import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.reflect.Method;
-
-import distMaker.DistUtils;
 
 public class MemUtils
 {
@@ -19,8 +15,8 @@ public class MemUtils
 	public static final long GB_SIZE = 1024 * 1024 * 1024;
 
 	/**
-	 * Utility method that attempts to compute the installed system memory (ram). If the installed system ram can not be
-	 * computed, then the system is assumed to have 4 GB.
+	 * Utility method that attempts to compute the installed system memory (ram). If the installed system ram can not be computed, then the system is assumed to
+	 * have 4 GB.
 	 */
 	public static long getInstalledSystemMemory()
 	{
@@ -61,107 +57,7 @@ public class MemUtils
 	}
 
 	/**
-	 * Utility method to configure the (active) DistMaker distribution to use the specified maxMem.
-	 * <P>
-	 * Method will return false on failure.
-	 * 
-	 * @param warnPanel
-	 *           GUI message panel to route error messages.
-	 * @param maxMemSize
-	 *           Maximum heap memory in bytes.
-	 */
-	public static boolean setMaxHeapMem(MessagePanel warnPanel, long maxMemSize)
-	{
-		File installPath, pFile, configFile, scriptFile;
-		String errMsg;
-		boolean isValidPlatform;
-
-		// Get the top level install path
-		installPath = DistUtils.getAppPath().getParentFile();
-		isValidPlatform = false;
-
-		// Apple specific platform files
-		pFile = new File(installPath, "Info.plist");
-		if (pFile.isFile() == false)
-			pFile = new File(installPath.getParentFile(), "Info.plist");
-
-		if (pFile.isFile() == true)
-		{
-			isValidPlatform = true;
-
-			errMsg = null;
-			if (pFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permissions.";
-			else 
-				errMsg = AppleUtils.updateMaxMem(pFile, maxMemSize); 
-
-			if (errMsg != null)
-			{
-				errMsg = "File: " + pFile + "\n   " + errMsg;
-				warnPanel.setTitle("Failed setting Apple properties.");
-				warnPanel.setInfo(errMsg);
-				warnPanel.setVisible(true);
-				return false;
-			}
-		}
-
-		// Linux specific platform files
-		scriptFile = LinuxUtils.getScriptFile();
-		if (scriptFile != null && scriptFile.isFile() == true)
-		{
-			isValidPlatform = true;
-
-			errMsg = null;
-			if (scriptFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permmisions for file: " + scriptFile;
-			else if (LinuxUtils.updateMaxMem(scriptFile, maxMemSize) == false)
-				errMsg = "Failure. Failed to update file: " + scriptFile;
-
-			if (errMsg != null)
-			{
-				warnPanel.setTitle("Failed setting Linux configuration.");
-				warnPanel.setInfo(errMsg);
-				warnPanel.setVisible(true);
-				return false;
-			}
-		}
-
-		// Windows specific platform files
-		configFile = WindowsUtils.getConfigFile();
-		if (configFile != null && configFile.isFile() == true)
-		{
-			isValidPlatform = true;
-
-			errMsg = null;
-			if (WindowsUtils.updateMaxMem(configFile, maxMemSize) == false)
-				errMsg = "Failure. Failed to update file: " + configFile;
-
-			if (errMsg != null)
-			{
-				warnPanel.setTitle("Failed setting Windows configuration.");
-				warnPanel.setInfo(errMsg);
-				warnPanel.setVisible(true);
-				return false;
-			}
-		}
-
-		// Bail if no valid platform found
-		if (isValidPlatform == false)
-		{
-			errMsg = "This does not appear to be a valid DistMaker build. Memory changes will not take effect.";
-
-			warnPanel.setTitle("No valid DistMaker platform located.");
-			warnPanel.setInfo(errMsg);
-			warnPanel.setVisible(true);
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Utility method that takes an inputStr, locates the fragment -Xmx*, and replaces the fragment with the appropriate
-	 * -Xmx with respect to numBytes.
+	 * Utility method that takes an inputStr, locates the fragment -Xmx*, and replaces the fragment with the appropriate -Xmx with respect to numBytes.
 	 * <P>
 	 * This method is a bit brittle in that it assumes the -Xmx string is surrounded with 1 white space character.
 	 * <P>

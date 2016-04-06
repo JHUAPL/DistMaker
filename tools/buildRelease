@@ -71,7 +71,7 @@ def buildRelease(version, doNotClean=False):
 	# Copy the scripts
 	dstPath = os.path.join(workPath, 'script')
 	os.mkdir(dstPath)
-	for aScript in ['appleUtils.py', 'linuxUtils.py', 'windowsUtils.py', 'buildDist.py', 'deployDist.py', 'jreUtils.py', 'logUtils.py', 'miscUtils.py']:
+	for aScript in ['appleUtils.py', 'linuxUtils.py', 'windowsUtils.py', 'buildDist.py', 'deployAppDist.py', 'deployJreDist.py', 'jreUtils.py', 'logUtils.py', 'miscUtils.py']:
 		srcPath = os.path.join(installPath, 'script', aScript)
 		shutil.copy2(srcPath, dstPath)
 

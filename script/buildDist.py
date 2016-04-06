@@ -39,10 +39,22 @@ class FancyArgumentParser(argparse.ArgumentParser):
 #			yield arg
 
 
-def buildCatalogFile(deltaPath):
-
-	# Build the delta md5sum catalog
+def buildCatalogFile(args, deltaPath):
+	# Build the delta catalog
 	records = []
+
+	# Record the digest used
+	digestType = args.digest
+	record = ('digest', digestType)
+	records.append(record)
+
+	# Record the JRE required
+	jreVersion = args.jreVersion
+	if jreVersion == None:
+		jreVersion = jreUtils.getDefaultJrVersion()
+	if jreVersion != None:
+		record = ('jre', jreVersion)
+		records.append(record)
 
 	snipLen = len(deltaPath) + 1
 #	for root, dirNames, fileNames in os.walk(deltaPath, onerror=failTracker.recordError):
@@ -73,22 +85,20 @@ def buildCatalogFile(deltaPath):
 			elif os.path.isfile(fullPath) == True:
 				# Gather the various stats of the specified file
 				stat = os.stat(fullPath)
-				md5sum = miscUtils.computeMd5ForFile(fullPath)
+				digestVal = miscUtils.computeDigestForFile(fullPath, digestType)
 				relPath = fullPath[snipLen:]
-				record = ('F', md5sum, str(stat.st_size), relPath)
+				record = ('F', digestVal, str(stat.st_size), relPath)
 				records.append(record)
 			else:
 				print("Undefined node. Full path: " + fullPath + "\n")
-
 
 	# Save the records to the catalog file
 	dstPath = os.path.join(deltaPath, "catalog.txt")
 	f = open(dstPath, 'wb')
 	for aRecord in records:
-		if len(aRecord) == 2:
-			f.write(aRecord[0] + ',' + aRecord[1] + '\n')
-		else:
-			f.write(aRecord[0] + ',' + aRecord[1] + ',' + aRecord[2] + ',' + aRecord[3] + '\n')
+		f.write(','.join(aRecord) + '\n')
+
+	f.write('exit\n')
 	f.close()
 
 def checkForRequiredApplications():
@@ -166,7 +176,7 @@ if __name__ == "__main__":
 	parser.add_argument('-appArgs', help='Application arguments. Note that this argument must ALWAYS be the last specified!', nargs=argparse.REMAINDER, default=[])
 	parser.add_argument('-dataCode', '-dc', help='A list of supporting folders for the application.', nargs='+', default=[])
 	parser.add_argument('-javaCode', '-jc', help='A folder which contains the Java build.')
-	parser.add_argument('-jreRelease', help='JRE release to utilize. Note there should be a corresponding folder in ~/jre/<platform>/', default=None)
+	parser.add_argument('-jreVersion', help='JRE version to utilize. This should be a value like 1.7 or 1.8 or 1.8.34. Note there should be corresponding tar.gz JREs for each platform in the folder ~/jre/', default=None)
 	parser.add_argument('-jvmArgs', help='JVM arguments.', nargs='+', default=[])
 	parser.add_argument('-classPath', help='Class path listing of jar files relative to javaCode. Leave blank for auto determination.', nargs='+', default=[])
 	parser.add_argument('-debug', help='Turn on debug options for built applications.', action='store_true', default=False)
@@ -174,7 +184,8 @@ if __name__ == "__main__":
 	parser.add_argument('-bgFile', help='Background file used for apple dmg file.')
 	parser.add_argument('-iconFile', help='PNG file used for linux/windows icon.')
 	parser.add_argument('-icnsFile', help='Icon file used for apple build.')
-	parser.add_argument('-forceSingleInstance', help='Force the application to have only one instance..', default=False)
+	parser.add_argument('-forceSingleInstance', help='Force the application to have only one instance.', default=False)
+	parser.add_argument('-digest', help='Digest used to ensure integrity of application upgrades. Default: sha256', choices=['md5', 'sha256', 'sha512'], default='sha256')
 #	parser.add_argument('-bundleId', help='Apple specific id descriptor.')
 
 	# Intercept any request for a  help message and bail
@@ -265,8 +276,8 @@ if __name__ == "__main__":
 	dstPath = os.path.join(buildPath, "delta/app.cfg")
 	miscUtils.buildAppLauncherConfig(dstPath, args)
 
-	# Build the delta md5sum catalog
-	buildCatalogFile(deltaPath)
+	# Build the delta catalog
+	buildCatalogFile(args, deltaPath)
 
 	# Build the Apple release
 	appleUtils.buildRelease(args, buildPath)
@@ -278,6 +289,6 @@ if __name__ == "__main__":
 	windowsUtils.buildRelease(args, buildPath)
 
 	# Copy over the deploy script
-	srcPath = os.path.join(miscUtils.getInstallRoot(), "deployDist.py")
+	srcPath = os.path.join(miscUtils.getInstallRoot(), "deployAppDist.py")
 	shutil.copy(srcPath, buildPath)
 
