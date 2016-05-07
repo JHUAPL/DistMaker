@@ -119,6 +119,7 @@ def addRelease(appName, version, buildDate):
 
 	# Update the version info
 	addReleaseInfo(installPath, appName, version, buildDate)
+	print('Application {} ({}) has been deployed to location: {}'.format(appName, version, args.deployRoot))
 
 
 def delRelease(appName, version, buildDate):

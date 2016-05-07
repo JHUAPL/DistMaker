@@ -18,25 +18,22 @@ def buildRelease(args, buildPath):
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
-	jreRelease = args.jreVersion
+	jreVerSpec = args.jreVerSpec
 	platformStr = 'linux'
 
 	# Check our system environment before proceeding
 	if checkSystemEnvironment() == False:
 		return
 
-	# Attempt to locate a default JRE if None is specified in the args.
-	if jreRelease == None:
-		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
-	# Let the user know if the 'user' specified JRE is not available and locate an alternative
-	elif jreUtils.getJreTarGzFile(platformStr, jreRelease) == None:
-		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreRelease, platformStr.capitalize()))
-		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
-	args.jreRelease = jreRelease
+	# Select the jreTarGzFile to utilize for static releases
+	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
+	if jreTarGzFile == None:
+		# Let the user know if the 'user' specified JRE is not available and locate an alternative
+		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreVerSpec, platformStr.capitalize()))
+		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, None)
 
 	# Form the list of distributions to build (dynamic and static JREs)
 	distList = [(appName + '-' + version, None)]
-	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreRelease)
 	if jreTarGzFile != None:
 		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
 
@@ -48,7 +45,7 @@ def buildRelease(args, buildPath):
 		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
 		# Let the user know of the JRE release we are going to build with
 		if aJreTarGzFile != None:
-			print('\tUtilizing jreRelease: ' + jreRelease)
+			print('\tUtilizing JRE: ' + aJreTarGzFile)
 
 		# Create the (top level) distribution folder
 		dstPath = os.path.join(tmpPath, aDistName)
@@ -62,7 +59,7 @@ def buildRelease(args, buildPath):
 		print('\tForming tar.gz file: ' + tarFile)
 		childPath = aDistName
 		subprocess.check_call(["tar", "-czf", tarFile, "-C", tmpPath, childPath], stderr=subprocess.STDOUT)
-		print('\tFinished building release: ' + os.path.basename(tarFile))
+		print('\tFinished building release: ' + os.path.basename(tarFile) + '\n')
 
 	# Perform cleanup
 	shutil.rmtree(tmpPath)
@@ -73,7 +70,6 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appName = args.name
-	jreRelease = args.jreRelease
 
 	# Form the app contents folder
 	srcPath = os.path.join(buildPath, "delta")

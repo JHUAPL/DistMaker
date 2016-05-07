@@ -17,25 +17,22 @@ def buildRelease(args, buildPath):
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
-	jreRelease = args.jreVersion
+	jreVerSpec = args.jreVerSpec
 	platformStr = 'windows'
 
 	# Check our system environment before proceeding
 	if checkSystemEnvironment() == False:
 		return
 
-	# Attempt to locate a default JRE if none is specified in the args.
-	if jreRelease == None:
-		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
-	# Let the user know if the 'user' specified JRE is not available and locate an alternative
-	elif jreUtils.getJreTarGzFile(platformStr, jreRelease) == None:
-		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreRelease, platformStr.capitalize()))
-		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
-	args.jreRelease = jreRelease
+	# Select the jreTarGzFile to utilize for static releases
+	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
+	if jreTarGzFile == None:
+		# Let the user know if the 'user' specified JRE is not available and locate an alternative
+		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreVerSpec, platformStr.capitalize()))
+		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, None)
 
 	# Form the list of distributions to build (dynamic and static JREs)
 	distList = [(appName + '-' + version, None)]
-	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreRelease)
 	if jreTarGzFile != None:
 		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
 
@@ -47,7 +44,7 @@ def buildRelease(args, buildPath):
 		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
 		# Let the user know of the JRE tar.gz  we are going to build with
 		if aJreTarGzFile != None:
-			print('\tUtilizing jreRelease: ' + aJreTarGzFile)
+			print('\tUtilizing JRE: ' + aJreTarGzFile)
 
 		# Create the (top level) distribution folder
 		dstPath = os.path.join(tmpPath, aDistName)
@@ -63,9 +60,9 @@ def buildRelease(args, buildPath):
 		proc = miscUtils.executeAndLog(cmd, "\t\tjar: ")
 		if proc.returncode != 0:
 			print('\tError: Failed to form zip file. Return code: ' + str(proc.returncode))
-			print('\tAborting build of release: ' + os.path.basename(zipFile))
+			print('\tAborting build of release: ' + os.path.basename(zipFile) + '\n')
 		else:
-			print('\tFinished building release: ' + os.path.basename(zipFile))
+			print('\tFinished building release: ' + os.path.basename(zipFile) + '\n')
 
 	# Perform cleanup
 	shutil.rmtree(tmpPath)
@@ -76,7 +73,6 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appName = args.name
-	jreRelease = args.jreRelease
 
 	# Form the app contents folder
 	srcPath = os.path.join(buildPath, "delta")
@@ -180,7 +176,7 @@ def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
 		writeln(f, 2, "<path>" + jrePath + "</path>");
 	else:
-		jreVer = getJreMajorVersion(args.jreRelease)
+		jreVer = getJreMajorVersion(args.jreVerSpec[0])
 		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");  # Valid values: '1.7.0' or '1.8.0' ...
 	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");  # Valid values: jreOnlyjdkOnly|preferJre|preferJdk
 	for aJvmArg in args.jvmArgs:
@@ -216,15 +212,15 @@ def checkSystemEnvironment():
 	return True
 
 
-def getJreMajorVersion(aJreRelease):
+def getJreMajorVersion(aJreVerStr):
 	"""Returns the minimum version of the JRE to utilize based on the passed in JRE release. 
-	The passed in value should be of the form X.X.X ---> example: 1.8.73 would result in 1.8.0 
-	If aJreRelease is invalid then returns the default value of: 1.8.0"""
-	if aJreRelease == None: return '1.8.0'
-	verList = aJreRelease.split('.')
+	The passed in value should be of the form X.X.X ---> example: 1.8.0_73 would result in 1.8.0 
+	If aJreVerStr is invalid then returns the default value of: 1.8.0"""
+	if aJreVerStr == None: return '1.8.0'
+	verList = aJreVerStr.split('.')
 	if len(verList) == 2: verList.append('0')
 	if len(verList) == 3 and verList[2] == '': verList[2] = '0'
-	if len(verList) != 3: return '1.8.0'
+	if len(verList) < 3: return '1.8.0'
 	try:
 		[int(y) for y in verList]
 	except:

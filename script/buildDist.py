@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
+from __future__ import print_function
 import argparse
-import distutils.spawn
 import getpass
 import math
 import os
@@ -12,31 +12,14 @@ import sys
 import tempfile
 import time
 
-#import buildCatalog
+import distutils.spawn
+import jreUtils
 import miscUtils
 import appleUtils
 import linuxUtils
 import windowsUtils
-
-
-class FancyArgumentParser(argparse.ArgumentParser):
-	def __init__(self, *args, **kwargs):
-		self._action_defaults = {}
-		argparse.ArgumentParser.__init__(self, *args, **kwargs)
-
-	def convert_arg_line_to_args(self, arg_line):
-		# Add the line as an argument if it does not appear to be a comment
-		if len(arg_line) > 0 and arg_line.strip()[0] != '#':
-			yield arg_line
-#			argsparse.ArgumentParser.convert_arg_line_to_args(arg_line)
-#		else:
-#			print('Skipping line: ' + arg_line)
-
-#		# Example below will break all space separated lines into individual arguments
-#		for arg in arg_line.split():
-#			if not arg.strip():
-#				continue
-#			yield arg
+from miscUtils import ErrorDM
+from miscUtils import FancyArgumentParser
 
 
 def buildCatalogFile(args, deltaPath):
@@ -49,11 +32,11 @@ def buildCatalogFile(args, deltaPath):
 	records.append(record)
 
 	# Record the JRE required
-	jreVersion = args.jreVersion
-	if jreVersion == None:
-		jreVersion = jreUtils.getDefaultJrVersion()
-	if jreVersion != None:
-		record = ('jre', jreVersion)
+	jreVerSpec = args.jreVerSpec
+	if jreVerSpec == None:
+		jreVerSpec = [jreUtils.getDefaultJreVerStr()]
+	if jreVerSpec != None:
+		record = ('jre', ",".join(jreVerSpec))
 		records.append(record)
 
 	snipLen = len(deltaPath) + 1
@@ -101,13 +84,14 @@ def buildCatalogFile(args, deltaPath):
 	f.write('exit\n')
 	f.close()
 
-def checkForRequiredApplications():
-	"""Method to ensure we have all of the required applications installed to support building of distributions
-	The current set of applications required are:
-	java, jar, genisoimage, ImageMagick:convert"""
+
+def checkForRequiredApplicationsAndExit():
+	"""Method to ensure we have all of the required applications installed to support building of distributions.
+	If there are mandatory applications that are missing then this will be printed to stderr and the program will exit.
+	The current set of required applications are:
+	java, jar, genisoimage"""
 	evalPath = distutils.spawn.find_executable('java')
 	errList = []
-	warnList = []
 	if evalPath == None:
 		errList.append('Failed while trying to locate java. Please install Java')
 	evalPath = distutils.spawn.find_executable('jar')
@@ -116,26 +100,36 @@ def checkForRequiredApplications():
 	evalPath = distutils.spawn.find_executable('genisoimage')
 	if evalPath == None:
 		errList.append('Failed while trying to locate genisoimage. Please install genisoimage')
+
+	# Bail if there are no issues
+	if len(errList) == 0:
+		return
+
+	# Log the issues and exit
+	print('There are configuration errors with the environment or system.')
+#	print('System Path:' + str(sys.path))
+	print('Please correct the following:')
+	for aError in errList:
+		print('\t' + aError)
+	warnList = checkForSuggestedApplications()
+	if len(warnList) > 0:
+		print('In addition please fix the following for full program functionality:')
+		for aWarn in warnList:
+			print('\t' + aWarn)
+	sys.exit(0)
+
+
+def checkForSuggestedApplications():
+	"""Method to check for any suggested missing applications. If all suggested applications are installed then this method will return None,
+	otherwise it will return a list of messages which describe the missing applications and the corresponding missing functionality.
+	The current set of suggested applications are:
+	ImageMagick:convert"""
+	warnList = []
 	evalPath = distutils.spawn.find_executable('convert')
 	if evalPath == None:
 		warnList.append('Application \'convert\' was not found. Please install (ImageMagick) convert')
 		warnList.append('\tWindows icons will not be supported when using argument: -iconFile.')
-	if len(errList) > 0:
-		print('There are configuration errors with the environment or system.')
-#		print('System Path:' + str(sys.path))
-		print('Please correct the following:')
-		for aError in errList:
-			print('\t' + aError)
-		if len(warnList) > 0:
-			print('Please correct the following for full program functionality:')
-			for aWarn in warnList:
-				print('\t' + aWarn)
-		sys.exit(0)
-	if len(warnList) > 0:
-		print('There are configuration issues with the environment or system.')
-		print('Please correct the following for full program functionality:')
-		for aWarn in warnList:
-			print('\t' + aWarn)
+	return warnList
 
 
 def getClassPath(javaCodePath):
@@ -176,7 +170,9 @@ if __name__ == "__main__":
 	parser.add_argument('-appArgs', help='Application arguments. Note that this argument must ALWAYS be the last specified!', nargs=argparse.REMAINDER, default=[])
 	parser.add_argument('-dataCode', '-dc', help='A list of supporting folders for the application.', nargs='+', default=[])
 	parser.add_argument('-javaCode', '-jc', help='A folder which contains the Java build.')
-	parser.add_argument('-jreVersion', help='JRE version to utilize. This should be a value like 1.7 or 1.8 or 1.8.34. Note there should be corresponding tar.gz JREs for each platform in the folder ~/jre/', default=None)
+	parser.add_argument('-jreVersion', dest='jreVerSpec', help='JRE version to utilize. This should be either 1 or 2 values where each value should be something like 1.7 or 1.8 or 1.8.0_34. '
+							+ 'If 2 values are specified than the second value must be later than the first value. Any static build will be built with the latest allowable JRE.'
+							+ ' Note there should be corresponding tar.gz JREs for each platform in the folder ~/jre/', nargs='+', default=None)
 	parser.add_argument('-jvmArgs', help='JVM arguments.', nargs='+', default=[])
 	parser.add_argument('-classPath', help='Class path listing of jar files relative to javaCode. Leave blank for auto determination.', nargs='+', default=[])
 	parser.add_argument('-debug', help='Turn on debug options for built applications.', action='store_true', default=False)
@@ -194,8 +190,8 @@ if __name__ == "__main__":
 			parser.print_help()
 			exit()
 
-	# Check to ensure all of the required applications are installed
-	checkForRequiredApplications()
+	# Check to ensure all of the required applications are installed before proceeding
+	checkForRequiredApplicationsAndExit()
 
 	# Parse the args		
 	parser.formatter_class.max_help_position = 50
@@ -212,12 +208,26 @@ if __name__ == "__main__":
 		errList.append('-mainClass')
 	if len(errList) != 0:
 		print('At a minimum the following must be specified: ' + str(errList) +  '.\nExiting...')
-		exit();
+		exit()
+
+	# Ensure the reserved 'jre' name is not utilized	
+	if args.name.lower() == 'jre':
+		print('The application can not be named: {}. That name is reserved for the JRE.'.format(args.name))
+		exit()
+
 #
 #	# Ensure java options are specified properly
 #	if (args.javaCode == None and args.mainClass != None) or (args.javaCode != None and args.mainClass == None):
 #		print('Both javaCode and mainClass must be specified, if either are specified. Exiting...')
 #		exit();
+
+	# Validate the jreVerSpec argument
+	try:
+		jreUtils.validateJreVersionSpec(args.jreVerSpec)
+	except ErrorDM as aExp:
+		print('The specified jreVerVersion is invalid. Input: {}'.format(args.jreVerSpec))
+		print('  ' + aExp.message, file=sys.stderr)
+		exit()
 
 	# Form the classPath if none specified
 	if args.javaCode != None and len(args.classPath) == 0:
@@ -241,6 +251,14 @@ if __name__ == "__main__":
 	if (os.path.exists(buildPath) == True):
 		print('   [ERROR] The release appears to be built. Path: ' + buildPath)
 		exit(-1)
+
+	# Let the user know of any missing functionality
+	warnList = checkForSuggestedApplications()
+	if len(warnList) > 0:
+		print('All suggested applications are not installed. There will be reduced functionality:')
+		for aWarn in warnList:
+			print('\t' + aWarn)
+		print()
 
 	# Form the buildPath
 	os.makedirs(buildPath)
@@ -291,4 +309,6 @@ if __name__ == "__main__":
 	# Copy over the deploy script
 	srcPath = os.path.join(miscUtils.getInstallRoot(), "deployAppDist.py")
 	shutil.copy(srcPath, buildPath)
+
+	print('Finished building all distributions.\n')
 

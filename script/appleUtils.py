@@ -20,25 +20,22 @@ def buildRelease(args, buildPath):
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
-	jreRelease = args.jreVersion
+	jreVerSpec = args.jreVerSpec
 	platformStr = 'apple'
 
 	# Check our system environment before proceeding
 	if checkSystemEnvironment() == False:
 		return
 
-	# Attempt to locate a default JRE if None is specified in the args.
-	if jreRelease == None:
-		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
-	# Let the user know if the 'user' specified JRE is not available and locate an alternative
-	elif jreUtils.getJreTarGzFile(platformStr, jreRelease) == None:
-		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreRelease, platformStr.capitalize()))
-		jreRelease = jreUtils.getDefaultJreRelease(platformStr)
-	args.jreRelease = jreRelease
+	# Select the jreTarGzFile to utilize for static releases
+	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
+	if jreTarGzFile == None:
+		# Let the user know if the 'user' specified JRE is not available and locate an alternative
+		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreVerSpec, platformStr.capitalize()))
+		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, None)
 
-	# Form the list of distributions to build (dynamic and static JREs)
+	# Form the list of distributions to build (dynamic and static releases)
 	distList = [(appName + '-' + version, None)]
-	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreRelease)
 	if jreTarGzFile != None:
 		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
 
@@ -47,7 +44,7 @@ def buildRelease(args, buildPath):
 		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
 		# Let the user know of the JRE tar.gz  we are going to build with
 		if aJreTarGzFile != None:
-			print('\tUtilizing jreRelease: ' + aJreTarGzFile)
+			print('\tUtilizing JRE: ' + aJreTarGzFile)
 
 		# Create a tmp folder and build the static release to the tmp folder
 		tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
@@ -62,9 +59,9 @@ def buildRelease(args, buildPath):
 		print('\tForming DMG image. File: ' + dmgFile)
 		proc = miscUtils.executeAndLog(cmd, "\t\tgenisoimage: ")
 		if proc.returncode != 0:
-			print('\tError: Failed to form DMG image. Return code: ' + str(proc.returncode))
+			print('\tError: Failed to form DMG image. Return code: ' + str(proc.returncode) + '\n')
 		else:
-			print('\tFinished building release: ' + os.path.basename(dmgFile))
+			print('\tFinished building release: ' + os.path.basename(dmgFile) + '\n')
 
 		# Perform cleanup
 		shutil.rmtree(tmpPath)
@@ -136,7 +133,6 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	appName = args.name
 	bgFile = args.bgFile
 	icnsFile = args.icnsFile
-	jreRelease = args.jreRelease
 
 	# Form the symbolic link which points to /Applications
 	srcPath = '/Applications'
@@ -208,7 +204,7 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 		# Form the Info.plist file
 		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Info.plist')
 		if jreTarGzFile != None:
-			buildPListInfoStatic(dstPath, args)
+			buildPListInfoStatic(dstPath, args, jreTarGzFile)
 		else:
 			buildPListInfoShared(dstPath, args)
 
@@ -353,7 +349,7 @@ def buildPListInfoShared(destFile, args):
 
 	f.close()
 
-def buildPListInfoStatic(destFile, args):
+def buildPListInfoStatic(destFile, args, jreTarGzFile):
 	# Retrieve vars of interest
 	icnsStr = None
 	if args.icnsFile != None:
@@ -386,7 +382,7 @@ def buildPListInfoStatic(destFile, args):
 	tupList.append(('CFBundleVersion', args.version))
 	tupList.append(('NSHighResolutionCapable', 'true'))
 	tupList.append(('NSHumanReadableCopyright', ''))
-	jrePath = 'jre' + args.jreRelease
+	jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
 	tupList.append(('JVMRuntime', jrePath))
 
 	tupList.append(('JVMMainClassName', 'appLauncher.AppLauncher'))

@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import argparse
 import hashlib
 import os
 import time
@@ -6,6 +7,31 @@ import subprocess
 import sys
 
 import logUtils
+
+
+class FancyArgumentParser(argparse.ArgumentParser):
+	def __init__(self, *args, **kwargs):
+		self._action_defaults = {}
+		argparse.ArgumentParser.__init__(self, *args, **kwargs)
+
+	def convert_arg_line_to_args(self, arg_line):
+		# Add the line as an argument if it does not appear to be a comment
+		if len(arg_line) > 0 and arg_line.strip()[0] != '#':
+			yield arg_line
+#			argsparse.ArgumentParser.convert_arg_line_to_args(arg_line)
+#		else:
+#			print('Skipping line: ' + arg_line)
+
+#		# Example below will break all space separated lines into individual arguments
+#		for arg in arg_line.split():
+#			if not arg.strip():
+#				continue
+#			yield arg
+
+
+class ErrorDM(Exception):
+    """Base class for exceptions in this module."""
+    pass
 
 
 def checkRoot():
@@ -19,16 +45,16 @@ def checkRoot():
 
 
 # Source: http://stackoverflow.com/questions/1131220/get-md5-hash-of-a-files-without-open-it-in-python
-def computeDigestForFile(evalFile, digest, block_size=2**20):
+def computeDigestForFile(evalFile, digestType, block_size=2**20):
 	# Select the proper hash algorithm
-	if digest == 'md5':
+	if digestType == 'md5':
 		hash = hashlib.md5()
-	elif digest == 'sha256':
+	elif digestType == 'sha256':
 		hash = hashlib.sha256()
-	elif digest == 'sha512':
+	elif digestType == 'sha512':
 		hash = hashlib.sha512()
 	else:
-		raise Exception('Unrecognized hash function: ' + digest);
+		raise ErrorDM('Unrecognized hash function: ' + digestType);
 
 	f = open(evalFile, 'rb')
 	while True:
@@ -44,14 +70,11 @@ def getInstallRoot():
 	"""Returns the root path where the running script is installed."""
 	argv = sys.argv;
 	installRoot = os.path.dirname(argv[0])
-#	print('appInstallRoot: ' + appInstallRoot)
 	return installRoot
 
 
 def executeAndLog(command, indentStr=""):
 	"""Executes the specified command via subprocess and logs all (stderr,stdout) output to the console"""
-#	proc = subprocess.
-#	proc.returncode = -1
 	try:
 		proc = subprocess.Popen(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
 		proc.wait()
@@ -70,8 +93,6 @@ def executeAndLog(command, indentStr=""):
 		class Proc:
 			returncode = None
 		proc = Proc
-		
-#		proc = None
 	
 	return proc
 #		if proc.returncode != 0:
