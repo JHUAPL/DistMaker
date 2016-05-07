@@ -1,7 +1,8 @@
 package distMaker.platform;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -11,7 +12,8 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.*;
 
-import distMaker.DistUtils;
+import distMaker.*;
+import distMaker.jre.JreVersion;
 
 /**
  * Utility class which contains a set of methods to interact with an Apple Info.plist file.
@@ -19,22 +21,13 @@ import distMaker.DistUtils;
 public class AppleUtils
 {
 	/**
-	 * Utility method to update the JRE to reflect the specified path.
-	 * <P>
-	 * TODO: Complete this comment and method.
-	 */
-	public static boolean updateJrePath(File aPath)
-	{
-		int zios_finish;
-		return false;
-	}
-
-	/**
 	 * Returns the plist file used to configure apple applications.
 	 * <P>
 	 * Two locations will be searched.... TODO: Add more details of those locations.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	private static File getPlistFile()
+	public static File getPlistFile()
 	{
 		File installPath;
 		File pFile;
@@ -42,58 +35,54 @@ public class AppleUtils
 		// Get the top level install path
 		installPath = DistUtils.getAppPath().getParentFile();
 
-		// Attempt to locate the pList file
+		// Attempt to locate the pList file (from one of the possible locations)
 		pFile = new File(installPath, "Info.plist");
 		if (pFile.isFile() == false)
 			pFile = new File(installPath.getParentFile(), "Info.plist");
+
+		// Bail if we failed to locate the plist file
+		if (pFile.exists() == false)
+			throw new ErrorDM("The plist file could not be located.");
+
+		// Bail if the plist file is not a regular file.
 		if (pFile.isFile() == false)
-			pFile = null;
+			throw new ErrorDM("The plist file does not appear to be a regular file: " + pFile);
 
 		return pFile;
 	}
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the plist file (aFile) to the specified maxMemVal.
+	 * Utility method to update the specified version in the plist file (pFile) to the new version.
 	 * <P>
-	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
-	 * may be empty but must be specified.
-	 * 
-	 * @return Returns null on success or an error message describing the issue.
+	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately follows the node with a value of
+	 * CFBundleVersion. TODO: Consider reducing brittleness.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static String updateMaxMem(long numBytes)
+	public static void updateAppVersion(String aNewVersion)
 	{
 		// Utilize the system pList file and delegate.
-		return updateMaxMem(numBytes, getPlistFile());
+		updateAppVersion(aNewVersion, getPlistFile());
 	}
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the plist file (aFile) to the specified maxMemVal.
+	 * Utility method to update the specified version in the plist file (pFile) to the new version.
 	 * <P>
-	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
-	 * may be empty but must be specified.
-	 * 
-	 * @return Returns null on success or an error message describing the issue.
+	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately follows the node with a value of
+	 * CFBundleVersion. TODO: Consider reducing brittleness.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static String updateMaxMem(long numBytes, File pFile)
+	public static void updateAppVersion(String aNewVersin, File pFile)
 	{
 		Document doc;
 		Element docElement;
-		String evalStr, updateStr;
-		NodeList dictList, childList;
-		Node childNode, targNode;
-		Element evalE, arrE, memE;
-		String tagStr, valStr, currKeyVal;
-		int zios_Clean;
+		NodeList nodeList;
+		Node keyNode, strNode;
 
-		// Bail if we failed to locate the pList file.
-		if (pFile == null)
-			return "The plist file could not be located.";
-		// Bail if the plist file is not a regular file.
-		if (pFile.isFile() == false)
-			return "The plist file does not appear to be a regular file: " + pFile;
-		// Bail if the plist file is not writeable.
+		// Bail if the pFile is not writable.
 		if (pFile.setWritable(true) == false)
-			return "The plist file is not writeable: " + pFile;
+			throw new ErrorDM("The plist file is not writeable: " + pFile);
 
 		// Load the XML document via the javax.xml.parsers.* package
 		try
@@ -103,14 +92,148 @@ public class AppleUtils
 		}
 		catch(Exception aExp)
 		{
-			aExp.printStackTrace();
-			return "Failed to parse XML document. File: " + pFile;
+			throw new ErrorDM(aExp, "Failed to parse XML document. File: " + pFile);
+		}
+
+		nodeList = docElement.getElementsByTagName("*");
+		for (int c1 = 0; c1 < nodeList.getLength(); c1++)
+		{
+			keyNode = nodeList.item(c1).getFirstChild();
+			if (keyNode != null && keyNode.getNodeValue().equals("CFBundleVersion") == true)
+			{
+				System.out.println("Updating contents of file: " + pFile);
+
+				strNode = nodeList.item(c1 + 1).getFirstChild();
+				System.out.println("  Old Version: " + strNode.getNodeValue());
+
+				strNode.setNodeValue(aNewVersin);
+				System.out.println("  New Version: " + strNode.getNodeValue());
+			}
+		}
+
+		// Update the file with the changed document
+		saveDoc(pFile, doc);
+	}
+
+	/**
+	 * Utility method to update the JRE to point to the specified path in the system plist file.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateJreVersion(JreVersion aJreVersion)
+	{
+		// Utilize the system pList file and delegate.
+		updateJreVersion(aJreVersion, getPlistFile());
+	}
+
+	/**
+	 * Utility method to update the JRE to point to the specified path in the plist file (pFile).
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateJreVersion(JreVersion aJreVersion, File pFile)
+	{
+		List<String> inputList;
+		String evalStr, tmpStr;
+		int currLineNum, targLineNum;
+
+		// Bail if the pFile is not writable
+		if (pFile.setWritable(true) == false)
+			throw new ErrorDM("The pFile is not writeable: " + pFile);
+
+		// Process our input
+		inputList = new ArrayList<>();
+		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
+		{
+			// Read the lines
+			currLineNum = 0;
+			targLineNum = -1;
+			while (true)
+			{
+				evalStr = br.readLine();
+				if (evalStr == null)
+					break;
+
+				// Record the start of the JVMRunitme section. Note the JRE should be specified on the next line
+				tmpStr = evalStr.trim();
+				if (tmpStr.equals("<key>JVMRuntime</key>") == true)
+					targLineNum = currLineNum + 1;
+
+				inputList.add(evalStr);
+				currLineNum++;
+			}
+		}
+		catch(IOException aExp)
+		{
+			throw new ErrorDM(aExp, "Failed while processing the pFile: " + pFile);
+		}
+
+		// Update the pFile
+		String regex = "<string>(.*?)</string>";
+		String repStr = "<string>jre" + aJreVersion.getLabel() + "</string>";
+		if (targLineNum == -1)
+			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'JVMRuntime' section.");
+		else if (targLineNum >= inputList.size())
+			throw new ErrorDM("[" + pFile + "] The pFile appears to be incomplete!");
+		else
+			inputList.set(targLineNum, inputList.get(targLineNum).replaceFirst(regex, repStr));
+
+		// Write the pFile
+		MiscUtils.writeDoc(pFile, inputList);
+	}
+
+	/**
+	 * Utility method to update the specified max memory (-Xmx) value in the system plist file to the specified maxMemVal.
+	 * <P>
+	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
+	 * may be empty but must be specified.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateMaxMem(long numBytes)
+	{
+		// Utilize the system pList file and delegate.
+		updateMaxMem(numBytes, getPlistFile());
+	}
+
+	/**
+	 * Utility method to update the specified max memory (-Xmx) value in the plist file (pFile) to the specified maxMemVal.
+	 * <P>
+	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
+	 * may be empty but must be specified.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateMaxMem(long numBytes, File pFile)
+	{
+		Document doc;
+		Element docElement;
+		String evalStr, updateStr;
+		NodeList dictList, childList;
+		Node childNode, targNode;
+		Element evalE, arrE, memE;
+		String tagStr, valStr, currKeyVal;
+		int zzz_Clean_this;
+
+		// Bail if the pFile is not writable.
+		if (pFile.setWritable(true) == false)
+			throw new ErrorDM("The plist file is not writeable: " + pFile);
+
+		// Load the XML document via the javax.xml.parsers.* package
+		try
+		{
+			doc = loadDoc(pFile);
+			docElement = doc.getDocumentElement();
+		}
+		catch(Exception aExp)
+		{
+			throw new ErrorDM(aExp, "Failed to parse XML document. File: " + pFile);
 		}
 
 		// Locate the <dict> element
 		dictList = docElement.getElementsByTagName("dict");
 		if (dictList.getLength() == 0)
-			return "No <dict> element found! File: " + pFile;
+			throw new ErrorDM("No <dict> element found! File: " + pFile);
 
 		arrE = null;
 		currKeyVal = null;
@@ -148,7 +271,7 @@ public class AppleUtils
 
 		// Bail if we failed to locate the array element
 		if (arrE == null)
-			return "Failed to locate the element <array> following the element: <key>JVMOptions</key>\nFile: " + pFile;
+			throw new ErrorDM("Failed to locate the element <array> following the element: <key>JVMOptions</key>\nFile: " + pFile);
 
 		memE = null;
 		childList = arrE.getChildNodes();
@@ -192,57 +315,11 @@ public class AppleUtils
 		evalStr = targNode.getNodeValue();
 		updateStr = MemUtils.transformMaxMemHeapString(evalStr, numBytes);
 		if (updateStr == null)
-			return "Failed to transform the memory spec value. Original value: " + evalStr + "\nFile: " + pFile;
+			throw new ErrorDM("Failed to transform the memory spec value. Original value: " + evalStr + "\nFile: " + pFile);
 		targNode.setNodeValue(updateStr);
 
 		// Update the file with the changed document
-		System.out.println("Updating contents of file: " + pFile);
-		return saveDoc(pFile, doc);
-	}
-
-	/**
-	 * Utility method to update the specified version in the plist file (aFile) to the new version.
-	 * <P>
-	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately follows the node with a value of
-	 * CFBundleVersion.
-	 */
-	public static String updateVersion(File aFile, String aNewVersin)
-	{
-		Document doc;
-		Element docElement;
-		NodeList nodeList;
-		Node keyNode, strNode;
-
-		// Load the XML document via the javax.xml.parsers.* package
-		try
-		{
-			doc = loadDoc(aFile);
-			docElement = doc.getDocumentElement();
-		}
-		catch(Exception aExp)
-		{
-			aExp.printStackTrace();
-			return "Failed to parse XML document. File: " + aFile;
-		}
-
-		nodeList = docElement.getElementsByTagName("*");
-		for (int c1 = 0; c1 < nodeList.getLength(); c1++)
-		{
-			keyNode = nodeList.item(c1).getFirstChild();
-			if (keyNode != null && keyNode.getNodeValue().equals("CFBundleVersion") == true)
-			{
-				System.out.println("Updating contents of file: " + aFile);
-
-				strNode = nodeList.item(c1 + 1).getFirstChild();
-				System.out.println("  Old Version: " + strNode.getNodeValue());
-
-				strNode.setNodeValue(aNewVersin);
-				System.out.println("  New Version: " + strNode.getNodeValue());
-			}
-		}
-
-		// Update the file with the changed document
-		return saveDoc(aFile, doc);
+		saveDoc(pFile, doc);
 	}
 
 	/**
@@ -264,8 +341,10 @@ public class AppleUtils
 
 	/**
 	 * Helper method to output aDoc to the specified file.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	private static String saveDoc(File aFile, Document aDoc)
+	private static void saveDoc(File aFile, Document aDoc)
 	{
 		try (FileOutputStream oStream = new FileOutputStream(aFile);)
 		{
@@ -282,11 +361,8 @@ public class AppleUtils
 		}
 		catch(Exception aExp)
 		{
-			aExp.printStackTrace();
-			return "Failed to write the file: " + aFile;
+			throw new ErrorDM(aExp, "Failed to write the file: " + aFile);
 		}
-
-		return null;
 	}
 
 }

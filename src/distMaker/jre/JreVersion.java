@@ -24,7 +24,7 @@ public class JreVersion implements Comparable<JreVersion>
 	 * <P>
 	 * The better version is defined as the later version (and the more specific version).
 	 * <P>
-	 * Returns null if the better version can not be determined
+	 * Returns null if the better version can not be determined or if the versions are equal.
 	 */
 	public static JreVersion getBetterVersion(JreVersion verA, JreVersion verB)
 	{
@@ -35,10 +35,12 @@ public class JreVersion implements Comparable<JreVersion>
 		tokenA = verA.getLabel().split("[._]");
 		tokenB = verB.getLabel().split("[._]");
 
-		// Default return JreVersion is verA or the version that is more specific
-		defaultVer = verA;
+		// Default JreVersion is the version that is more specific
+		defaultVer = null;
 		if (tokenA.length < tokenB.length)
 			defaultVer = verB;
+		else if (tokenB.length < tokenA.length)
+			defaultVer = verA;
 
 		// Set the idxCnt to the less specific JreVersion
 		idxCnt = tokenA.length;

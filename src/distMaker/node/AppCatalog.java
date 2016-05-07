@@ -5,7 +5,7 @@ import java.util.*;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import distMaker.jre.JreVersion;
+import distMaker.jre.*;
 
 /**
  * Object that describes the structure (files, folders, and JRE version) of a Java application.
@@ -13,23 +13,98 @@ import distMaker.jre.JreVersion;
 public class AppCatalog
 {
 	/** The minimum JRE version required. */
-	private JreVersion jreVersion;
+	private JreVersion minJreVer;
+
+	/** The maximum JRE version allowed. This will be null if there is no maximum. */
+	private JreVersion maxJreVer;
 
 	/** A mapping of filename to to corresponding Node */
 	private ImmutableMap<String, Node> nodeMap;
 
-	public AppCatalog(JreVersion aJreVersion, List<Node> aNodeList)
+	public AppCatalog(List<Node> aNodeList, JreVersion aMinJreVer, JreVersion aMaxJreVer)
 	{
-		jreVersion = aJreVersion;
+		minJreVer = aMinJreVer;
+		maxJreVer = aMaxJreVer;
 		nodeMap = ImmutableMap.copyOf(formNameMap(aNodeList));
 	}
 
 	/**
-	 * Returns the minimum JreVersion required.
+	 * Returns the most recent JRE from the specified release that is compatible with this Appcatalog.
+	 * <P>
+	 * Returns null if there are no JREs that are compatible.
 	 */
-	public JreVersion getJreVersion()
+	public JreRelease getCompatibleJre(List<JreRelease> aJreList)
 	{
-		return jreVersion;
+		// Sort the platforms, but reverse the order so that the newest version is first
+		Collections.sort(aJreList);
+		Collections.reverse(aJreList);
+
+		for (JreRelease aRelease : aJreList)
+		{
+			if (isJreVersionTooNew(aRelease.getVersion()) == true)
+				continue;
+
+			if (isJreVersionTooOld(aRelease.getVersion()) == true)
+				continue;
+
+			return aRelease;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Returns the minimum JreVersion that is compatible.
+	 */
+	public JreVersion getMinJreVersion()
+	{
+		return minJreVer;
+	}
+
+	/**
+	 * Returns the maximum JreVersion that is compatible.
+	 */
+	public JreVersion getMaxJreVersion()
+	{
+		return maxJreVer;
+	}
+
+	public boolean isJreVersionCompatible(JreVersion aJreVer)
+	{
+		// Check to make sure aJreVer is not too old
+		if (isJreVersionTooOld(aJreVer) == true)
+			return false;
+
+		// Check to make sure aJreVer is not too new
+		if (isJreVersionTooNew(aJreVer) == true)
+			return false;
+
+		// The version aJreVer must be compatible
+		return true;
+	}
+
+	/**
+	 * Returns true if the specified version is not compatible (too new) with this AppCatalog.
+	 */
+	public boolean isJreVersionTooNew(JreVersion aJreVer)
+	{
+		// Check to make sure aJreVer is not too old
+		if (maxJreVer != null && JreVersion.getBetterVersion(maxJreVer, aJreVer) == aJreVer)
+			return true;
+
+		return false;
+	}
+
+	/**
+	 * Returns true if the specified version is not compatible (too old) with this AppCatalog.
+	 */
+	public boolean isJreVersionTooOld(JreVersion aJreVer)
+	{
+		// Check to make sure aJreVer is not too old
+		if (minJreVer != null && JreVersion.getBetterVersion(minJreVer, aJreVer) == minJreVer)
+			return true;
+
+		return false;
 	}
 
 	/**
@@ -54,7 +129,7 @@ public class AppCatalog
 	 * TODO: This should be renamed formNameMap to formDigestMap<BR>
 	 * TODO: This should probably be a mapping of Digest to Node rather than filename to Node
 	 */
-	public Map<String, Node> formNameMap(List<Node> aNodeList)
+	private Map<String, Node> formNameMap(List<Node> aNodeList)
 	{
 		Map<String, Node> retMap;
 

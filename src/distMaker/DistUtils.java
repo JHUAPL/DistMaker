@@ -12,6 +12,8 @@ import glum.util.ThreadUtil;
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.*;
@@ -76,24 +78,6 @@ public class DistUtils
 	}
 
 	/**
-	 * Returns the platform (Apple, Linux, or Windows) on which the current JRE is running on.
-	 */
-	public static String getPlatform()
-	{
-		String osName;
-
-		osName = System.getProperty("os.name").toUpperCase();
-		if (osName.startsWith("LINUX") == true)
-			return "Linux";
-		if (osName.startsWith("MAC OS X") == true)
-			return "Apple";
-		if (osName.startsWith("WINDOWS") == true)
-			return "Windows";
-
-		return System.getProperty("os.name");
-	}
-
-	/**
 	 * Returns the code associated with the update.
 	 */
 	public static int getUpdateCode()
@@ -115,6 +99,26 @@ public class DistUtils
 	public static boolean isDevelopersEnvironment()
 	{
 		return isDevelopersEnvironment;
+	}
+
+	/**
+	 * Utility method to determine if the JRE is embedded with this application.
+	 */
+	public static boolean isJreBundled()
+	{
+		Path rootPath, jrePath;
+
+		// Get the top level folder of our installation
+		rootPath = getAppPath().toPath().getParent();
+
+		// Get the path to the JRE
+		jrePath = Paths.get(System.getProperty("java.home"));
+
+		// Determine if the java.home JRE is a subdirectory of the top level app folder
+		if (jrePath.startsWith(rootPath) == true)
+			return true;
+
+		return false;
 	}
 
 	/**
@@ -383,28 +387,23 @@ public class DistUtils
 	public static AppCatalog readAppCatalog(Task aTask, File aCatalogFile, URL aUpdateUrl)
 	{
 		List<Node> nodeList;
-		JreVersion jreVersion;
-		InputStream inStream;
-		BufferedReader bufReader;
+		JreVersion minJreVersion, maxJreVersion;
 		DigestType digestType;
 		String errMsg, strLine;
 
 		errMsg = null;
 		nodeList = new ArrayList<>();
-		jreVersion = null;
+		minJreVersion = null;
+		maxJreVersion = null;
 
 		// Default to DigestType of MD5
 		digestType = DigestType.MD5;
 
-		inStream = null;
-		bufReader = null;
-		try
+		try (BufferedReader bufReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(new FileInputStream(aCatalogFile))));)
 		{
 			String[] tokens;
 
 			// Read the contents of the file
-			inStream = new FileInputStream(aCatalogFile);
-			bufReader = new BufferedReader(new InputStreamReader(new BufferedInputStream(inStream)));
 			while (true)
 			{
 				strLine = bufReader.readLine();
@@ -447,16 +446,18 @@ public class DistUtils
 					else
 						digestType = tmpDigestType;
 				}
-				else if (tokens.length == 2 && tokens[0].equals("jre") == true)
+				else if ((tokens.length == 2 || tokens.length == 3) && tokens[0].equals("jre") == true)
 				{
-					if (jreVersion != null)
+					if (minJreVersion != null)
 					{
-						aTask.infoAppendln("JRE version has already been specified. Current ver: " + jreVersion.getLabel() + " Requested ver: " + tokens[1]
+						aTask.infoAppendln("JRE version has already been specified. Current ver: " + minJreVersion.getLabel() + " Requested ver: " + tokens[1]
 								+ ". Skipping...");
 						continue;
 					}
 
-					jreVersion = new JreVersion(tokens[1]);
+					minJreVersion = new JreVersion(tokens[1]);
+					if (tokens.length == 3)
+						maxJreVersion = new JreVersion(tokens[2]);
 				}
 				else
 				{
@@ -467,11 +468,6 @@ public class DistUtils
 		catch(IOException aExp)
 		{
 			errMsg = ThreadUtil.getStackTrace(aExp);
-		}
-		finally
-		{
-			IoUtil.forceClose(inStream);
-			IoUtil.forceClose(bufReader);
 		}
 
 		// See if we are in a valid state
@@ -487,7 +483,7 @@ public class DistUtils
 			return null;
 		}
 
-		return new AppCatalog(jreVersion, nodeList);
+		return new AppCatalog(nodeList, minJreVersion, maxJreVersion);
 	}
 
 	/**

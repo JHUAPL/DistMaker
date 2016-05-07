@@ -10,10 +10,12 @@ import glum.task.*;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
 
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
+import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 
@@ -21,13 +23,13 @@ import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 
 import distMaker.digest.Digest;
 import distMaker.digest.DigestUtils;
 import distMaker.gui.PickReleasePanel;
 import distMaker.jre.*;
 import distMaker.node.*;
-import distMaker.platform.AppleUtils;
 import distMaker.platform.PlatformUtils;
 
 public class DistMakerEngine
@@ -111,6 +113,14 @@ public class DistMakerEngine
 	}
 
 	/**
+	 * Returns the URL where software updates for this application are retrieved from.
+	 */
+	public URL getUpdateSite()
+	{
+		return updateSiteUrl;
+	}
+
+	/**
 	 * returns
 	 * 
 	 * @return
@@ -154,7 +164,6 @@ public class DistMakerEngine
 	private void initialize()
 	{
 		File appPath, cfgFile;
-		BufferedReader br;
 		DateUnit dateUnit;
 		String currInstr, strLine;
 		String appName, verName, buildStr;
@@ -180,11 +189,8 @@ public class DistMakerEngine
 		}
 
 		// Read in the configuration file
-		br = null;
-		try
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(cfgFile))))
 		{
-			br = new BufferedReader(new InputStreamReader(new FileInputStream(cfgFile)));
-
 			// Read the lines
 			currInstr = "None";
 			while (true)
@@ -214,10 +220,6 @@ public class DistMakerEngine
 		catch(IOException aExp)
 		{
 			aExp.printStackTrace();
-		}
-		finally
-		{
-			IoUtil.forceClose(br);
 		}
 
 		if (appName == null || verName == null)
@@ -343,7 +345,7 @@ public class DistMakerEngine
 		}
 
 		// Download the release
-		isPass = downloadRelease(aTask, chosenItem, deltaPath);
+		isPass = downloadAppRelease(aTask, chosenItem, deltaPath);
 		if (isPass == false || aTask.isActive() == false)
 		{
 			IoUtil.deleteDirectory(deltaPath);
@@ -370,6 +372,29 @@ public class DistMakerEngine
 			aMsg += "Please check installation configuration.";
 		}
 
+		// If the parentFrame is not visible then delay the showing until it is visible
+		if (parentFrame.isVisible() == false)
+		{
+			final String tmpMsg = aMsg;
+			parentFrame.addComponentListener(new ComponentAdapter() {
+				@Override
+				public void componentShown(ComponentEvent aEvent)
+				{
+					msgPanel.setTitle("Application Updater");
+					msgPanel.setInfo(tmpMsg);
+					msgPanel.setVisible(true);
+
+					// Deregister for events after the parentFrame is made visible
+					parentFrame.removeComponentListener(this);
+				}
+			});
+
+			return;
+		}
+
+		// Transform tabs to 3 spaces
+		aMsg = aMsg.replace("\t", "   ");
+
 		// Display the message
 		msgPanel.setTitle("Application Updater");
 		msgPanel.setInfo(aMsg);
@@ -381,7 +406,7 @@ public class DistMakerEngine
 	 * <P>
 	 * Returns true if the release was downloaded properly.
 	 */
-	private boolean downloadRelease(Task aTask, AppRelease aRelease, File destPath)
+	private boolean downloadAppRelease(Task aTask, AppRelease aRelease, File destPath)
 	{
 		AppCatalog staleCat, updateCat;
 		Node staleNode, updateNode;
@@ -390,7 +415,6 @@ public class DistMakerEngine
 		Task mainTask, tmpTask;
 		double progressVal;
 		long tmpFileLen;
-		boolean isPass;
 
 		try
 		{
@@ -404,20 +428,21 @@ public class DistMakerEngine
 			return false;
 		}
 
-		// Download the update catalog to the (local) delta location (Progress -> [0% - 1%])
-		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
-		catalogFile = new File(destPath, "catalog.txt");
-		if (DistUtils.downloadFile(new PartialTask(aTask, 0.00, 0.01), catUrl, catalogFile, refCredential, -1L, null) == false)
-			return false;
-
 		// Load the stale catalog
 		catalogFile = new File(DistUtils.getAppPath(), "catalog.txt");
 		staleCat = DistUtils.readAppCatalog(aTask, catalogFile, staleUrl);
 		if (staleCat == null)
 			return false;
 
+		// Download the update app catalog to the (local) delta location (Progress -> [0% - 1%])
+		File appNewPath = new File(destPath, "app");
+		appNewPath.mkdirs();
+		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
+		catalogFile = new File(appNewPath, "catalog.txt");
+		if (DistUtils.downloadFile(new PartialTask(aTask, 0.00, 0.01), catUrl, catalogFile, refCredential, -1L, null) == false)
+			return false;
+
 		// Load the update catalog
-		catalogFile = new File(destPath, "catalog.txt");
 		updateCat = DistUtils.readAppCatalog(aTask, catalogFile, updateUrl);
 		if (updateCat == null)
 			return false;
@@ -433,136 +458,29 @@ public class DistMakerEngine
 		// Set up the mainTask for downloading of remote content (Progress -> [1% - 95%])
 		mainTask = new PartialTask(aTask, 0.01, 0.94);
 
-		// Ensure our JRE version is sufficient for this release
+		// Ensure our JRE version is compatible for this release
+		JreRelease targJre = null;
 		JreVersion currJreVer = DistUtils.getJreVersion();
-		JreVersion targJreVer = updateCat.getJreVersion();
-		if (targJreVer != null && JreVersion.getBetterVersion(targJreVer, currJreVer) != currJreVer)
+		if (updateCat.isJreVersionCompatible(currJreVer) == false)
 		{
-			List<JreRelease> jreList;
-
-			aTask.infoAppendln("Your current JRE is too old. It will need to be updated!");
-			aTask.infoAppendln("\tCurrent  JRE: " + currJreVer.getLabel());
-			aTask.infoAppendln("\tMinimun  JRE: " + targJreVer.getLabel() + "\n");
-
-			// Get list of all available JREs
-			jreList = JreUtils.getAvailableJreReleases(aTask, updateSiteUrl, refCredential);
-			if (jreList == null)
-			{
-				aTask.infoAppendln("The update site has not had any JREs deployed.");
-				aTask.infoAppendln("Please contact the update site adminstartor.");
+			// Bail if we failed to download a compatible JRE
+			targJre = downloadJreUpdate(mainTask, updateCat, destPath, releaseSizeFull);
+			if (targJre == null)
 				return false;
-			}
-			if (jreList.size() == 0)
-			{
-				aTask.infoAppendln("No JRE releases found!");
-				aTask.infoAppendln("Please contact the update site adminstartor.");
-				return false;
-			}
 
-			// Retrieve the latest appropriate JreRelease
-			String platform = DistUtils.getPlatform();
-			jreList = JreUtils.getMatchingPlatforms(jreList, platform);
-			if (jreList.size() == 0)
-			{
-				aTask.infoAppendln("There are no JRE releases available for the platform: " + platform + "!");
-				return false;
-			}
-
-			JreRelease pickJre = jreList.get(0);
-			JreVersion pickJreVer = pickJre.getVersion();
-
-			if (JreVersion.getBetterVersion(pickJreVer, targJreVer) == currJreVer)
-			{
-				aTask.infoAppendln("The latest available JRE on the update site is not recent enought!");
-				aTask.infoAppendln("Minimun required JRE: " + targJreVer.getLabel());
-				aTask.infoAppendln("Latest available JRE: " + pickJreVer.getLabel());
-				return false;
-			}
-
-			// Update the number of bytes to be retrieved to take into account the JRE which we will be downloading
-			// and form the appropriate tmpTask
-			tmpFileLen = pickJre.getFileLen();
-			releaseSizeFull += tmpFileLen;
-			tmpTask = new PartialTask(mainTask, mainTask.getProgress(), tmpFileLen / (releaseSizeFull + 0.00));
-
-			// Download the JRE
-			Digest targDigest, testDigest;
-			targDigest = pickJre.getDigest();
-			MessageDigest msgDigest;
-			msgDigest = DigestUtils.getDigest(targDigest.getType());
-			mainTask.infoAppendln("Downloading JRE... Version: " + pickJre.getVersion().getLabel());
-			URL srcUrl = IoUtil.createURL(updateSiteUrl.toString() + "/jre/" + pickJre.getFileName());
-			File dstFile = new File(new File(destPath, "jre"), pickJre.getFileName());
-			DistUtils.downloadFile(tmpTask, srcUrl, dstFile, refCredential, tmpFileLen, msgDigest);
-
-			// Validate that the JRE was downloaded successfully
-			testDigest = new Digest(targDigest.getType(), msgDigest.digest());
-			if (targDigest.equals(testDigest) == false)
-			{
-				aTask.infoAppendln("The download of the JRE appears to be corrupted.");
-				aTask.infoAppendln("\tFile: " + dstFile);
-				aTask.infoAppendln("\t\tExpected " + targDigest.getDescr());
-				aTask.infoAppendln("\t\tRecieved " + testDigest.getDescr() + "\n");
-				return false;
-			}
-			releaseSizeCurr += tmpFileLen;
+			// Update the progress to reflect the downloaded / updated JRE
+			releaseSizeCurr += targJre.getFileLen();
+			releaseSizeFull += targJre.getFileLen();
 			progressVal = releaseSizeCurr / (releaseSizeFull + 0.00);
 			mainTask.setProgress(progressVal);
-
-			// TODO: Unpack the JRE at the proper location and then delete it
-			File jrePath = PlatformUtils.getJreLocation(pickJre);
-			try
-			{
-				int finish_me_and_clean_me;
-//				Files.createTempDirectory(dstFile, prefix, attrs)
-//				Files.createTempDir();
-				
-				
-				File unpackPath;
-				unpackPath = new File(destPath, "jre/unpack");
-				unpackPath.mkdirs();
-				MiscUtils.unTar(dstFile, unpackPath);
-				
-				File[] fileArr;
-				fileArr = unpackPath.listFiles();
-				if (fileArr.length != 1 && fileArr[0].isDirectory() == false)
-					throw new Exception("Expected only one (top level) folder to be unpacked. Items extracted: " + fileArr.length + "   Path: " + unpackPath);
-				
-				File jreUnpackedPath;
-				jreUnpackedPath = fileArr[0];
-				
-				// Moved the unpacked file to the "standardized" jrePath
-				jreUnpackedPath.renameTo(jrePath);
-//				MiscUtils.unTar(dstFile, jrePath);
-				
-				// TODO: Remove the unpacked folder...
-			}
-			catch(Exception aExp)
-			{
-				aTask.infoAppendln("Failed to untar archive. The update has been aborted.");
-				aTask.infoAppendln("\tTar File: " + dstFile);
-				aTask.infoAppendln("\tDestination: " + jrePath);
-				return false;
-			}
-
-			// TODO: Update the launch script or launch config file to point to the proper JRE
-			if (PlatformUtils.setJreLocation(jrePath) == false)
-			{
-				aTask.infoAppendln("Failed to update the configuration to point to the updated JRE!");
-				aTask.infoAppendln("\tCurrent JRE: " + currJreVer.getLabel());
-				aTask.infoAppendln("\t Chosen JRE: " + pickJreVer.getLabel());
-				return false;
-			}
-
-			return true;
-
-			// TODO: Eventually remove the old JRE - perhaps from the app launcher
 		}
 
 		// Download the individual application files
 		mainTask.infoAppendln("Downloading release: " + aRelease.getVersion() + " Nodes: " + updateCat.getAllNodesList().size());
 		for (Node aNode : updateCat.getAllNodesList())
 		{
+			boolean isPass;
+
 			// Bail if we have been aborted
 			if (mainTask.isActive() == false)
 				return false;
@@ -580,9 +498,9 @@ public class DistMakerEngine
 			{
 				// Note we pass the SilentTask since
 				// - This should be fairly fast since this should result in a local disk copy
-				// - This may fail, (but the failuer is recoverable and this serves just as an optimization)
+				// - This may fail, (but the failure is recoverable and this serves just as an optimization)
 //				isPass = staleNode.transferContentTo(tmpTask, refCredential, destPath);
-				isPass = staleNode.transferContentTo(new SilentTask(), refCredential, destPath);
+				isPass = staleNode.transferContentTo(new SilentTask(), refCredential, appNewPath);
 				if (isPass == true)
 					mainTask.infoAppendln("\t(L) " + staleNode.getFileName());
 			}
@@ -590,7 +508,7 @@ public class DistMakerEngine
 			// Use the remote update copy, if we were not able to use a local stale copy
 			if (isPass == false && mainTask.isActive() == true)
 			{
-				isPass = updateNode.transferContentTo(tmpTask, refCredential, destPath);
+				isPass = updateNode.transferContentTo(tmpTask, refCredential, appNewPath);
 				if (isPass == true)
 					mainTask.infoAppendln("\t(R) " + updateNode.getFileName());
 			}
@@ -601,7 +519,7 @@ public class DistMakerEngine
 				mainTask.infoAppendln("Failed to download from update site.");
 				mainTask.infoAppendln("\tSite: " + updateUrl);
 				mainTask.infoAppendln("\tFile: " + updateNode.getFileName());
-				mainTask.infoAppendln("\tDest: " + destPath);
+				mainTask.infoAppendln("\tDest: " + appNewPath);
 				return false;
 			}
 
@@ -610,11 +528,246 @@ public class DistMakerEngine
 			progressVal = releaseSizeCurr / (releaseSizeFull + 0.00);
 			mainTask.setProgress(progressVal);
 		}
+		mainTask.infoAppendln("Finished downloading release.\n");
 
 		// Update the platform configuration files
-		isPass = updatePlatformConfigFiles(aTask, aRelease);
+		try
+		{
+			PlatformUtils.updateAppRelease(aRelease);
+		}
+		catch(ErrorDM aExp)
+		{
+			aTask.infoAppendln("Failed updating application configuration.");
+			printErrorDM(aTask, aExp, 1);
+			return false;
+		}
 
-		return isPass;
+		// Retrieve the reference to the appCfgFile
+		File appCfgFile = PlatformUtils.getConfigurationFile();
+
+		// Create the delta.cmd file which provides the Updater with the clean activities to perform (based on fail / pass conditions)
+		File deltaCmdFile = new File(destPath, "delta.cmd");
+		try (FileWriter tmpFW = new FileWriter(deltaCmdFile))
+		{
+			if (targJre != null)
+			{
+				File rootPath = DistUtils.getAppPath().getParentFile();
+
+				JreVersion targJreVer = targJre.getVersion();
+				tmpFW.write("# Define the fail section (clean up for failure)\n");
+				tmpFW.write("sect,fail\n");
+				tmpFW.write("copy," + "delta/" + appCfgFile.getName() + ".old," + MiscUtils.getRelativePath(rootPath, appCfgFile) + "\n");
+				tmpFW.write("move,jre" + targJreVer.getLabel() + ",delta" + "\n");
+				tmpFW.write("reboot\n\n");
+
+				tmpFW.write("# Define the pass section (clean up for success)\n");
+				tmpFW.write("sect,pass\n");
+				tmpFW.write("trash,jre" + currJreVer.getLabel() + "\n");
+				tmpFW.write("exit\n\n");
+			}
+			else
+			{
+				tmpFW.write("# Define the fail section (clean up for failure)\n");
+				tmpFW.write("sect,fail\n");
+				tmpFW.write("exit\n\n");
+
+				tmpFW.write("# Define the pass section (clean up for success)\n");
+				tmpFW.write("sect,pass\n");
+				tmpFW.write("exit\n\n");
+			}
+
+			tmpFW.write("# Define the reboot section\n");
+			tmpFW.write("sect,reboot\n");
+			tmpFW.write("exit\n\n");
+
+			tmpFW.write("# Define the test section\n");
+			tmpFW.write("sect,test\n");
+			tmpFW.write("exit\n\n");
+		}
+		catch(IOException aExp)
+		{
+			aTask.infoAppendln("Failed to generate the delta.cfg file.");
+			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
+			return false;
+		}
+
+		// We are done if there was no updated JRE
+		if (targJre == null)
+			return true;
+
+		// Since an updated JRE was needed...
+		// Moved the JRE (unpacked folder) from its drop path to the proper location
+		File jreDropPath = new File(destPath, "jre" + targJre.getVersion().getLabel());
+		File jreTargPath = PlatformUtils.getJreLocation(targJre);
+		jreTargPath.getParentFile().setWritable(true);
+		if (jreDropPath.renameTo(jreTargPath) == false)
+		{
+			aTask.infoAppendln("Failed to move the updated JRE to its target location!");
+			aTask.infoAppendln("\t Current path: " + jreDropPath);
+			aTask.infoAppendln("\tOfficial path: " + jreTargPath);
+			return false;
+		}
+
+		// Backup the application configuration
+		try
+		{
+			Files.copy(appCfgFile.toPath(), new File(destPath, appCfgFile.getName() + ".old").toPath(), StandardCopyOption.COPY_ATTRIBUTES);
+		}
+		catch(IOException aExp)
+		{
+			aTask.infoAppendln("Failed to backup application configuration file: " + deltaCmdFile);
+			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
+			return false;
+		}
+
+		// Update the application configuration to reflect the proper JRE
+		try
+		{
+			PlatformUtils.setJreVersion(targJre.getVersion());
+		}
+		catch(ErrorDM aExp)
+		{
+			aTask.infoAppendln("Failed to update the configuration to point to the updated JRE!");
+			aTask.infoAppendln("\tCurrent JRE: " + currJreVer.getLabel());
+			aTask.infoAppendln("\t Chosen JRE: " + targJre.getVersion().getLabel());
+			printErrorDM(aTask, aExp, 1);
+
+			// Remove the just installed JRE
+			IoUtil.deleteDirectory(jreTargPath);
+
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Helper method to download a compatible JreRelease for the AppCatalog to the specified destPath.
+	 * <P>
+	 * On success the JreVersion that was downloaded is returned.
+	 */
+	private JreRelease downloadJreUpdate(Task aTask, AppCatalog aUpdateCat, File aDestPath, long releaseSizeFull)
+	{
+		List<JreRelease> jreList;
+
+		// Ensure our JRE version is compatible for this release
+		JreVersion currJreVer = DistUtils.getJreVersion();
+
+		// Let the user know why their version is not compatible
+		String updnStr = "downgraded";
+		if (aUpdateCat.isJreVersionTooOld(currJreVer) == true)
+			updnStr = "upgraded";
+		aTask.infoAppendln("Your current JRE is not compatible with this release. It will need to be " + updnStr + "!");
+		aTask.infoAppendln("\tCurrent  JRE: " + currJreVer.getLabel());
+		aTask.infoAppendln("\tMinimun  JRE: " + aUpdateCat.getMinJreVersion().getLabel());
+		JreVersion tmpJreVer = aUpdateCat.getMaxJreVersion();
+		if (tmpJreVer != null)
+			aTask.infoAppendln("\tMaximun  JRE: " + tmpJreVer.getLabel());
+		aTask.infoAppendln("");
+
+		// Bail if we are running a bundled JRE
+		if (DistUtils.isJreBundled() == false)
+		{
+			aTask.infoAppend("This is the non bundled JRE version of the application. You are running the system JRE. ");
+			aTask.infoAppendln("Please update the JRE (or path) to reflect a compatible JRE version.\n");
+			return null;
+		}
+
+		// Get list of all available JREs
+		jreList = JreUtils.getAvailableJreReleases(aTask, updateSiteUrl, refCredential);
+		if (jreList == null)
+		{
+			aTask.infoAppendln("The update site has not had any JREs deployed.");
+			aTask.infoAppendln("Please contact the update site adminstartor.");
+			return null;
+		}
+		if (jreList.size() == 0)
+		{
+			aTask.infoAppendln("No JRE releases found!");
+			aTask.infoAppendln("Please contact the update site adminstartor.");
+			return null;
+		}
+
+		// Retrieve the latest appropriate JreRelease
+		String platform = PlatformUtils.getPlatform();
+		jreList = JreUtils.getMatchingPlatforms(jreList, platform);
+		if (jreList.size() == 0)
+		{
+			aTask.infoAppendln("There are no JRE releases available for the platform: " + platform + "!");
+			return null;
+		}
+
+		// Retrieve the JRE that is compatible from the list
+		JreRelease pickJre = aUpdateCat.getCompatibleJre(jreList);
+		if (pickJre == null)
+		{
+			aTask.infoAppendln("There are no compatible JREs found on the deploy site. Available JREs: " + jreList.size());
+			for (JreRelease aJreRelease : jreList)
+				aTask.infoAppendln("\t" + aJreRelease.getFileName() + "   --->   (JRE: " + aJreRelease.getVersion().getLabel() + ")");
+			aTask.infoAppendln("\nPlease contact the update site adminstartor.");
+			return null;
+		}
+		JreVersion pickJreVer = pickJre.getVersion();
+
+		// Update the number of bytes to be retrieved to take into account the JRE which we will be downloading
+		long tmpFileLen = pickJre.getFileLen();
+		releaseSizeFull += tmpFileLen;
+
+		// Download the JRE
+		Digest targDigest, testDigest;
+		targDigest = pickJre.getDigest();
+		MessageDigest msgDigest;
+		msgDigest = DigestUtils.getDigest(targDigest.getType());
+		aTask.infoAppendln("Downloading JRE... Version: " + pickJreVer.getLabel());
+		URL srcUrl = IoUtil.createURL(updateSiteUrl.toString() + "/jre/" + pickJreVer.getLabel() + "/" + pickJre.getFileName());
+		File dstFile = new File(aDestPath, pickJre.getFileName());
+		Task tmpTask = new PartialTask(aTask, aTask.getProgress(), (tmpFileLen * 0.75) / (releaseSizeFull + 0.00));
+		if (DistUtils.downloadFile(tmpTask, srcUrl, dstFile, refCredential, tmpFileLen, msgDigest) == false)
+			return null;
+
+		// Validate that the JRE was downloaded successfully
+		testDigest = new Digest(targDigest.getType(), msgDigest.digest());
+		if (targDigest.equals(testDigest) == false)
+		{
+			aTask.infoAppendln("The download of the JRE appears to be corrupted.");
+			aTask.infoAppendln("\tFile: " + dstFile);
+			aTask.infoAppendln("\t\tExpected " + targDigest.getDescr());
+			aTask.infoAppendln("\t\tRecieved " + testDigest.getDescr() + "\n");
+			return null;
+		}
+
+		// Unpack the JRE at the unpack location
+		aTask.infoAppendln("Finshed downloading JRE. Unpacking JRE...");
+		File jreRootPath = null;
+		File jreTargPath = new File(aDestPath, "jre" + pickJreVer.getLabel());
+		try
+		{
+			// Create the working unpack folder where the JRE will be initially unpacked to.
+			File unpackPath = new File(aDestPath, "unpack");
+			unpackPath.mkdirs();
+
+			// Unpack the JRE to the working unpack folder and ensure that the unpacked JRE results in a 1 top level root folder.
+			tmpTask = new PartialTask(aTask, aTask.getProgress(), (tmpFileLen * 0.25) / (releaseSizeFull + 0.00));
+			MiscUtils.unTar(tmpTask, dstFile, unpackPath);
+			File[] fileArr = unpackPath.listFiles();
+			if (fileArr.length != 1 && fileArr[0].isDirectory() == false)
+				throw new Exception("Expected only one (top level) folder to be unpacked. Items extracted: " + fileArr.length + "   Path: " + unpackPath);
+			jreRootPath = fileArr[0];
+
+			// Moved the unpacked JRE to aDestPath/jre/ folder and remove the working unpack folder and the tar.gz file
+			jreRootPath.renameTo(jreTargPath);
+			unpackPath.delete();
+			dstFile.delete();
+		}
+		catch(Exception aExp)
+		{
+			aTask.infoAppendln("Failed to properly untar archive. The update has been aborted.");
+			aTask.infoAppendln("\tTar File: " + dstFile);
+			aTask.infoAppendln("\tDestination: " + jreTargPath);
+			return null;
+		}
+
+		return pickJre;
 	}
 
 	/**
@@ -653,6 +806,39 @@ public class DistMakerEngine
 	}
 
 	/**
+	 * Helper method that prints the exception of ErrorDM in an intelligent fashion to the specified task.
+	 * <P>
+	 * All ErrorDM exceptions (and their causes) will be printed. If the cause is not of type ErrorDM then the stack trace will be printed as well.
+	 */
+	private void printErrorDM(Task aTask, ErrorDM aErrorDM, int numTabs)
+	{
+		Throwable cause;
+		String tabStr;
+
+		tabStr = Strings.repeat("\t", numTabs);
+
+		aTask.infoAppendln(tabStr + "Reason: " + aErrorDM.getMessage());
+		cause = aErrorDM.getCause();
+		while (cause != null)
+		{
+			if (cause instanceof ErrorDM)
+			{
+				aTask.infoAppendln(tabStr + "Reason: " + cause.getMessage());
+			}
+			else
+			{
+				aTask.infoAppendln(tabStr + "StackTrace: ");
+				aTask.infoAppendln(ThreadUtil.getStackTrace(cause));
+				break;
+			}
+
+			cause = aErrorDM.getCause();
+		}
+
+		aTask.infoAppendln("");
+	}
+
+	/**
 	 * Helper method that prompts the user for forms of input depending on the state of the App
 	 * <P>
 	 * This method will be called via reflection.
@@ -675,11 +861,8 @@ public class DistMakerEngine
 				return;
 			}
 
-			// Remove the retrieved update, and restore the platform configuration files to this (running) release
-			// It is necessary to do this, since the user may later cancel the update request and it is important to
-			// leave the program and configuration files in a stable state.
-			IoUtil.deleteDirectory(deltaPath);
-			updatePlatformConfigFiles(aTask, currRelease);
+			// Revert the update
+			revertUpdate(aTask);
 		}
 
 		// Query the user of the version to update to
@@ -695,37 +878,126 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Helper method to update platform specific configuration files
+	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration should be in the same state as before an
+	 * update was applied. Reverting consists of the following:
+	 * <UL>
+	 * <LI>Removal of any downloaded and installed JRE
+	 * <LI>Removing the delta directory
+	 * <LI>Removing the delta.cfg file
+	 * </UL>
+	 * <P>
+	 * There should not be any issues with this roll back process. However if there are a best effort will be made to continue rolling back the updates - note
+	 * that the application might be in an unstable state - and may not be able to be restarted.
 	 */
-	private boolean updatePlatformConfigFiles(Task aTask, AppRelease aRelease)
+	private void revertUpdate(Task aTask)
 	{
-		File installPath, pFile;
-		String errMsg;
-
-		// Get the top level install path
-		installPath = DistUtils.getAppPath().getParentFile();
-
-		// Apple specific platform files
-		pFile = new File(installPath, "Info.plist");
-		if (pFile.isFile() == false)
-			pFile = new File(installPath.getParentFile(), "Info.plist");
-
-		if (pFile.isFile() == true)
+		// Revert our application's configuration (which will be loaded when it is restarted) to reflect the proper JRE
+		try
 		{
-			errMsg = null;
-			if (pFile.setWritable(true) == false)
-				errMsg = "Failure. No writable permmisions for file: " + pFile;
-			else
-				errMsg = AppleUtils.updateVersion(pFile, aRelease.getVersion());
-
-			if (errMsg != null)
-			{
-				aTask.infoAppendln(errMsg);
-				return false;
-			}
+			JreVersion currJreVer = DistUtils.getJreVersion();
+			PlatformUtils.setJreVersion(currJreVer);
+		}
+		catch(ErrorDM aExp)
+		{
+			aTask.infoAppendln("Failed to revert application's JRE!");
+			aTask.infoAppendln("\tApplication may be in an unstable state.");
+			printErrorDM(aTask, aExp, 1);
 		}
 
-		return true;
+		// Revert any platform specific config files
+		try
+		{
+			PlatformUtils.updateAppRelease(currRelease);
+		}
+		catch(ErrorDM aExp)
+		{
+			aTask.infoAppendln("Failed to revert application configuration!");
+			aTask.infoAppendln("\tApplication may be in an unstable state.");
+			printErrorDM(aTask, aExp, 1);
+		}
+
+		// Determine the path to the delta (update) folder
+		File rootPath = DistUtils.getAppPath().getParentFile();
+		File deltaPath = new File(rootPath, "delta");
+
+		// It is necessary to do this, since the user may later cancel the update request and it is important to
+		// leave the program and configuration files in a stable state.
+
+		// Execute any trash commands from the "fail" section of the delta.cmd file
+		File deltaCmdFile = new File(deltaPath, "delta.cmd");
+		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(deltaCmdFile))
+		{
+			String currSect = null;
+			while (true)
+			{
+				String inputStr = br.readLine();
+
+				// Delta command files should always have a proper exit (or reboot) and thus never arrive here
+				if (inputStr == null)
+					throw new ErrorDM("Command file (" + deltaCmdFile + ") is incomplete.");
+
+				// Ignore empty lines and comments
+				if (inputStr.isEmpty() == true || inputStr.startsWith("#") == true)
+					continue;
+
+				// Tokenize the input and retrieve the command
+				String[] strArr = inputStr.split(",");
+				String cmdStr = strArr[0];
+
+				// Skip to next line when we read a new section
+				if (strArr.length == 2 && cmdStr.equals("sect") == true)
+				{
+					currSect = strArr[1];
+					continue;
+				}
+
+				// Skip to the next line if we are not in the "fail" section
+				if (currSect != null && currSect.equals("fail") == false)
+					continue;
+				else if (currSect == null)
+					throw new ErrorDM("Command specified outside of section. Command: " + inputStr);
+
+				// Exit if we reach the exit or reboot command
+				if (strArr.length == 1 && cmdStr.equals("exit") == true)
+					break;
+				else if (strArr.length == 1 && cmdStr.equals("reboot") == true)
+					break;
+
+				// Execute the individual (trash) commands
+				if (strArr.length == 2 && cmdStr.equals("trash") == true)
+				{
+					// Resolve the argument to the corresponding file and ensure it is relative to our rootPath
+					File tmpFile = new File(rootPath, strArr[1]).getCanonicalFile();
+					if (MiscUtils.getRelativePath(rootPath, tmpFile) == null)
+						throw new ErrorDM("File (" + tmpFile + ") is not relative to folder: " + rootPath);
+
+					if (tmpFile.isFile() == true)
+					{
+						if (tmpFile.delete() == false)
+							throw new ErrorDM("Failed to delete file: " + tmpFile);
+					}
+					else if (tmpFile.isDirectory() == true)
+					{
+						if (IoUtil.deleteDirectory(tmpFile) == false)
+							throw new ErrorDM("Failed to delete folder: " + tmpFile);
+					}
+					else
+					{
+						throw new ErrorDM("File type is not recognized: " + tmpFile);
+					}
+				}
+			}
+		}
+		catch(IOException aExp)
+		{
+			aTask.infoAppendln("Failed to revert application configuration!");
+			aTask.infoAppendln("\tApplication may be in an unstable state.");
+			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
+		}
+
+		// Remove the entire delta folder
+		if (IoUtil.deleteDirectory(deltaPath) == false)
+			throw new ErrorDM("Failed to delete folder: " + deltaPath);
 	}
 
 }

@@ -8,6 +8,7 @@ import glum.gui.component.GSlider;
 import glum.gui.panel.GlassPanel;
 import glum.gui.panel.generic.MessagePanel;
 import glum.unit.ByteUnit;
+import glum.util.ThreadUtil;
 import glum.zio.raw.ZioRaw;
 
 import java.awt.*;
@@ -22,6 +23,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
+import distMaker.ErrorDM;
 import distMaker.platform.MemUtils;
 import distMaker.platform.PlatformUtils;
 import static distMaker.platform.MemUtils.KB_SIZE;
@@ -123,9 +125,26 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Zio
 		targMemSize = (long)targMemS.getModelValue();
 		targMemSize = roundToMB(targMemSize);
 
-		// Bail if we are not able to set the DistMaker max heap memory
-		if (PlatformUtils.setMaxHeapMem(warnPanel, targMemSize) == false)
-			return;
+		try
+		{
+			// Delegate the updating of the memory
+			PlatformUtils.setMaxHeapMem(targMemSize);
+		}
+		catch(ErrorDM aExp)
+		{
+			String subjectStr = aExp.getSubject();
+			if (subjectStr == null)
+				subjectStr = "Application Configuration Error";
+
+			String messageStr = aExp.getMessage();
+			if (aExp.getCause() != null)
+				messageStr += "\n\n" + ThreadUtil.getStackTrace(aExp.getCause());
+
+			// Show the user the details of the failure
+			warnPanel.setTitle(subjectStr);
+			warnPanel.setInfo(messageStr);
+			warnPanel.setVisible(true);
+		}
 
 		// Update our state vars
 		instMemSize = targMemSize;

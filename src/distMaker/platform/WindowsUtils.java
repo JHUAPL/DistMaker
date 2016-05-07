@@ -4,20 +4,87 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import distMaker.DistUtils;
-import distMaker.MiscUtils;
+import distMaker.*;
+import distMaker.jre.JreVersion;
 
 public class WindowsUtils
 {
 	/**
-	 * Utility method to update the JRE to reflect the specified path.
+	 * Returns the l4j runtime configuration file. If one can not be determined then this method will return null.
 	 * <P>
-	 * TODO: Complete this comment and method.
+	 * If the configuration file is determined but does not exist, then an empty configuration file will be created.
+	 * <P>
+	 * Note this method looks for a file that ends in .l4j.cfg, or an exe file and creates the corresponding config file.
+	 * <P>
+	 * If there are multiple .exe or .l4j.cfg files, then this method may grab the wrong file and fail.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static boolean updateJrePath(File aPath)
+	public static File getConfigFile()
 	{
-		int zios_finish;
-		return false;
+		File[] fileArr;
+		File installPath;
+		File retFile;
+
+		installPath = DistUtils.getAppPath().getParentFile();
+		fileArr = installPath.listFiles();
+
+		// Attempt to locate the <appExe>.l4j.ini file
+		retFile = null;
+		for (File aFile : fileArr)
+		{
+			if (aFile.getName().endsWith(".l4j.ini") == true)
+				retFile = aFile;
+		}
+
+		if (retFile == null)
+		{
+			for (File aFile : fileArr)
+			{
+				if (aFile.getName().endsWith(".exe") == true)
+					retFile = new File(aFile.getParentFile(), aFile.getName().substring(0, aFile.getName().length() - 4) + ".l4j.ini");
+			}
+		}
+
+		if (retFile == null)
+			throw new ErrorDM("The config file could not be located.");
+
+		if (retFile.isFile() == false)
+		{
+			try
+			{
+				retFile.createNewFile();
+			}
+			catch(IOException aExp)
+			{
+				throw new ErrorDM(aExp, "A default config file could not be created.");
+			}
+		}
+
+		System.out.println("Windows config file: " + retFile);
+		return retFile;
+	}
+
+	/**
+	 * Utility method to update the configuration to reflect the specified JRE version.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateJreVersion(JreVersion aJreVersion)
+	{
+		// Utilize the system configFile and delegate.
+		updateJreVersion(aJreVersion, getConfigFile());
+	}
+
+	/**
+	 * Utility method to update the configuration to reflect the specified JRE version.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateJreVersion(JreVersion aJreVersion, File aConfigFile)
+	{
+		int zzz_incomplete_logic;
+		throw new ErrorDM("The logic is incomplete.");
 	}
 
 	/**
@@ -25,24 +92,39 @@ public class WindowsUtils
 	 * <P>
 	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in the script. It assumes this string will
 	 * be surrounded by a single space character on each side.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static String updateMaxMem(long numBytes)
+	public static void updateMaxMem(long numBytes)
 	{
-		File configFile;
+		// Utilize the system configFile and delegate.
+		updateMaxMem(numBytes, getConfigFile());
+	}
+
+	/**
+	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified maxMemVal.
+	 * <P>
+	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in the script. It assumes this string will
+	 * be surrounded by a single space character on each side.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 */
+	public static void updateMaxMem(long numBytes, File aConfigFile)
+	{
 		List<String> inputList;
 		String strLine, updateStr;
 		boolean isProcessed;
 
-		// Bail if we fail to locate the configFile.
-		configFile = getConfigFile();
-		if (configFile != null && configFile.isFile() == true)
-			return "The config file could not be located.";
+		// Bail if the configFile is not writable
+		aConfigFile = getConfigFile();
+		if (aConfigFile.setWritable(true) == false)
+			throw new ErrorDM("The config file is not writeable: " + aConfigFile);
 
 		isProcessed = false;
 		inputList = new ArrayList<>();
 
 		// Process our input
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(configFile))))
+		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aConfigFile))
 		{
 			// Read the lines
 			while (true)
@@ -72,72 +154,11 @@ public class WindowsUtils
 		}
 		catch(Exception aExp)
 		{
-			aExp.printStackTrace();
-			return "Failed while processing the config file: " + configFile;
+			throw new ErrorDM(aExp, "Failed while processing the config file: " + aConfigFile);
 		}
 
 		// Update the script
-		System.out.println("Updating contents of file: " + configFile);
-		if (MiscUtils.writeDoc(configFile, inputList) == false)
-			return "Failed to write the config file: " + configFile;
-
-		// On success return null
-		return null;
-	}
-
-	/**
-	 * Returns the l4j runtime configuration file. If one can not be determined then this method will return null.
-	 * <P>
-	 * If the configuration file is determined but does not exist, then an empty configuration file will be created.
-	 * <P>
-	 * Note this method looks for a file that ends in .l4j.cfg, or an exe file and creates the corresponding config file.
-	 * <P>
-	 * If there are multiple .exe or .l4j.cfg files, then this method may grab the wrong file and fail.
-	 */
-	public static File getConfigFile()
-	{
-		File[] fileArr;
-		File installPath;
-		File retFile;
-
-		installPath = DistUtils.getAppPath().getParentFile();
-		fileArr = installPath.listFiles();
-
-		// Attempt to locate the <appExe>.l4j.ini file
-		retFile = null;
-		for (File aFile : fileArr)
-		{
-			if (aFile.getName().endsWith(".l4j.ini") == true)
-				retFile = aFile;
-		}
-
-		if (retFile == null)
-		{
-			for (File aFile : fileArr)
-			{
-				if (aFile.getName().endsWith(".exe") == true)
-					retFile = new File(aFile.getParentFile(), aFile.getName().substring(0, aFile.getName().length() - 4) + ".l4j.ini");
-			}
-		}
-
-		if (retFile == null)
-			return null;
-
-		if (retFile.isFile() == false)
-		{
-			try
-			{
-				retFile.createNewFile();
-			}
-			catch(IOException aExp)
-			{
-				aExp.printStackTrace();
-				return null;
-			}
-		}
-
-		System.out.println("Windows config file: " + retFile);
-		return retFile;
+		MiscUtils.writeDoc(aConfigFile, inputList);
 	}
 
 }

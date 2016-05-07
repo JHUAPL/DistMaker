@@ -14,6 +14,7 @@ import java.util.*;
 
 import distMaker.digest.Digest;
 import distMaker.digest.DigestType;
+import distMaker.platform.PlatformUtils;
 
 public class JreUtils
 {
@@ -29,6 +30,7 @@ public class JreUtils
 		BufferedReader bufReader;
 		DigestType digestType;
 		String errMsg, strLine;
+		String version;
 
 		errMsg = null;
 		retList = new ArrayList<>();
@@ -36,6 +38,7 @@ public class JreUtils
 
 		// Default to DigestType of MD5
 		digestType = DigestType.MD5;
+		version = null;
 
 		inStream = null;
 		bufReader = null;
@@ -62,6 +65,8 @@ public class JreUtils
 					; // Nothing to do
 				else if (tokens.length >= 1 && tokens[0].equals("exit") == true)
 					break; // Bail once we get the 'exit' command
+				else if (tokens.length == 2 && tokens[0].equals("name") == true && tokens[1].equals("JRE") == true)
+					; // Nothing to do - we just entered the "JRE" section
 				else if (tokens.length == 2 && tokens[0].equals("digest") == true)
 				{
 					DigestType tmpDigestType;
@@ -72,17 +77,35 @@ public class JreUtils
 					else
 						digestType = tmpDigestType;
 				}
-				else if (tokens.length == 6 && tokens[0].equals("jre") == true)
+				else if (tokens.length == 2 && tokens[0].equals("jre") == true)
 				{
-					String platform, version, filename, digestStr;
+					version = tokens[1];
+				}
+				else if (tokens.length == 4 && tokens[0].equals("F") == true)
+				{
+					String platform, filename, digestStr;
 					long fileLen;
+
+					if (version == null)
+					{
+						aTask.infoAppendln("Skipping input: " + strLine);
+						aTask.infoAppendln("\tJRE version has not been specifed. Missing input line: jre,<jreVersion>");
+						continue;
+					}
 
 					// Form the JreRelease
 					digestStr = tokens[1];
-					platform = tokens[2];
-					version = tokens[3];
-					fileLen = GuiUtil.readLong(tokens[4], -1);
-					filename = tokens[5];
+					fileLen = GuiUtil.readLong(tokens[2], -1);
+					filename = tokens[3];
+
+					platform = PlatformUtils.getPlatformOfJreTarGz(filename);
+					if (platform == null)
+					{
+						aTask.infoAppendln("Skipping input: " + strLine);
+						aTask.infoAppendln("\tFailed to determine the target platform of the JRE.");
+						continue;
+					}
+
 					retList.add(new JreRelease(platform, version, filename, new Digest(digestType, digestStr), fileLen));
 				}
 				else
