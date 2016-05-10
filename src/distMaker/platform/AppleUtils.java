@@ -213,7 +213,6 @@ public class AppleUtils
 		Node childNode, targNode;
 		Element evalE, arrE, memE;
 		String tagStr, valStr, currKeyVal;
-		int zzz_Clean_this;
 
 		// Bail if the pFile is not writable.
 		if (pFile.setWritable(true) == false)
@@ -242,10 +241,7 @@ public class AppleUtils
 		{
 			childNode = childList.item(c1);
 			if (childNode.getNodeType() != Node.ELEMENT_NODE)
-			{
-//				System.out.println("" + c1 + ": nodeType: " + childNode.getNodeType());
 				continue;
-			}
 
 			evalE = (Element)childNode;
 			tagStr = evalE.getTagName();

@@ -30,12 +30,16 @@ def buildRelease(args, buildPath):
 	# Select the jreTarGzFile to utilize for static releases
 	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
 	if jreTarGzFile == None:
-		# Let the user know if the 'user' specified JRE is not available and locate an alternative
-		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreVerSpec, platformStr.capitalize()))
-		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, None)
+		# Let the user know that a compatible JRE was not found - thus no static release will be made.
+		print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
+		# Let the user know that a compatible JRE was not found - and thus no Apple builds will be made
+		print('Only static Apple distributions are supported - thus there will be no Apple distribution of the application: ' + appName + '\n')
+		return
 
 	# Form the list of distributions to build (dynamic and static releases)
-	distList = [(appName + '-' + version, None)]
+	# Note as of 2016May01 there is no longer support for a dynamic Apple release
+#	distList = [(appName + '-' + version, None)]
+	distList = []
 	if jreTarGzFile != None:
 		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
 

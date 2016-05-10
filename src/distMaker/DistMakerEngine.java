@@ -23,7 +23,6 @@ import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
 
 import distMaker.digest.Digest;
 import distMaker.digest.DigestUtils;
@@ -34,6 +33,10 @@ import distMaker.platform.PlatformUtils;
 
 public class DistMakerEngine
 {
+	// Constants
+	private final String NonDistmakerAppMsg = "This application does not appear to be a properly configured DistMaker application.\n\n"
+			+ "Please check installation configuration.";
+
 	// State vars
 	private URL updateSiteUrl;
 	private AppRelease currRelease;
@@ -73,7 +76,7 @@ public class DistMakerEngine
 			if (DistUtils.isDevelopersEnvironment() == true)
 				displayNotice("Updates are not possible in a developer environment.");
 			else
-				displayNotice(null);
+				displayNotice(NonDistmakerAppMsg);
 			return;
 		}
 		appName = currRelease.getName();
@@ -183,7 +186,7 @@ public class DistMakerEngine
 		{
 			// Alert the user to the incongruence if this is not a developer's build
 			if (DistUtils.isDevelopersEnvironment() == false)
-				displayNotice(null);
+				displayNotice(NonDistmakerAppMsg);
 
 			return;
 		}
@@ -224,7 +227,7 @@ public class DistMakerEngine
 
 		if (appName == null || verName == null)
 		{
-			displayNotice(null);
+			displayNotice(NonDistmakerAppMsg);
 			System.err.println("Failed to properly parse DistMaker config file: " + cfgFile);
 			return;
 		}
@@ -238,12 +241,12 @@ public class DistMakerEngine
 
 		currRelease = new AppRelease(appName, verName, buildTime);
 
-		// Notify the user, if the application has been successfully updated
-		markSystemFullyStarted();
-
 		// Form the PickReleasePanel
 		pickVersionPanel = new PickReleasePanel(parentFrame, currRelease);
 		pickVersionPanel.setSize(550, 500); // 320, 350);
+
+		// Notify the user of (any) update results
+		showUpdateResults();
 	}
 
 	/**
@@ -361,28 +364,51 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Helper method to display a DistMaker information notice
+	 * Helper method to show an informative message on msgPanel.
 	 */
 	private void displayNotice(String aMsg)
 	{
-		// Default message
-		if (aMsg == null)
-		{
-			aMsg = "This application does not appear to be a properly configured DistMaker application.\n\n";
-			aMsg += "Please check installation configuration.";
-		}
+		Runnable silentRunnable = new Runnable() {
+			@Override
+			public void run()
+			{
+				; // Nothing to do
+			}
+		};
 
-		// If the parentFrame is not visible then delay the showing until it is visible
+		// Delegate to displayNoticeAndExecute
+		displayNoticeAndExecute(aMsg, silentRunnable, false);
+	}
+
+	/**
+	 * Helper method to show an informative message on msgPanel and execute the specified runnable.
+	 * <P>
+	 * If isModal == true then aRunnable will only be executed after the msgPanel has been accepted.
+	 * <P>
+	 * The runnable will not be run until the parentFrame is visible.
+	 */
+	private void displayNoticeAndExecute(final String aMsg, final Runnable aRunnable, final boolean isModal)
+	{
+		// Transform tabs to 3 spaces
+		final String infoMsg = aMsg.replace("\t", "    ");
+
+		// If the parentFrame is not visible then execute the code once it is made visible
 		if (parentFrame.isVisible() == false)
 		{
-			final String tmpMsg = aMsg;
 			parentFrame.addComponentListener(new ComponentAdapter() {
 				@Override
 				public void componentShown(ComponentEvent aEvent)
 				{
+					// Show the message panel and wait for user to close panel
 					msgPanel.setTitle("Application Updater");
-					msgPanel.setInfo(tmpMsg);
-					msgPanel.setVisible(true);
+					msgPanel.setInfo(infoMsg);
+					if (isModal == true)
+						msgPanel.setVisibleAsModal();
+					else
+						msgPanel.setVisible(true);
+
+					// Execute aRunnable's logic
+					aRunnable.run();
 
 					// Deregister for events after the parentFrame is made visible
 					parentFrame.removeComponentListener(this);
@@ -392,13 +418,16 @@ public class DistMakerEngine
 			return;
 		}
 
-		// Transform tabs to 3 spaces
-		aMsg = aMsg.replace("\t", "   ");
-
-		// Display the message
+		// Show the message panel and wait for user to close panel
 		msgPanel.setTitle("Application Updater");
-		msgPanel.setInfo(aMsg);
-		msgPanel.setVisible(true);
+		msgPanel.setInfo(infoMsg);
+		if (isModal == true)
+			msgPanel.setVisibleAsModal();
+		else
+			msgPanel.setVisible(true);
+
+		// Execute aRunnable's logic
+		aRunnable.run();
 	}
 
 	/**
@@ -538,7 +567,7 @@ public class DistMakerEngine
 		catch(ErrorDM aExp)
 		{
 			aTask.infoAppendln("Failed updating application configuration.");
-			printErrorDM(aTask, aExp, 1);
+			MiscUtils.printErrorDM(aTask, aExp, 1);
 			return false;
 		}
 
@@ -557,8 +586,8 @@ public class DistMakerEngine
 				tmpFW.write("# Define the fail section (clean up for failure)\n");
 				tmpFW.write("sect,fail\n");
 				tmpFW.write("copy," + "delta/" + appCfgFile.getName() + ".old," + MiscUtils.getRelativePath(rootPath, appCfgFile) + "\n");
-				tmpFW.write("move,jre" + targJreVer.getLabel() + ",delta" + "\n");
-				tmpFW.write("reboot\n\n");
+				tmpFW.write("reboot,trash,jre" + targJreVer.getLabel() + "\n");
+				tmpFW.write("exit\n\n");
 
 				tmpFW.write("# Define the pass section (clean up for success)\n");
 				tmpFW.write("sect,pass\n");
@@ -630,7 +659,7 @@ public class DistMakerEngine
 			aTask.infoAppendln("Failed to update the configuration to point to the updated JRE!");
 			aTask.infoAppendln("\tCurrent JRE: " + currJreVer.getLabel());
 			aTask.infoAppendln("\t Chosen JRE: " + targJre.getVersion().getLabel());
-			printErrorDM(aTask, aExp, 1);
+			MiscUtils.printErrorDM(aTask, aExp, 1);
 
 			// Remove the just installed JRE
 			IoUtil.deleteDirectory(jreTargPath);
@@ -771,71 +800,134 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Notification that the corresponding application has been fully initialized. This helper method will notify the user on the status of any update.
-	 */
-	private void markSystemFullyStarted()
-	{
-		String appName, msg;
-		int updateCode;
-
-		updateCode = DistUtils.getUpdateCode();
-		appName = currRelease.getName();
-
-		// No update
-		if (updateCode == 0)
-		{
-			return;
-		}
-		// Update passed
-		else if (updateCode == 1)
-		{
-			msg = "The application, " + currRelease.getName() + ", has been updated to ";
-			msg += "version: " + currRelease.getVersion();
-		}
-		// Update failed
-		else
-		// if (updateCode == 2)
-		{
-			msg = "There was an issue while updating the " + appName + " application.\n";
-			msg += "The application, " + appName + ", is currently at version: " + currRelease.getVersion() + "\n\n";
-
-			msg += DistUtils.getUpdateMsg();
-		}
-
-		displayNotice(msg);
-	}
-
-	/**
-	 * Helper method that prints the exception of ErrorDM in an intelligent fashion to the specified task.
+	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration should be in the same state as before an
+	 * update was applied. Reverting consists of the following:
+	 * <UL>
+	 * <LI>Removal of any downloaded and installed JRE
+	 * <LI>Removing the delta directory
+	 * <LI>Removing the delta.cfg file
+	 * </UL>
 	 * <P>
-	 * All ErrorDM exceptions (and their causes) will be printed. If the cause is not of type ErrorDM then the stack trace will be printed as well.
+	 * There should not be any issues with this roll back process. However if there are a best effort will be made to continue rolling back the updates - note
+	 * that the application might be in an unstable state - and may not be able to be restarted.
 	 */
-	private void printErrorDM(Task aTask, ErrorDM aErrorDM, int numTabs)
+	private void revertUpdate(Task aTask)
 	{
-		Throwable cause;
-		String tabStr;
-
-		tabStr = Strings.repeat("\t", numTabs);
-
-		aTask.infoAppendln(tabStr + "Reason: " + aErrorDM.getMessage());
-		cause = aErrorDM.getCause();
-		while (cause != null)
+		// Revert our application's configuration (which will be loaded when it is restarted) to reflect the proper JRE
+		try
 		{
-			if (cause instanceof ErrorDM)
-			{
-				aTask.infoAppendln(tabStr + "Reason: " + cause.getMessage());
-			}
-			else
-			{
-				aTask.infoAppendln(tabStr + "StackTrace: ");
-				aTask.infoAppendln(ThreadUtil.getStackTrace(cause));
-				break;
-			}
-
-			cause = aErrorDM.getCause();
+			JreVersion currJreVer = DistUtils.getJreVersion();
+			PlatformUtils.setJreVersion(currJreVer);
+		}
+		catch(ErrorDM aExp)
+		{
+			aTask.infoAppendln("Failed to revert application's JRE!");
+			aTask.infoAppendln("\tApplication may be in an unstable state.");
+			MiscUtils.printErrorDM(aTask, aExp, 1);
 		}
 
-		aTask.infoAppendln("");
+		// Revert any platform specific config files
+		try
+		{
+			PlatformUtils.updateAppRelease(currRelease);
+		}
+		catch(ErrorDM aExp)
+		{
+			aTask.infoAppendln("Failed to revert application configuration!");
+			aTask.infoAppendln("\tApplication may be in an unstable state.");
+			MiscUtils.printErrorDM(aTask, aExp, 1);
+		}
+
+		// Determine the path to the delta (update) folder
+		File rootPath = DistUtils.getAppPath().getParentFile();
+		File deltaPath = new File(rootPath, "delta");
+
+		// It is necessary to do this, since the user may later cancel the update request and it is important to
+		// leave the program and configuration files in a stable state.
+
+		// Execute any trash commands from the "fail" section of the delta.cmd file
+		File deltaCmdFile = new File(deltaPath, "delta.cmd");
+		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(deltaCmdFile))
+		{
+			String currSect = null;
+			while (true)
+			{
+				String inputStr = br.readLine();
+
+				// Delta command files should always have a proper exit and thus never arrive here
+				if (inputStr == null)
+					throw new ErrorDM("Command file (" + deltaCmdFile + ") is incomplete.");
+
+				// Ignore empty lines and comments
+				if (inputStr.isEmpty() == true || inputStr.startsWith("#") == true)
+					continue;
+
+				// Tokenize the input and retrieve the command
+				String[] strArr = inputStr.split(",");
+				String cmdStr = strArr[0];
+
+				// Skip to next line when we read a new section
+				if (strArr.length == 2 && cmdStr.equals("sect") == true)
+				{
+					currSect = strArr[1];
+					continue;
+				}
+
+				// Skip to the next line if we are not in the "fail" section
+				if (currSect != null && currSect.equals("fail") == false)
+					continue;
+				else if (currSect == null)
+					throw new ErrorDM("Command specified outside of section. Command: " + inputStr);
+
+				// Bail if we reach the exit command
+				if (strArr.length == 1 && cmdStr.equals("exit") == true)
+					break;
+
+				// We are interested only in trash (or reboot,trash) commands. Execute the individual trash (or reboot,trash) commands.
+				// It is safe to execute reboot,trash commands now since the actual update is not running yet.
+				String delTargStr = null;
+				if (inputStr.startsWith("trash,") == true)
+					delTargStr = inputStr.substring(6);
+				else if (inputStr.startsWith("reboot,trash,") == true)
+					delTargStr = inputStr.substring(13);
+				else
+					continue;
+
+				// Ensure we are not looking at a "hollow" trash command
+				if (delTargStr.isEmpty() == true)
+					throw new ErrorDM("File (" + deltaCmdFile + ") has invalid input: " + inputStr);
+
+				// Resolve the argument to the corresponding file and ensure it is relative to our rootPath
+				File trashFile = new File(rootPath, delTargStr).getCanonicalFile();
+				if (MiscUtils.getRelativePath(rootPath, trashFile) == null)
+					throw new ErrorDM("File (" + trashFile + ") is not relative to folder: " + rootPath);
+
+				if (trashFile.isFile() == true)
+				{
+					if (trashFile.delete() == false)
+						throw new ErrorDM("Failed to delete file: " + trashFile);
+				}
+				else if (trashFile.isDirectory() == true)
+				{
+					if (IoUtil.deleteDirectory(trashFile) == false)
+						throw new ErrorDM("Failed to delete folder: " + trashFile);
+				}
+				else
+				{
+					throw new ErrorDM("File type is not recognized: " + trashFile);
+				}
+			}
+		}
+		catch(IOException aExp)
+		{
+			aTask.infoAppendln("Failed to revert application configuration!");
+			aTask.infoAppendln("\tApplication may be in an unstable state.");
+			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
+		}
+
+		// Remove the entire delta folder
+		if (IoUtil.deleteDirectory(deltaPath) == false)
+			throw new ErrorDM("Failed to delete folder: " + deltaPath);
 	}
 
 	/**
@@ -878,126 +970,52 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration should be in the same state as before an
-	 * update was applied. Reverting consists of the following:
-	 * <UL>
-	 * <LI>Removal of any downloaded and installed JRE
-	 * <LI>Removing the delta directory
-	 * <LI>Removing the delta.cfg file
-	 * </UL>
-	 * <P>
-	 * There should not be any issues with this roll back process. However if there are a best effort will be made to continue rolling back the updates - note
-	 * that the application might be in an unstable state - and may not be able to be restarted.
+	 * Notification that the corresponding application has been fully initialized. This helper method will notify the user on the status of any update.
 	 */
-	private void revertUpdate(Task aTask)
+	private void showUpdateResults()
 	{
-		// Revert our application's configuration (which will be loaded when it is restarted) to reflect the proper JRE
-		try
+		String appName, infoMsg;
+		int updateCode;
+
+		updateCode = DistUtils.getUpdateCode();
+		appName = currRelease.getName();
+
+		// No update
+		if (updateCode == 0)
 		{
-			JreVersion currJreVer = DistUtils.getJreVersion();
-			PlatformUtils.setJreVersion(currJreVer);
+			return;
 		}
-		catch(ErrorDM aExp)
+		// Update passed
+		else if (updateCode == 1)
 		{
-			aTask.infoAppendln("Failed to revert application's JRE!");
-			aTask.infoAppendln("\tApplication may be in an unstable state.");
-			printErrorDM(aTask, aExp, 1);
+			infoMsg = "The application, " + currRelease.getName() + ", has been updated to ";
+			infoMsg += "version: " + currRelease.getVersion();
+		}
+		// Update failed
+		else
+		{
+			infoMsg = "There was an issue while updating the " + appName + " application.\n";
+			infoMsg += "The application, " + appName + ", is currently at version: " + currRelease.getVersion() + "\n\n";
+			infoMsg += DistUtils.getUpdateMsg();
 		}
 
-		// Revert any platform specific config files
-		try
-		{
-			PlatformUtils.updateAppRelease(currRelease);
-		}
-		catch(ErrorDM aExp)
-		{
-			aTask.infoAppendln("Failed to revert application configuration!");
-			aTask.infoAppendln("\tApplication may be in an unstable state.");
-			printErrorDM(aTask, aExp, 1);
-		}
-
-		// Determine the path to the delta (update) folder
-		File rootPath = DistUtils.getAppPath().getParentFile();
-		File deltaPath = new File(rootPath, "delta");
-
-		// It is necessary to do this, since the user may later cancel the update request and it is important to
-		// leave the program and configuration files in a stable state.
-
-		// Execute any trash commands from the "fail" section of the delta.cmd file
-		File deltaCmdFile = new File(deltaPath, "delta.cmd");
-		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(deltaCmdFile))
-		{
-			String currSect = null;
-			while (true)
+		// Setup the runnable that will clean up our delta folder
+		Runnable cleanDeltaRunnable = new Runnable() {
+			@Override
+			public void run()
 			{
-				String inputStr = br.readLine();
+				// Remove the delta folder (if it exists)
+				File deltaPath = new File(DistUtils.getAppPath().getParentFile(), "delta");
+				if (deltaPath.isDirectory() == false)
+					return;
 
-				// Delta command files should always have a proper exit (or reboot) and thus never arrive here
-				if (inputStr == null)
-					throw new ErrorDM("Command file (" + deltaCmdFile + ") is incomplete.");
-
-				// Ignore empty lines and comments
-				if (inputStr.isEmpty() == true || inputStr.startsWith("#") == true)
-					continue;
-
-				// Tokenize the input and retrieve the command
-				String[] strArr = inputStr.split(",");
-				String cmdStr = strArr[0];
-
-				// Skip to next line when we read a new section
-				if (strArr.length == 2 && cmdStr.equals("sect") == true)
-				{
-					currSect = strArr[1];
-					continue;
-				}
-
-				// Skip to the next line if we are not in the "fail" section
-				if (currSect != null && currSect.equals("fail") == false)
-					continue;
-				else if (currSect == null)
-					throw new ErrorDM("Command specified outside of section. Command: " + inputStr);
-
-				// Exit if we reach the exit or reboot command
-				if (strArr.length == 1 && cmdStr.equals("exit") == true)
-					break;
-				else if (strArr.length == 1 && cmdStr.equals("reboot") == true)
-					break;
-
-				// Execute the individual (trash) commands
-				if (strArr.length == 2 && cmdStr.equals("trash") == true)
-				{
-					// Resolve the argument to the corresponding file and ensure it is relative to our rootPath
-					File tmpFile = new File(rootPath, strArr[1]).getCanonicalFile();
-					if (MiscUtils.getRelativePath(rootPath, tmpFile) == null)
-						throw new ErrorDM("File (" + tmpFile + ") is not relative to folder: " + rootPath);
-
-					if (tmpFile.isFile() == true)
-					{
-						if (tmpFile.delete() == false)
-							throw new ErrorDM("Failed to delete file: " + tmpFile);
-					}
-					else if (tmpFile.isDirectory() == true)
-					{
-						if (IoUtil.deleteDirectory(tmpFile) == false)
-							throw new ErrorDM("Failed to delete folder: " + tmpFile);
-					}
-					else
-					{
-						throw new ErrorDM("File type is not recognized: " + tmpFile);
-					}
-				}
+				if (IoUtil.deleteDirectory(deltaPath) == false)
+					System.err.println("Failed to remove delta path. Cleanup after update was not fully completed.");
 			}
-		}
-		catch(IOException aExp)
-		{
-			aTask.infoAppendln("Failed to revert application configuration!");
-			aTask.infoAppendln("\tApplication may be in an unstable state.");
-			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
-		}
+		};
 
-		// Remove the entire delta folder
-		if (IoUtil.deleteDirectory(deltaPath) == false)
-			throw new ErrorDM("Failed to delete folder: " + deltaPath);
+		// Show the message panel and execute cleanDeltaRunnable
+		displayNoticeAndExecute(infoMsg, cleanDeltaRunnable, true);
 	}
 
 }

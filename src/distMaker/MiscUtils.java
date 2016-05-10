@@ -1,6 +1,7 @@
 package distMaker;
 
 import glum.task.Task;
+import glum.util.ThreadUtil;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.utils.IOUtils;
 
+import com.google.common.base.Strings;
 import com.google.common.io.CountingInputStream;
 
 /**
@@ -83,6 +85,39 @@ public class MiscUtils
 	}
 
 	/**
+	 * Helper method that prints the exception of ErrorDM in an intelligent fashion to the specified task.
+	 * <P>
+	 * All ErrorDM exceptions (and their causes) will be printed. If the cause is not of type ErrorDM then the stack trace will be printed as well.
+	 */
+	public static void printErrorDM(Task aTask, ErrorDM aErrorDM, int numTabs)
+	{
+		Throwable cause;
+		String tabStr;
+
+		tabStr = Strings.repeat("\t", numTabs);
+
+		aTask.infoAppendln(tabStr + "Reason: " + aErrorDM.getMessage());
+		cause = aErrorDM.getCause();
+		while (cause != null)
+		{
+			if (cause instanceof ErrorDM)
+			{
+				aTask.infoAppendln(tabStr + "Reason: " + cause.getMessage());
+			}
+			else
+			{
+				aTask.infoAppendln(tabStr + "StackTrace: ");
+				aTask.infoAppendln(ThreadUtil.getStackTrace(cause));
+				break;
+			}
+
+			cause = aErrorDM.getCause();
+		}
+
+		aTask.infoAppendln("");
+	}
+
+	/**
 	 * Untar an input file into an output file.
 	 * <P>
 	 * Source based off of:<BR>
@@ -138,10 +173,20 @@ public class MiscUtils
 			else if (entry.isSymbolicLink() == true)
 			{
 				File tmpFile = new File(entry.getLinkName());
-				Path outLink = Files.createSymbolicLink(outputFile.toPath(), tmpFile.toPath());
+				Files.createSymbolicLink(outputFile.toPath(), tmpFile.toPath());
 
-				long tmpUtc = entry.getModTime().getTime();
-				outputFile.setLastModified(tmpUtc);
+//				long tmpUtc = entry.getModTime().getTime();
+//				outputFile.setLastModified(tmpUtc);
+//				// TODO: In the future if you want the symbolic link to have the same time as that in the tar do something like the below
+//				// since in Java (as of 1.8) it is impossible to set the time on the link rather than the target
+//				Path outLink = Files.createSymbolicLink(outputFile.toPath(), tmpFile.toPath());
+//				if (PlatformUtils.getPlatform().equals("Linux") == true)
+//				{
+//					DateUnit dUnit = new DateUnit("", "yyyyMMddHHmmss");
+//					long tmpUtc = entry.getModTime().getTime();
+//					String timeStamp = dUnit.getString(tmpUtc); 
+//					Runtime.getRuntime().exec("touch -h -t " + timeStamp + " " + outLink.toAbsolutePath());
+//				}
 			}
 			else if (entry.isFile() == true)
 			{

@@ -75,7 +75,7 @@ def getJreTarGzFilesForVerStr(aVerStr):
 
 def getJreTarGzFile(aPlatform, aJvmVerSpec):
 	"""Returns the JRE tar.gz file for the appropriate platform and JRE release. If there are several possible 
-	matches then the tar.gz with the latest version will be rteurned. 
+	matches then the tar.gz with the latest version will be returned. 
 
 	This will return None if there is no file that is sufficient for the request. Note if you do not care about 
 	any specific update for a major version of JAVA then just specify the major version. Example '1.8' instead of
@@ -226,6 +226,12 @@ def validateJreVersionSpec(aVerSpec):
 	minVer = verStrToVerArr(aVerSpec[0])
 	if minVer == None:
 		raise ErrorDM('The specified string: "' + aVerSpec[0] + ' is not a valid JRE version specification.')
+
+	# Ensure the minVer is not before Java 1.7
+	if isVerAfterAB([1, 7], minVer) == True:
+		raise ErrorDM('In the parameter jreVersion, the minVer ({0}) must be later than 1.7.'.format(aVerSpec[0]))
+
+	# Bail if only the minVer was specified
 	if len(aVerSpec) == 1:
 		return
 

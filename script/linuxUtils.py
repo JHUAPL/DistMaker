@@ -28,9 +28,8 @@ def buildRelease(args, buildPath):
 	# Select the jreTarGzFile to utilize for static releases
 	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
 	if jreTarGzFile == None:
-		# Let the user know if the 'user' specified JRE is not available and locate an alternative
-		print('[Warning] User specified JRE ({0}) is not available for {1} platform. Searching for alternative...'.format(jreVerSpec, platformStr.capitalize()))
-		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, None)
+		# Let the user know that a compatible JRE was not found - thus no static release will be made.
+		print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
 
 	# Form the list of distributions to build (dynamic and static JREs)
 	distList = [(appName + '-' + version, None)]

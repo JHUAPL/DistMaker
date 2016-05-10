@@ -226,7 +226,7 @@ if __name__ == "__main__":
 		jreUtils.validateJreVersionSpec(args.jreVerSpec)
 	except ErrorDM as aExp:
 		print('The specified jreVerVersion is invalid. Input: {}'.format(args.jreVerSpec))
-		print('  ' + aExp.message, file=sys.stderr)
+		print('  ' + aExp.message + "\n", file=sys.stderr)
 		exit()
 
 	# Form the classPath if none specified
