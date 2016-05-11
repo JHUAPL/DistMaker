@@ -155,6 +155,10 @@ public class MiscUtils
 		TarArchiveEntry entry = null;
 		while ((entry = (TarArchiveEntry)debInputStream.getNextEntry()) != null)
 		{
+			// Bail if we have been aborted
+			if (aTask.isActive() == false)
+				return null;
+
 			final File outputFile = new File(aDestPath, entry.getName());
 			if (entry.isDirectory())
 			{
@@ -225,7 +229,13 @@ public class MiscUtils
 
 		// Update all of the times on the folders last
 		for (File aDir : pathMap.keySet())
+		{
+			// Bail if we have been aborted
+			if (aTask.isActive() == false)
+				return null;
+
 			aDir.setLastModified(pathMap.get(aDir));
+		}
 
 		aTask.infoAppendln("\tUnpacked: " + untaredFiles.size() + " files\n");
 

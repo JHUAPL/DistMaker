@@ -405,8 +405,8 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 #	if icnsStr != None:
 #		writeln(f, 3, '<string>-Xdock:icon=Contents/Resources/' + icnsStr + '</string>')
 	writeln(f, 3, '<string>-Dapple.laf.useScreenMenuBar=true</string>')
-	writeln(f, 3, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
 	writeln(f, 3, '<string>-Dcom.apple.macos.useScreenMenuBar=true</string>')
+	writeln(f, 3, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
 	writeln(f, 3, '<string>-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name + '</string>')
 	writeln(f, 3, '<string>-Dapple.awt.application.name=' + args.name + '</string>')
 	writeln(f, 3, '<string>-Djava.system.class.loader=appLauncher.RootClassLoader</string>')
