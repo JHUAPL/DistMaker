@@ -3,6 +3,7 @@
 import copy
 import math
 import os
+import platform
 import shutil
 import subprocess
 import tempfile
@@ -59,7 +60,11 @@ def buildRelease(args, buildPath):
 		# Create the DMG image via genisoimage
 		dmgFile = os.path.join(buildPath, aDistName + '.dmg')
 #		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
-		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
+		if platform.system() == 'Darwin':
+#			cmd = ['hdiutil', 'create', '-fs', 'HFS+'  '-o', dmgFile, '-quiet', '-volname', appName, '-srcfolder', tmpPath]
+			cmd = ['hdiutil', 'makehybrid', '-hfs', '-o', dmgFile, '-default-volume-name', appName, tmpPath]
+		else:
+			cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
 		print('\tForming DMG image. File: ' + dmgFile)
 		proc = miscUtils.executeAndLog(cmd, "\t\tgenisoimage: ")
 		if proc.returncode != 0:
@@ -398,18 +403,23 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 		writeln(f, 2, '<string>' + str(val) + '</string>')
 
 	# JVM options
+	jvmArgs = list(args.jvmArgs)
+	if any(aStr.startswith("-Dapple.laf.useScreenMenuBar") == False for aStr in jvmArgs) == True:
+		jvmArgs.append('-Dapple.laf.useScreenMenuBar=true')
+	if any(aStr.startswith("-Dcom.apple.macos.useScreenMenuBar") == False for aStr in jvmArgs) == True:
+		jvmArgs.append('-Dcom.apple.macos.useScreenMenuBar=true')
+	if any(aStr.startswith("-Dcom.apple.macos.use-file-dialog-packages") == False for aStr in jvmArgs) == True:
+		jvmArgs.append('-Dcom.apple.macos.use-file-dialog-packages=true')
+	jvmArgs.append('-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name)
+	jvmArgs.append('-Dapple.awt.application.name=' + args.name)
+	jvmArgs.append('-Djava.system.class.loader=appLauncher.RootClassLoader')
+#	if icnsStr != None:
+#		jvmArgs.append('-Xdock:icon=Contents/Resources/' + icnsStr)
+
 	writeln(f, 2, '<key>JVMOptions</key>')
 	writeln(f, 2, '<array>')
-	for aStr in args.jvmArgs:
+	for aStr in jvmArgs:
 		writeln(f, 3, '<string>' + aStr + '</string>')
-#	if icnsStr != None:
-#		writeln(f, 3, '<string>-Xdock:icon=Contents/Resources/' + icnsStr + '</string>')
-	writeln(f, 3, '<string>-Dapple.laf.useScreenMenuBar=true</string>')
-	writeln(f, 3, '<string>-Dcom.apple.macos.useScreenMenuBar=true</string>')
-	writeln(f, 3, '<string>-Dcom.apple.macos.use-file-dialog-packages=true</string>')
-	writeln(f, 3, '<string>-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name + '</string>')
-	writeln(f, 3, '<string>-Dapple.awt.application.name=' + args.name + '</string>')
-	writeln(f, 3, '<string>-Djava.system.class.loader=appLauncher.RootClassLoader</string>')
 	writeln(f, 2, '</array>')
 
 #	# App arguments
