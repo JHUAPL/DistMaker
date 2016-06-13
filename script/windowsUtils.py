@@ -175,7 +175,7 @@ def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
 		writeln(f, 2, "<path>" + jrePath + "</path>");
 	else:
-		jreVer = getJreMajorVersion(args.jreVerSpec[0])
+		jreVer = getJreMajorVersion(args.jreVerSpec)
 		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");  # Valid values: '1.7.0' or '1.8.0' ...
 	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");  # Valid values: jreOnlyjdkOnly|preferJre|preferJdk
 	for aJvmArg in args.jvmArgs:
@@ -211,21 +211,23 @@ def checkSystemEnvironment():
 	return True
 
 
-def getJreMajorVersion(aJreVerStr):
-	"""Returns the minimum version of the JRE to utilize based on the passed in JRE release. 
-	The passed in value should be of the form X.X.X ---> example: 1.8.0_73 would result in 1.8.0 
-	If aJreVerStr is invalid then returns the default value of: 1.8.0"""
-	if aJreVerStr == None: return '1.8.0'
-	verList = aJreVerStr.split('.')
-	if len(verList) == 2: verList.append('0')
-	if len(verList) == 3 and verList[2] == '': verList[2] = '0'
-	if len(verList) < 3: return '1.8.0'
+def getJreMajorVersion(aJreVerSpec):
+	"""Returns the minimum version of the JRE to utilize based on the passed in JreVerSpec. If aJreVerSpec is None then
+	the value specified in jreUtils.getDefaultJreVerStr() will be utilized. If that value is None then the value of 
+	1.8.0 will be utilized.""" 
+	if aJreVerSpec == None:
+		aJreVerSpec = [jreUtils.getDefaultJreVerStr()]
+	minJreVerStr = aJreVerSpec[0]
+	if minJreVerStr == None:
+		minJreVerStr = '1.8.0'
+
 	try:
-		[int(y) for y in verList]
+		verArr = jreUtils.verStrToVerArr(minJreVerStr)
 	except:
 		return '1.8.0'
-	verList[2] = '0'
-	return ".".join(verList)
+	if len(verArr) <= 1: return '1.8.0'
+	if len(verArr) == 2: verArr.append(0)
+	return jreUtils.verArrToVerStr(verArr)
 
 
 def writeln(f, tabL, aStr, tabStr='\t'):
