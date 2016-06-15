@@ -5,6 +5,7 @@ import argparse
 import getpass
 import math
 import os
+import platform
 import shutil
 import signal
 import subprocess
@@ -89,7 +90,7 @@ def checkForRequiredApplicationsAndExit():
 	"""Method to ensure we have all of the required applications installed to support building of distributions.
 	If there are mandatory applications that are missing then this will be printed to stderr and the program will exit.
 	The current set of required applications are:
-	java, jar, genisoimage"""
+	java, jar, (genisoimage or hdiutil)"""
 	evalPath = distutils.spawn.find_executable('java')
 	errList = []
 	if evalPath == None:
@@ -97,9 +98,14 @@ def checkForRequiredApplicationsAndExit():
 	evalPath = distutils.spawn.find_executable('jar')
 	if evalPath == None:
 		errList.append('Failed while trying to locate jar. Please install jar (typically included with Java)')
-	evalPath = distutils.spawn.find_executable('genisoimage')
-	if evalPath == None:
-		errList.append('Failed while trying to locate genisoimage. Please install genisoimage')
+	
+	genisoimagePath = distutils.spawn.find_executable('genisoimage')
+	hdiutilPath = distutils.spawn.find_executable('hdiutil')
+	if genisoimagePath == None and hdiutilPath == None:
+		if platform.system() == 'Darwin':
+			errList.append('Failed while trying to locate executable hdiutil. Please install hdiutil')
+		else:
+			errList.append('Failed while trying to locate executable genisoimage. Please install genisoimage')
 
 	# Bail if there are no issues
 	if len(errList) == 0:
@@ -182,6 +188,7 @@ if __name__ == "__main__":
 	parser.add_argument('-icnsFile', help='Icon file used for apple build.')
 	parser.add_argument('-forceSingleInstance', help='Force the application to have only one instance.', default=False)
 	parser.add_argument('-digest', help='Digest used to ensure integrity of application upgrades. Default: sha256', choices=['md5', 'sha256', 'sha512'], default='sha256')
+	parser.add_argument('-enableJmx', help='Enables JMX technology on the target client. Allows one to attach jconsole, jvisualvm, or other JMX tools.', action='store_true', default=False)
 #	parser.add_argument('-bundleId', help='Apple specific id descriptor.')
 
 	# Intercept any request for a  help message and bail
@@ -245,6 +252,14 @@ if __name__ == "__main__":
 		else:
 			newJvmArgs.append(aJvmArg)
 	args.jvmArgs = newJvmArgs
+	
+	# Add the flag -Dcom.sun.management.jmxremote to allow JMX clients to attach to the Java application
+	# Add the flag -Djava.rmi.server.hostname=localhost to allow connections when using VPN. Not sure why???
+	# It appears that when the root class loader is replaced then JMX is disabled by default
+	# See also: http://docs.oracle.com/javase/8/docs/technotes/guides/management/agent.html
+	if args.enableJmx == True:
+		args.jvmArgs.append('-Dcom.sun.management.jmxremote')
+		args.jvmArgs.append('-Djava.rmi.server.hostname=localhost')
 
 	# Bail if the release has already been built
 	buildPath = os.path.abspath(args.name + '-' + args.version)

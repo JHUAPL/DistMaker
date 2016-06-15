@@ -2,7 +2,9 @@
 
 import copy
 import os
+import platform
 import shutil
+import subprocess
 import tempfile
 import glob
 
@@ -37,6 +39,21 @@ def buildRelease(args, buildPath):
 
 	# Create a tmp (working) folder
 	tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
+
+	# Unpack the proper launch4j release (for the platform we are 
+	# running on) into the tmp (working) folder
+	appInstallRoot = miscUtils.getInstallRoot()
+	appInstallRoot = os.path.dirname(appInstallRoot)
+	l4jPath = os.path.join(appInstallRoot, 'template', 'launch4j')
+	if platform.system() == 'Darwin':
+		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.8-macosx-x86-10.8.tgz']
+	else:
+		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.8-linux.tgz']
+	retCode = subprocess.call(exeCmd)
+	if retCode != 0:
+		print('Failed to extract launch4j package...')
+		shutil.rmtree(tmpPath)
+		return
 
 	# Create the various distributions
 	for (aDistName, aJreTarGzFile) in distList:
@@ -119,7 +136,8 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 		buildLaunch4JConfig(configFile, args, jreTarGzFile, winIconFile)
 
 		# Build the Windows executable
-		launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
+		tmpPath = os.path.dirname(rootPath)
+		launch4jExe = os.path.join(tmpPath, "launch4j", "launch4j")
 		cmd = [launch4jExe, configFile]
 		print('\tBuilding windows executable via launch4j')
 		proc = miscUtils.executeAndLog(cmd, "\t\t")
@@ -200,14 +218,6 @@ def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 def checkSystemEnvironment():
 	"""Checks to ensure that all system application / environment variables needed to build a Windows distribution are installed
 	and properly configured. Returns False if the system environment is insufficient"""
-	# Bail if launch4j is not installed
-	appInstallRoot = miscUtils.getInstallRoot()
-	appInstallRoot = os.path.dirname(appInstallRoot)
-	launch4jExe = os.path.join(appInstallRoot, "launch4j", "launch4j")
-	if os.path.exists(launch4jExe) == False:
-		print('Launch4j is not installed. Windows releases will not be built.')
-		return False
-
 	return True
 
 
