@@ -80,7 +80,7 @@ def addReleaseInfo(installPath, verStr):
 	for aFile in jreFiles:
 		shutil.copy(aFile, destPath)
 		destFile = os.path.join(destPath, aFile)
-		os.chmod(destFile, 0644)
+		os.chmod(destFile, 0o644)
 
 
 def delRelease(verStr):

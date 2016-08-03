@@ -114,7 +114,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, ZioR
          titleL.setText(appName + " needs to be updated.");
 			infoMsg = "You are running version " + currVerStr + ". ";
          infoMsg += "You may update to the latest release. You may also switch to an "
-               + "older relase by choosing another version below. ";
+               + "older release by choosing another version below. ";
 		}
 		infoMsg += "\n";
 

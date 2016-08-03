@@ -167,7 +167,7 @@ def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 	writeln(f, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
 # 	writeln(f, 1, "<supportUrl>url</supportUrl>");
 
-	writeln(f, 1, "<cmdLine>app.cfg</cmdLine>");
+#	writeln(f, 1, "<cmdLine>app.cfg</cmdLine>");
 	writeln(f, 1, "<chdir>app/</chdir>");
 	writeln(f, 1, "<priority>normal</priority>");
 	writeln(f, 1, "<customProcName>true</customProcName>");

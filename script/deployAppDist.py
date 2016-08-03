@@ -117,6 +117,13 @@ def addRelease(appName, version, buildDate):
 	# Copy over the contents of the release folder to the deploy location
 	shutil.copytree(distPath, versionPath, symlinks=True)
 
+	# Ensure all folders and files have the proper permissions
+	for root, dirs, files in os.walk(versionPath):
+		for d in dirs:
+			os.chmod(os.path.join(root, d), 0o755)
+		for f in files:
+			os.chmod(os.path.join(root, f), 0o644)
+
 	# Update the version info
 	addReleaseInfo(installPath, appName, version, buildDate)
 	print('Application {} ({}) has been deployed to location: {}'.format(appName, version, args.deployRoot))
