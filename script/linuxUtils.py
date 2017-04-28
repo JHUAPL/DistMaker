@@ -21,20 +21,27 @@ def buildRelease(args, buildPath):
 	jreVerSpec = args.jreVerSpec
 	platformStr = 'linux'
 
+	# Determine the types of builds we should do
+	platformType = miscUtils.getPlatformTypes(args.platform, platformStr)
+	if platformType.nonJre == False and platformType.withJre == False:
+		return;
+
 	# Check our system environment before proceeding
 	if checkSystemEnvironment() == False:
 		return
 
-	# Select the jreTarGzFile to utilize for static releases
-	jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
-	if jreTarGzFile == None:
-		# Let the user know that a compatible JRE was not found - thus no static release will be made.
-		print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
-
 	# Form the list of distributions to build (dynamic and static JREs)
-	distList = [(appName + '-' + version, None)]
-	if jreTarGzFile != None:
-		distList.append((appName + '-' + version + '-jre', jreTarGzFile))
+	distList = []
+	if platformType.nonJre == True:
+		distList = [(appName + '-' + version, None)]
+	if platformType.withJre == True:
+		# Select the jreTarGzFile to utilize for static releases
+		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
+		if jreTarGzFile == None:
+			# Let the user know that a compatible JRE was not found - thus no static release will be made.
+			print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
+		else:
+			distList.append((appName + '-' + version + '-jre', jreTarGzFile))
 
 	# Create a tmp (working) folder
 	tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)

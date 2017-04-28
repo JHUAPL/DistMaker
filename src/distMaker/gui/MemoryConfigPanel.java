@@ -9,7 +9,6 @@ import glum.gui.panel.GlassPanel;
 import glum.gui.panel.generic.MessagePanel;
 import glum.unit.ByteUnit;
 import glum.util.ThreadUtil;
-import glum.zio.raw.ZioRaw;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -30,7 +29,7 @@ import static distMaker.platform.MemUtils.KB_SIZE;
 import static distMaker.platform.MemUtils.MB_SIZE;
 import static distMaker.platform.MemUtils.GB_SIZE;
 
-public class MemoryConfigPanel extends GlassPanel implements ActionListener, ZioRaw, ListSelectionListener
+public class MemoryConfigPanel extends GlassPanel implements ActionListener, ListSelectionListener
 {
 	/** Unused - but added to eliminate warning due to poorly designed java.io.Serializable interface. */
 	private static final long serialVersionUID = 1L;

@@ -66,6 +66,31 @@ def computeDigestForFile(evalFile, digestType, block_size=2**20):
 	return hash.hexdigest()
 
 
+def getPlatformTypes(platformArr, platformStr):
+	"""Returns an object that defines the release types that should be built for the given platform. The object will
+	have 2 field members: [nonJre, withJre]. If the field is set to True then the corresonding platform should be
+	built. This is determined by examaning the platformStr and determine it's occurance in the platformArr. For
+	example to determine the build platforms for Linux one might call getPlatformArr(someArr, 'linux'). Following are
+	the results of contents in someArr:
+	   ['']       ---> nonJre = False, withJre = False
+	   ['linux']  --->  nonJre = True, withJre = True
+	   ['linux+'] --->  nonJre = False, withJre = True
+	   ['linux-'] --->  nonJre = True, withJre = False"""
+	class PlatformType(object):
+		nonJre = False
+		withJre = False
+
+	retObj = PlatformType()
+	if platformStr in platformArr:
+		retObj.nonJre = True
+		retObj.withJre = True
+	if platformStr + '-' in platformArr:
+		retObj.nonJre = True
+	if platformStr + '+' in platformArr:
+		retObj.withJre = True
+	return retObj
+
+
 def getInstallRoot():
 	"""Returns the root path where the running script is installed."""
 	argv = sys.argv;
@@ -89,16 +114,16 @@ def executeAndLog(command, indentStr=""):
 		print(indentStr + 'Stack Trace:')
 		outStr = logUtils.appendLogOutputWithText(aExp.child_traceback, indentStr + '\t')
 		print(outStr)
-		
+
 		class Proc:
 			returncode = None
 		proc = Proc
-	
+
 	return proc
 #		if proc.returncode != 0:
 #			print('\tError: Failed to build executable. Return code: ' + proc.returncode)
-	
-	
+
+
 def getPathSize(aRoot):
 	"""Computes the total disk space used by the specified path.
 	Note if aRoot does not exist or is None then this will return 0"""

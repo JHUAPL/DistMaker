@@ -1,14 +1,13 @@
 package dsstore;
 
-import glum.io.IoUtil;
 import glum.task.*;
-import glum.zio.*;
+import glum.zio.stream.FileZinStream;
+import glum.zio.stream.FileZoutStream;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import dsstore.record.*;
 
@@ -46,20 +45,14 @@ public class MainApp
 	
 	public void writeStore(File aFile)
 	{
-		FileZoutStream aStream;
-		int fileMagicKey;
-
 		// Ensure we have a valid dataBuf
 		if (dataBuf == null)
 			return;
 
-		aStream = null;
-		try
+		try (FileZoutStream aStream = new FileZoutStream(aFile);)
 		{
-			aStream = new FileZoutStream(aFile);
-
 			// Write the file's MagicKey
-			fileMagicKey = 0x0001;
+			int fileMagicKey = 0x0001;
 			aStream.writeInt(fileMagicKey);
 
 			// Dump the contents of aBytBuff
@@ -69,11 +62,8 @@ public class MainApp
 		}
 		catch(IOException aExp)
 		{
-			IoUtil.forceClose(aStream);
-
 			aExp.printStackTrace();
 		}
-
 	}
 
 	/**
@@ -83,9 +73,6 @@ public class MainApp
 	 */
 	public boolean readStore(File aFile)
 	{
-		ZinStream aStream;
-		int fileSize;
-		
 		// Bail if the file is not valid
 		if (aFile.isFile() == false)
 		{
@@ -94,8 +81,7 @@ public class MainApp
 		}
 		
 		dataBuf = null;
-		aStream = null;
-		try
+		try (FileZinStream iStream = new FileZinStream(aFile))
 		{
 			byte[] byteArr;
 List<BlockDir> blockDirList;
@@ -105,17 +91,16 @@ int allocBlockOffset1, allocBlockOffset2, allocBlockSize;
 int blockCnt, tmpSize, seekDiff, dirCnt;			
 int blockAddrArr[];
 			
-			fileSize = (int)aFile.length();
-			aStream = new FileZinStream(aFile);
+			int fileSize = (int)aFile.length();
 			
 			// DS_Store magic key: 0x0001
-			fileMagicKey = aStream.readInt();
+			fileMagicKey = iStream.readInt();
 			if (fileMagicKey != 0x0001)
 				throw new IOException("Bad magic key value: " + fileMagicKey + " Expected: " + 0x0001);
 
 			// Read the rest of the contents into a bytebuffer
 			byteArr = new byte[fileSize - 4];
-			aStream.readFully(byteArr);
+			iStream.readFully(byteArr);
 			dataBuf = ByteBuffer.wrap(byteArr);
 
 			// Header block (not stored in the allocators list)
@@ -209,12 +194,10 @@ refTask.infoAppendln("Reading freelists...");
 		catch (IOException aExp)
 		{
 			aExp.printStackTrace();
-			IoUtil.forceClose(aStream);
 			return false;
 		}
 		
 		return true;
-		
 	}
 	
 	

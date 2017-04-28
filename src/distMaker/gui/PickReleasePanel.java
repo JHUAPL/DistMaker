@@ -9,7 +9,6 @@ import glum.gui.panel.itemList.StaticItemProcessor;
 import glum.gui.panel.itemList.query.*;
 import glum.unit.ConstUnitProvider;
 import glum.unit.DateUnit;
-import glum.zio.raw.ZioRaw;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -27,7 +26,7 @@ import net.miginfocom.swing.MigLayout;
 import distMaker.LookUp;
 import distMaker.node.AppRelease;
 
-public class PickReleasePanel extends GlassPanel implements ActionListener, ZioRaw, ListSelectionListener
+public class PickReleasePanel extends GlassPanel implements ActionListener, ListSelectionListener
 {
    private static final long serialVersionUID = 1L;
 

@@ -98,7 +98,7 @@ def checkForRequiredApplicationsAndExit():
 	evalPath = distutils.spawn.find_executable('jar')
 	if evalPath == None:
 		errList.append('Failed while trying to locate jar. Please install jar (typically included with Java)')
-	
+
 	genisoimagePath = distutils.spawn.find_executable('genisoimage')
 	hdiutilPath = distutils.spawn.find_executable('hdiutil')
 	if genisoimagePath == None and hdiutilPath == None:
@@ -142,7 +142,7 @@ def getClassPath(javaCodePath):
 	retList = []
 
 	# Ensure the javaCodePath has a trailing slash
-	# to allow for proper computation of clipLen 
+	# to allow for proper computation of clipLen
 	if javaCodePath.endswith('/') == False:
 		javaCodePath += '/'
 	clipLen = len(javaCodePath)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, miscUtils.handleSignal)
 
-	# Set up the argument parser	
+	# Set up the argument parser
 	parser = FancyArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@')
 	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
 	parser.add_argument('-name', help='The name of the application.')
@@ -189,6 +189,9 @@ if __name__ == "__main__":
 	parser.add_argument('-forceSingleInstance', help='Force the application to have only one instance.', default=False)
 	parser.add_argument('-digest', help='Digest used to ensure integrity of application upgrades. Default: sha256', choices=['md5', 'sha256', 'sha512'], default='sha256')
 	parser.add_argument('-enableJmx', help='Enables JMX technology on the target client. Allows one to attach jconsole, jvisualvm, or other JMX tools.', action='store_true', default=False)
+	parser.add_argument('-platform', help='Target platforms to build. Choices are: [apple, linux, windows]. Note the following (append) modifiers.'
+		+ ' Modifier \'-\' results in only the non-JRE build. Modifier \'+\' results in only the JRE build. Default: apple+, linux, windows', nargs='+', default=['apple+', 'linux', 'windows'],
+		choices=['apple', 'apple-', 'apple+', 'linux', 'linux-', 'linux+', 'windows', 'windows-', 'windows+'], metavar='PLATFORM')
 #	parser.add_argument('-bundleId', help='Apple specific id descriptor.')
 
 	# Intercept any request for a  help message and bail
@@ -200,10 +203,15 @@ if __name__ == "__main__":
 	# Check to ensure all of the required applications are installed before proceeding
 	checkForRequiredApplicationsAndExit()
 
-	# Parse the args		
+	# Parse the args
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
 #	print args
+
+	# Warn if there are not any valid targets
+	if args.platform == ['apple-']:
+		print('The only release specified is Apple without JRE. This is currently unsupported.\nExiting...')
+		exit()
 
 	# Ensure we are getting the bare minimum options
 	errList = [];
@@ -217,7 +225,7 @@ if __name__ == "__main__":
 		print('At a minimum the following must be specified: ' + str(errList) +  '.\nExiting...')
 		exit()
 
-	# Ensure the reserved 'jre' name is not utilized	
+	# Ensure the reserved 'jre' name is not utilized
 	if args.name.lower() == 'jre':
 		print('The application can not be named: {}. That name is reserved for the JRE.'.format(args.name))
 		exit()
@@ -252,7 +260,7 @@ if __name__ == "__main__":
 		else:
 			newJvmArgs.append(aJvmArg)
 	args.jvmArgs = newJvmArgs
-	
+
 	# Add the flag -Dcom.sun.management.jmxremote to allow JMX clients to attach to the Java application
 	# Add the flag -Djava.rmi.server.hostname=localhost to allow connections when using VPN. Not sure why???
 	# It appears that when the root class loader is replaced then JMX is disabled by default
@@ -305,7 +313,7 @@ if __name__ == "__main__":
 		dstPath = deltaCodePath;
 		shutil.copytree(srcPath, dstPath, symlinks=False)
 
-	# Form the app.cfg file	
+	# Form the app.cfg file
 	dstPath = os.path.join(buildPath, "delta/app.cfg")
 	miscUtils.buildAppLauncherConfig(dstPath, args)
 
