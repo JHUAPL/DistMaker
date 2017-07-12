@@ -11,7 +11,7 @@ import time
 
 # Globals
 # The default version of DistMaker
-version = '0.45'
+version = '0.46'
 
 
 def logAndPrint(message="", indent=0, showTime=False):

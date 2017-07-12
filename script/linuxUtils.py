@@ -119,7 +119,9 @@ def buildBashScript(destFile, args, jreTarGzFile):
 			jvmArgsStr += aStr + ' '
 
 	f = open(destFile, 'wb')
-	f.write('#!/bin/bash\n')
+#	f.write('#!/bin/bash\n')
+	f.write('#!/usr/bin/env bash\n')
+
 	f.write('# Do not remove the opening or closing brackets: {}. This enables safe inline\n')
 	f.write('# mutations to this script while it is running\n')
 	f.write('{    # Do not remove this bracket! \n\n')
@@ -137,8 +139,18 @@ def buildBashScript(destFile, args, jreTarGzFile):
 	else:
 		f.write('maxMem=' + maxMem + '\n\n')
 
-	f.write('# Get the instalation path\n')
-	f.write('installPath=$(readlink -f "$BASH_SOURCE")\n')
+	f.write('# Get the installation path\n')
+	f.write('# We support the Apple / Linux variants explicitly and then default back to Linux\n')
+	f.write('if [ "$(uname -s)" == "Darwin" ]; then\n')
+	f.write('  # Apple platform: We assume the coreutils package has been installed...\n')
+	f.write('  installPath=$(greadlink -f "$BASH_SOURCE")\n')
+	f.write('elif [ "$(uname -s)" == "Linux" ]; then\n')
+	f.write('  # Linux platform\n')
+	f.write('  installPath=$(readlink -f "$BASH_SOURCE")\n')
+	f.write('else\n')
+	f.write('  # Other platform: ---> Defaults back to Linux platform\n')
+	f.write('  installPath=$(readlink -f "$BASH_SOURCE")\n')
+	f.write('fi\n')
 	f.write('installPath=$(dirname "$installPath")\n\n')
 
 	f.write('# Change the working directory to the app folder in the installation path\n')
