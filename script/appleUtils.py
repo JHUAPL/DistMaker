@@ -373,13 +373,6 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 	if args.icnsFile != None:
 		icnsStr = os.path.basename(args.icnsFile)
 
-	classPathStr = '$JAVAROOT/appLauncher.jar'
-#	classPathStr = ''
-#	for aStr in args.classPath:
-#		classPathStr += '$JAVAROOT/' + aStr + ':'
-#	if len(classPathStr) > 0:
-#		classPathStr = classPathStr[0:-1]
-
 	f = open(destFile, 'wb')
 	writeln(f, 0, '<?xml version="1.0" ?>')
 #	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
@@ -400,11 +393,14 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 	tupList.append(('CFBundleVersion', args.version))
 	tupList.append(('NSHighResolutionCapable', 'true'))
 	tupList.append(('NSHumanReadableCopyright', ''))
+
 	jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
 	tupList.append(('JVMRuntime', jrePath))
 
 	tupList.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
 
+	cwdPath = os.path.join('/Applications', args.name + '.app', 'Contents', 'app')
+	tupList.append(('WorkingDirectory', cwdPath))
 
 	# Application configuration
 	for (key, val) in tupList:
@@ -413,11 +409,11 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 
 	# JVM options
 	jvmArgs = list(args.jvmArgs)
-	if any(aStr.startswith("-Dapple.laf.useScreenMenuBar") == False for aStr in jvmArgs) == True:
+	if any(aStr.startswith('-Dapple.laf.useScreenMenuBar') == False for aStr in jvmArgs) == True:
 		jvmArgs.append('-Dapple.laf.useScreenMenuBar=true')
-	if any(aStr.startswith("-Dcom.apple.macos.useScreenMenuBar") == False for aStr in jvmArgs) == True:
+	if any(aStr.startswith('-Dcom.apple.macos.useScreenMenuBar') == False for aStr in jvmArgs) == True:
 		jvmArgs.append('-Dcom.apple.macos.useScreenMenuBar=true')
-	if any(aStr.startswith("-Dcom.apple.macos.use-file-dialog-packages") == False for aStr in jvmArgs) == True:
+	if any(aStr.startswith('-Dcom.apple.macos.use-file-dialog-packages') == False for aStr in jvmArgs) == True:
 		jvmArgs.append('-Dcom.apple.macos.use-file-dialog-packages=true')
 	jvmArgs.append('-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name)
 	jvmArgs.append('-Dapple.awt.application.name=' + args.name)
@@ -431,23 +427,18 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 		writeln(f, 3, '<string>' + aStr + '</string>')
 	writeln(f, 2, '</array>')
 
-#	# App arguments
-#	writeln(f, 2, '<key>JVMArguments</key>')
-#	writeln(f, 3, '<array>')
-#	for aStr in args.appArgs:
-#		writeln(f, 4, '<string>' + args + '</string>')
-#	writeln(f, 3, '</array>')
-
-
 	# JVM configuration
 	writeln(f, 2, '<key>Java</key>')
 	writeln(f, 2, '<dict>')
 
-	tupList = []
-#	tupList.append(('JVMVersion', '1.6+'))
-#	tupList.append(('MainClass', args.mainClass))
-	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/app'))
+	classPathStr = '$JAVAROOT/appLauncher.jar'
+#	classPathStr = ''
+#	for aStr in args.classPath:
+#		classPathStr += '$JAVAROOT/' + aStr + ':'
+#	if len(classPathStr) > 0:
+#		classPathStr = classPathStr[0:-1]
 
+	tupList = []
 	tupList.append(('ClassPath', classPathStr))
 
 	for (key, val) in tupList:
