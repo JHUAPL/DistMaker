@@ -2,8 +2,6 @@
 
 from __future__ import print_function
 import argparse
-import getpass
-import math
 import os
 import platform
 import shutil
@@ -11,7 +9,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import time
 
 import distutils.spawn
 import jreUtils
@@ -36,9 +33,8 @@ def buildCatalogFile(args, deltaPath):
 	jreVerSpec = args.jreVerSpec
 	if jreVerSpec == None:
 		jreVerSpec = [jreUtils.getDefaultJreVerStr()]
-	if jreVerSpec != None:
-		record = ('jre', ",".join(jreVerSpec))
-		records.append(record)
+	record = ('jre', ",".join(jreVerSpec))
+	records.append(record)
 
 	snipLen = len(deltaPath) + 1
 #	for root, dirNames, fileNames in os.walk(deltaPath, onerror=failTracker.recordError):
@@ -138,6 +134,24 @@ def checkForSuggestedApplications():
 	return warnList
 
 
+def checkReadable(src, names):
+	"""Utility method that will ensure that all of the files formed by <src>/<aName> exist
+	and are readable. An ErrorDM will be raised if any of the files are not readable. This method
+	is passed into shutil.copytree() and provides a way to check for issues with any files that
+	are about to be accessed."""
+	for aName in names:
+		tmpFile = os.path.join(src, aName)
+		# Ensure that symbolic links are not broken
+		if os.path.islink(tmpFile) == True and os.path.exists(tmpFile) == False:
+			raise ErrorDM('Broken symbolic link: {}'.format(tmpFile))
+		# Ensure that files are readable
+		if os.path.isfile(tmpFile) == True and os.access(tmpFile, os.R_OK) == False:
+			raise ErrorDM('File is not readable: {}'.format(tmpFile))
+
+	# We actually do not do any filtering
+	return []
+
+
 def getClassPath(javaCodePath):
 	retList = []
 
@@ -161,9 +175,6 @@ def getClassPath(javaCodePath):
 
 
 if __name__ == "__main__":
-	argv = sys.argv;
-	argc = len(argv);
-
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, miscUtils.handleSignal)
 
@@ -195,10 +206,10 @@ if __name__ == "__main__":
 #	parser.add_argument('-bundleId', help='Apple specific id descriptor.')
 
 	# Intercept any request for a  help message and bail
-	for aArg in argv:
-		if aArg == '-h' or aArg == '-help':
-			parser.print_help()
-			exit()
+	argv = sys.argv;
+	if '-h' in argv or '-help' in argv:
+		parser.print_help()
+		exit()
 
 	# Check to ensure all of the required applications are installed before proceeding
 	checkForRequiredApplicationsAndExit()
@@ -206,7 +217,6 @@ if __name__ == "__main__":
 	# Parse the args
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
-#	print args
 
 	# Warn if there are not any valid targets
 	if args.platform == ['apple-']:
@@ -225,9 +235,9 @@ if __name__ == "__main__":
 		print('At a minimum the following must be specified: ' + str(errList) +  '.\nExiting...')
 		exit()
 
-	# Ensure the reserved 'jre' name is not utilized
-	if args.name.lower() == 'jre':
-		print('The application can not be named: {}. That name is reserved for the JRE.'.format(args.name))
+	# Ensure the name is not reserved: ['jre', 'launcher']
+	if args.name.lower() == 'jre' or args.name == 'launcher':
+		print('The application can not be named: {}. That name is reserved.\n'.format(args.name))
 		exit()
 
 #
@@ -241,7 +251,7 @@ if __name__ == "__main__":
 		jreUtils.validateJreVersionSpec(args.jreVerSpec)
 	except ErrorDM as aExp:
 		print('The specified jreVerVersion is invalid. Input: {}'.format(args.jreVerSpec))
-		print('  ' + aExp.message + "\n", file=sys.stderr)
+		print('  ' + aExp.message + '\n', file=sys.stderr)
 		exit()
 
 	# Form the classPath if none specified
@@ -272,7 +282,7 @@ if __name__ == "__main__":
 	# Bail if the release has already been built
 	buildPath = os.path.abspath(args.name + '-' + args.version)
 	if (os.path.exists(buildPath) == True):
-		print('   [ERROR] The release appears to be built. Path: ' + buildPath)
+		print('   [ERROR] The release appears to be built. Path: ' + buildPath + '\n')
 		exit(-1)
 
 	# Let the user know of any missing functionality
@@ -296,7 +306,7 @@ if __name__ == "__main__":
 	for aPath in args.dataCode:
 		srcPath = aPath
 		if os.path.isdir(srcPath) == False:
-			print('   [ERROR] The dataCode path does not exist. Path: ' + srcPath)
+			print('   [ERROR] The dataCode path does not exist. Path: ' + srcPath + '\n')
 			shutil.rmtree(buildPath)
 			exit(-1)
 		dstPath = os.path.join(deltaDataPath, os.path.basename(aPath))
@@ -307,11 +317,17 @@ if __name__ == "__main__":
 		# Copy the javaCode to the proper location
 		srcPath = args.javaCode
 		if os.path.isdir(srcPath) == False:
-			print('   [ERROR] The javaCode path does not exist. Path: ' + srcPath)
+			print('   [ERROR] The javaCode path does not exist. Path: ' + srcPath + '\n')
 			shutil.rmtree(buildPath)
 			exit(-1)
 		dstPath = deltaCodePath;
-		shutil.copytree(srcPath, dstPath, symlinks=False)
+		try:
+			shutil.copytree(srcPath, dstPath, symlinks=False, ignore=checkReadable)
+		except (ErrorDM, shutil.Error) as aExp:
+			print('   [ERROR] There were issues while copying the javaCode files. Path: ' + srcPath)
+			print('      {}\n'.format(aExp), file=sys.stderr)
+			shutil.rmtree(buildPath)
+			exit(-1)
 
 	# Form the app.cfg file
 	dstPath = os.path.join(buildPath, "delta/app.cfg")

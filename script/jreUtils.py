@@ -15,23 +15,35 @@ from miscUtils import ErrorDM
 # default to. Note if this variable is not specified then the latest JRE release
 # located in the appropriate <installPath>/jre directory will be utilized.
 #
-# There should be corresponding tar.gz files with the following pattern:
-#      <installpath>/jre/jre-<VERSION>-<PLATFORM>-x64.tar.gz
+# There should be corresponding tar.gz files with patterns that match one of the below:
+#     <installpath>/jre/jre-<VERSION>-<PLATFORM>-x64.tar.gz
+#     <installpath>/jre/jre-<VERSION>_<PLATFORM>-x64_bin.tar.gz
 # where PLATFORM is one of the following: apple, linux, windows
-# where VERSION  is something like: 8u73
-# For example the Linux JRE 1.8.0_73 tar.gz release would be:
-#      <installpath>/jre/jre-8u73-linux-x64.tar.gz
+# where VERSION  is something like: 8u73 or 9.0.4
+#
+# Following are valid examples of named JRE tar.gz files:
+#     The Linux JRE 1.8.0_73 tar.gz release would be:
+#         <installpath>/jre/jre-8u73-linux-x64.tar.gz
+#     The Apple JRE 9.0.4 tar.gz release would be:
+#         <installpath>/jre/jre-9.0.4_osx-x64_bin.tar.gz
 defaultVersionStr = '1.8'
 
 
 def getBasePathForJreTarGzFile(aJreTarGzFile):
 	"""Returns the JRE (base) path that should be used to access the JRE found in the specified JRE tar.gz.
 	This is needed since different JRE tar.gz files have been found to have different top level paths. Using
-	this method ensures consistency between JRE tar.gz releases after the tar.gz file is unpacked."""
+	this method ensures consistency between JRE tar.gz releases after the tar.gz file is unpacked.
+
+	Please note that legacy JREs will expand to a different path than non-legacy JREs.
+	"""
 	verArr = getJreTarGzVerArr(aJreTarGzFile);
 	if verArr == None:
 		raise  ErrorDM('File name (' + aJreTarGzFile + ') does not conform to proper JRE tar.gz name specification.')
-	basePath = 'jre' + verArrToVerStr(verArr)
+	verStr = verArrToVerStr(verArr)
+	if verStr.startswith("1.") == True:
+		basePath = 'jre' + verArrToVerStr(verArr)
+	else:
+		basePath = 'jre-' + verArrToVerStr(verArr)
 	return basePath;
 
 
@@ -45,22 +57,44 @@ def getDefaultJreVerStr():
 
 def getJreTarGzFilesForVerStr(aVerStr):
 	"""Returns the JRE tar.gz files matching the specified specific JRE version specification. This will return an empty
-	list if there is no JRE tar.gz files that is sufficient for the request. 
+	list if there is no JRE tar.gz files that is sufficient for the request.
 
-	The version must be fully qualified (must specify platform, major, minor, and update components). If it is not then
-	an ErrorDM will be raised. An example of a valid fully qualified version string is: '1.8.0_73'"""
+	aVerStr --- The version of interest. The version must be fully qualified.
+
+	Fully qualified is defined as having the following:
+	   Pre Java 9 ---> Exactly 4 fields:
+	      <A>.<B>.<C>.<D>
+	         where:
+	         A ---> Platform (always defined as 1)
+	         B ---> Major (stored in minor index)
+	         C ---> Minor version (always defined as 0)
+		      D ---> Patch
+		Java 9 or later ---> 3 fields or more
+		   <A>.<B>.<C>...
+		      where:
+		      A ---> The major version
+		      B ---> The minor version
+		      C ---> The security release
+		      ... Any extra fields are vendor specific.
+
+	An ErrorDM will be raised if the version is not fully qualified Below are examples of fully qualified fields:
+	   '1.8.0_73'
+	   '9.0.4'
+	"""
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 
 	# Retrieve the target version - and ensure it is fully qualified
 	targVer = verStrToVerArr(aVerStr)
-	if len(targVer) != 4:
+	if len(targVer) < 3:
 		raise ErrorDM('The specified version is not a fully qualified version. Version: ' + aVerStr)
+	if targVer[0] == 1 and len(targVer) != 4:
+		raise ErrorDM('Legacy JRE releases require exactly 4 elements for the release. Legacy releases refer to any release before Java 9. Version: ' + aVerStr)
 
 	# Search all the appropriate tar.gz JREs for exact matches in our JRE folder
 	retList = []
-	matchName = "jre-*-*-x64.tar.gz";
-	searchPath = os.path.join(os.path.abspath(appInstallRoot), 'jre', matchName)
+	searchName = "jre-*.tar.gz";
+	searchPath = os.path.join(os.path.abspath(appInstallRoot), 'jre', searchName)
 #	for aFile in ['jre-8u739-windows-x64.tar.gz', 'jre-8u60-windows-x64.tar.gz', 'jre-7u27-windows-x64.tar.gz']:
 	for aFile in glob.glob(searchPath):
 		# Ensure that the aFile's JVM version is an exact match of targVer
@@ -74,19 +108,24 @@ def getJreTarGzFilesForVerStr(aVerStr):
 
 
 def getJreTarGzFile(aPlatform, aJvmVerSpec):
-	"""Returns the JRE tar.gz file for the appropriate platform and JRE release. If there are several possible 
-	matches then the tar.gz with the latest version will be returned. 
+	"""Returns the JRE tar.gz file for the appropriate platform and JRE release. If there are several possible
+	matches then the tar.gz with the latest version will be returned.
 
-	This will return None if there is no file that is sufficient for the request. Note if you do not care about 
+	aPlatform   --- The platform of the JRE tar.gz file of interest. Platform will typically be one of: 'apple',
+	               'linux', 'windows'
+	aJvmVerSpec --- A list of 1 or 2 items that define the range of JRE versions you are interested in. If the
+	                list has just one item then that version will be used as the minimum version.
+
+	Method will return None if there is no file that is sufficient for the request. Note if you do not care about
 	any specific update for a major version of JAVA then just specify the major version. Example '1.8' instead of
 	1.8.0_73'"""
+	# Transform a single string to a list of size 1
+	if isinstance(aJvmVerSpec, basestring):
+		aJvmVerSpec = [aJvmVerSpec]
+
+	# Retrieve the application installation location
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
-
-	# Normalize aPlotform to the proper string
-	platStr = aPlatform.lower()
-	if platStr == 'apple':
-		platStr = 'macosx'
 
 	# Retrieve the min and max JVM versions from aJvmVerSpec
 	minJvmVer = None
@@ -95,20 +134,28 @@ def getJreTarGzFile(aPlatform, aJvmVerSpec):
 	maxJvmVer = None
 	if aJvmVerSpec != None and len(aJvmVerSpec) == 2:
 		maxJvmVer = verStrToVerArr(aJvmVerSpec[1])
+	if aJvmVerSpec != None and len(aJvmVerSpec) > 2:
+		errorMsg = 'At most only 2 elements are allowed. Number of elements specified: {}'.format(aJvmVerSpec)
+		raise ValueError(errorMsg)
 
 	# Search all the appropriate tar.gz JREs for the best match from our JRE folder
+	aPlatform = aPlatform.lower()
 	matchList = []
-	searchName = "jre-*-" + platStr + "-x64.tar.gz";
+	searchName = "jre-*.tar.gz";
 	searchPath = os.path.join(os.path.abspath(appInstallRoot), 'jre', searchName)
-#	for file in ['jre-8u739-windows-x64.tar.gz', 'jre-8u60-windows-x64.tar.gz', 'jre-7u27-windows-x64.tar.gz']:
-	for file in glob.glob(searchPath):
+	for aFile in glob.glob(searchPath):
+		# Retrieve the platform and skip to next if it is not a match
+		platStr = getPlatformForJreTarGzFile(aFile)
+		if platStr != aPlatform:
+			continue
+
 		# Ensure that the file's JVM version is in range of minJvmVer and maxJvmVer
-		tmpVer = getJreTarGzVerArr(file)
+		tmpVer = getJreTarGzVerArr(aFile)
 		if minJvmVer != None and isVerAfterAB(minJvmVer, tmpVer) == True:
 			continue
 		if maxJvmVer != None and isVerAfterAB(tmpVer, maxJvmVer) == True:
 			continue
-		matchList.append(file);
+		matchList.append(aFile);
 
 	# Determine the best match of all the matches
 	bestMatch = None
@@ -134,35 +181,76 @@ def getJreTarGzFile(aPlatform, aJvmVerSpec):
 
 def getJreTarGzVerArr(aFile):
 	"""Returns the version corresponding to the passed in JRE tar.gz file.
-	The returned value will be a list consisting of the (platform, major, minor, update) integer components of the version.
-	 
-	 The file naming convention is expected to be:
-	jre-<B>u<D>-*.tar.gz
-	where:
-		B ---> The major version
-		D ---> The update version
-	Note that the platform version <A> will be assumed to be: 1 
-	Note that the minor version <C> will be assumed to be: 0
-	"""
-	# Retrieve the version component of the fileName
-	fileName = os.path.basename(aFile)
-	idx = fileName[4:].find('-')
-	if idx == -1:
-		return None
-	verStr = fileName[4: 4 + idx]
-	if len(verStr) == 0:
-		return None
-#	print('verStr: ' + verStr)
+	The returned value will be a list consisting of intergers defining the version associated with the
+	tar.gz file.
+	See the following references:
+	   https://docs.oracle.com/javase/9/migrate/#GUID-3A71ECEF-5FC5-46FE-9BA9-88CBFCE828CB
+	   http://openjdk.java.net/jeps/223
 
-	# Determine the version based on the pattern '<A>u<B>' where:
-	# if there is no <B> component then just assume 0 for minor version
-	tokenArr = verStr.split('u')
-	retVerArr = [1, int(tokenArr[0]), 0]
-	if len(retVerArr) == 1:
-		retVerArr.append(0)
+	The file naming convention is expected to follow the standard:
+	   jre-<Version>-<Platform>.tar.gz
+	   where <Version> can be:
+	      Pre Java 9:
+	         <B>u<D>
+	         where:
+	            B ---> The major version (stored in minor index)
+		         D ---> The update version (stored as the security)
+		         - Note the major version will be assumed to be: 1
+		   Java 9 or later:
+		      <A>.<B>.<C>.<D>
+		         A ---> The major version
+		         B ---> The minor version
+		         C ---> The security release
+	"""
+	# Retrieve the base file name of the path
+	fileName = os.path.basename(aFile)
+
+	# Tokenize the filename by spliting along chars: '_', '-'
+	compL = re.split('[_-]', fileName)
+	if len(compL) < 3:
+		return None
+#		raise Error('Failed to tokenize the file name: ' + fileName)
+
+	# The version string should be the second item
+	verStr = compL[1]
+
+	# Retrieve the version component of the fileName
+	# Based on the old naming convention - prior to Java 9
+	if verStr.find('u') != -1:
+		# Determine the version based on the pattern '<A>u<B>' where:
+		# if there is no <B> component then just assume 0 for minor version
+		tokenL = verStr.split('u')
+		retVerL = [1, int(tokenL[0]), 0]
+		if len(tokenL) == 1:
+			retVerL.append(0)
+		else:
+			retVerL.append(int(tokenL[1]))
+		return retVerL
+
+	# Retrieve the version component of the fileName
+	# Based on the new naming convention - Java 9 and later
 	else:
-		retVerArr.append(int(tokenArr[1]))
-	return retVerArr
+		retVerL = [int(aVal) for aVal in verStr.split('.')]
+		return retVerL
+
+
+def getPlatformForJreTarGzFile(aFile):
+	"""Returns a string representing the platform of the specified JRE file. The platform is computed by evaluating the name of the
+	JRE tar.gz file. The returned values will be in lowercase. Currently the known returned values are one of the following: (apple,
+	linux, windows). These returned values should correspond to x86-64 JRE releases. On failure None will be returned.
+	"""
+	# Tokenize the filename by spliting along chars: '_', '-'
+	fileName = os.path.basename(aFile)
+	compL = re.split('[_-]', fileName)
+	if len(compL) != 4 and len(compL) != 5:
+		return None
+
+	# The platform component is stored in the 3rd token. Any string matching osx or macosx will be transformed to apple
+	platStr = compL[2].lower()
+	if platStr == 'osx' or platStr == 'macosx':
+		platStr = 'apple'
+
+	return platStr;
 
 
 def normalizeJvmVerStr(aVerStr):
@@ -172,6 +260,7 @@ def normalizeJvmVerStr(aVerStr):
 	1.8      ---> 1.8
 	1.8.0.73 ---> 1.8.0_73
 	1.7.0_55 ---> 1.7.0_55
+	9.0.4    ---> 9.0.4
 	"""
 	verArr = verStrToVerArr(aVerStr)
 	retVerStr = verArrToVerStr(verArr)
@@ -179,7 +268,7 @@ def normalizeJvmVerStr(aVerStr):
 
 
 def unpackAndRenameToStandard(aJreTarGzFile, aDestPath):
-	"""Method that will unpack the specified JRE tar.gz into the folder aDestPath. The unpacked JRE folder will also 
+	"""Method that will unpack the specified JRE tar.gz into the folder aDestPath. The unpacked JRE folder will also
 	be renamed to a standard convention: jre<A>.<B> where
 		A: represents the major (classical) version
 		B: represents the minor version
@@ -252,29 +341,31 @@ def verStrToVerArr(aVerStr):
 	'1.7.0     ---> [1, 7, 0]
 	'1.8'      ---> [1, 8]
 	'1.8.0_73' ---> [1, 8, 0, 73]"""
-	verStrArr = re.compile("[._]").split(aVerStr)
+	verStrL = re.compile("[._]").split(aVerStr)
 	# Transform from string list to integer list
 	try:
-		retVerArr = [int(val) for val in verStrArr]
+		retVerL = [int(val) for val in verStrL]
 	except:
 		raise ErrorDM('Invalid JVM version: ' + aVerStr)
-	return retVerArr
+	return retVerL
 
 
-def verArrToVerStr(aVerArr):
+def verArrToVerStr(aVerL):
 	"""Utility method to convert an integral version (list) to the equivalent jvm version string. If the specified version is not a valid jvm version
-	then an ErrorDM will be raised. Each component in the list must be integral. Note typical versions follow this pattern: <langVer>.<majVer>.<minVer>_<upVer>
-	Thus the following will get transformed to:
-	[1, 7, 0]     ---> '1.7.0' 
-	[1, 8]        ---> '1.8' 
-	[1, 8, 0, 73] ---> '1.8.0_73'"""
+	then an ErrorDM will be raised. Each component in the list must be integral.
+	Note that as of Java 9 the version scheme has changed. Below defines the version scheme
+	    Prior to Java 9: <language>.<major>.<minor>_<update> to <majVer>.<minVer>.<s>
+	   Java 9 and later: <major>.<minor>.<security>.<patch>
+	[1, 8]        ---> '1.8'
+	[1, 8, 0, 73] ---> '1.8.0_73'
+	[9, 0, 4]     ---> '9.0.4'"""
 	# Transform from integer list to string
-	if len(aVerArr) <= 3:
-		retVerStr = ".".join(str(x) for x in aVerArr)
+	if len(aVerL) <= 3:
+		retVerStr = ".".join(str(x) for x in aVerL)
 		return retVerStr
 	else:
-		retVerStr = ".".join(str(x) for x in aVerArr[0:3])
-		retVerStr += '_' + ".".join(str(x) for x in aVerArr[3:])
+		retVerStr = ".".join(str(x) for x in aVerL[0:3])
+		retVerStr += '_' + ".".join(str(x) for x in aVerL[3:])
 		return retVerStr
 
 

@@ -13,25 +13,28 @@ def getDistInfo(distPath):
 	appName = None
 	version = None
 	buildDate = None
+	isLegacyJre = None
 
+	# Process the app.cfg file
 	cfgFile = os.path.join(distPath, 'delta', 'app.cfg')
 	if os.path.isfile(cfgFile) == False:
 		print('Distribution corresponding to the folder: ' + distPath + ' does not appear to be valid!')
+		print('File does not exist: ' + cfgFile)
 		print('Release will not be deployed...')
 		exit()
 
 	exeMode = None
 	f = open(cfgFile, 'r')
-	for line in f:
-		line = line[:-1]
-		if line.startswith('-') == True:
-			exeMode = line;
-		elif exeMode == '-name' and len(line) > 0:
-			appName = line
-		elif exeMode == '-version' and len(line) > 0:
-			version = line
-		elif exeMode == '-buildDate' and len(line) > 0:
-			buildDate = line
+	for aLine in f:
+		aLine = aLine[:-1]
+		if aLine.startswith('-') == True:
+			exeMode = aLine;
+		elif exeMode == '-name' and len(aLine) > 0:
+			appName = aLine
+		elif exeMode == '-version' and len(aLine) > 0:
+			version = aLine
+		elif exeMode == '-buildDate' and len(aLine) > 0:
+			buildDate = aLine
 	f.close()
 
 	if appName == None or version == None or buildDate == None:
@@ -40,7 +43,32 @@ def getDistInfo(distPath):
 		print('Release will not be made for app ' + appName)
 		exit()
 
-	return (appName, version, buildDate)
+	# Process the catalog.txt file
+	catFile = os.path.join(distPath, 'delta', 'catalog.txt')
+	if os.path.isfile(catFile) == False:
+		print('Distribution corresponding to the folder: ' + distPath + ' does not appear to be valid!')
+		print('File does not exist: ' + catFile)
+		print('Release will not be deployed...')
+		exit()
+
+	f = open(catFile, 'r')
+	for aLine in f:
+		aLine = aLine[:-1]
+		tokenL = aLine.split(',')
+		# Check to see if legacy JREs are allowed
+		if len(tokenL) >= 2 and tokenL[0] == 'jre' and isLegacyJre == None:
+			isLegacyJre = False
+			if tokenL[1].strip().startswith('1.') == True:
+				isLegacyJre = True
+	f.close()
+
+	if isLegacyJre == None:
+		print('Distribution corresponding to the folder: ' + distPath + ' does not appear to be valid!')
+		print('The catalog file, ' + catFile + ', is not valid.')
+		print('Release will not be made for app ' + appName)
+		exit()
+
+	return (appName, version, buildDate, isLegacyJre)
 
 
 def handleSignal(signal, frame):
@@ -49,29 +77,81 @@ def handleSignal(signal, frame):
 		sys.exit(0)
 
 
-def addReleaseInfo(installPath, appName, version, buildDate):
-	verFile = os.path.join(installPath, 'releaseInfo.txt')
+def addReleaseInfo(deployPath, appName, version, buildDate, isLegacyJre):
+	# Determine if this Application was deployed with a a legacy DistMaker release
+	legacyReleaseL = []
+	isLegacyRelease = False
+	verFile = os.path.join(deployPath, 'releaseInfo.txt')
+	if os.path.isfile(verFile) == True:
+		# Read the legacy releases
+		f = open(verFile, 'r')
+		for aLine in f:
+			aLine = aLine[:-1]
+			# Ignore empty lines and comments
+			if len(aLine) == 0:
+				continue
+			if aLine.startswith('#') == True:
+				continue
 
-	# Create the release info file
-	if os.path.isfile(verFile) == False:
-		f = open(verFile, 'w')
-		f.write('name' + ',' + appName + '\n')
+			tokenL = aLine.split(',')
+			if len(tokenL) >= 2 and tokenL[0] == 'name':
+				isLegacyRelease = True
+				continue
+
+			# Ignore legacy exit instructions
+			if len(tokenL) >= 1 and tokenL[0] == 'exit':
+				continue
+
+			# Record all legacy releases
+			if len(tokenL) == 2:
+				legacyReleaseL += [(tokenL[0], tokenL[1])]
+				continue
 		f.close()
 
-	# Updated the release info file
-	f = open(verFile, 'a')
-	f.write(version + ',' + buildDate + '\n')
+	# Create the appCatalog.txt file
+	catFile = os.path.join(deployPath, 'appCatalog.txt')
+	if os.path.isfile(catFile) == False:
+		if isLegacyRelease == True and len(legacyReleaseL) > 0:
+			f = open(catFile, 'w')
+			f.write('name' + ',' + appName + '\n\n')
+			# Copy the legacy releases
+			for (aLegacyVer, aLegacyDate) in legacyReleaseL:
+				f.write('R,{},{}\n'.format(aLegacyVer, aLegacyDate))
+				f.write('info,msg,This is a legacy release.\n')
+				f.write('info,msg,\n')
+				if isLegacyJre == True:
+					f.write('info,msg,Downgrading to this version may require a mandatory upgrade (ver: ' + version + ') before further upgrades are allowed.\n\n')
+				else:
+					f.write('# A release should be made using a legacy JRE (1.8+) and this DistMaker release. The release notes will need to be manually.\n')
+					f.write('info,msg,Downgrading to this version will require a mandatory 2-step upgrade in order to use releases made with non legacy JREs.\n\n')
+			f.close()
+			os.chmod(catFile, 0o644)
+		else:
+			# Form the default (empty) appCatalog.txt
+			f = open(catFile, 'w')
+			f.write('name' + ',' + appName + '\n\n')
+			f.close()
+			os.chmod(catFile, 0o644)
+
+	# Updated the appCatalog.txt info file
+	f = open(catFile, 'a')
+	f.write('R,{},{}\n'.format(version, buildDate))
+	f.write('info,msg,There are no release notes available.\n\n')
 	f.close()
 
+	# Update the (legacy) releaseInfo.txt file
+	if isLegacyRelease == True and isLegacyJre == True:
+		f = open(verFile, 'a')
+		f.write(version + ',' + buildDate + '\n')
+		f.close()
 
-def delReleaseInfo(installPath, appName, version, buildDate):
-	verFile = os.path.join(installPath, 'releaseInfo.txt')
+
+def delReleaseInfoLegacy(deployPath, appName, version, buildDate):
+	verFile = os.path.join(deployPath, 'releaseInfo.txt')
 
 	# Bail if the release info file does not exist
 	if os.path.isfile(verFile) == False:
-		print('Failed to locate deployment release info file: ' + verFile)
-		print('Aborting removal action for version: ' + version)
-		exit()
+		return;
 
 	# Read the file
 	releaseInfo = []
@@ -93,10 +173,55 @@ def delReleaseInfo(installPath, appName, version, buildDate):
 	f.close()
 
 
-def addRelease(appName, version, buildDate):
+def delReleaseInfo(deployPath, appName, version, buildDate):
+	# Remove any legacy releases
+	delReleaseInfoLegacy(deployPath, appName, version, buildDate)
+
+	catFile = os.path.join(deployPath, 'appCatalog.txt')
+
+	# Bail if the appCatalog.txt file does not exist
+	if os.path.isfile(catFile) == False:
+		print('Failed to locate deployment appCatalog file: ' + catFile)
+		print('Aborting removal action for version: ' + version)
+		exit()
+
+	# Read the file (and skip over all lines found after the release we are searching for)
+	isDeleteMode = False
+	passLineL = []
+	f = open(catFile, 'r')
+	for aLine in f:
+		aLine = aLine[:-1]
+		tokenL = aLine.split(',', 1);
+		# Determine when to enter / exit isDeleteMode
+		if len(tokenL) == 3 and tokenL[0] == 'R' and tokenL[1] == version:
+			# By not adding the current record to the releaseInfo list, we are effectively removing the record
+			isDeleteMode = True
+			print('Removing release record from info file. Version: ' + version)
+		# We exit deleteMode when see a different release or exit instruction
+		elif len(tokenL) == 3 and tokenL[0] == 'R' and tokenL[1] != version:
+			isDeleteMode = False
+		elif len(tokenL) >= 1 and tokenL[0] == 'exit':
+			isDeleteMode = False
+
+		# Skip to next if we are in deleteMode
+		if isDeleteMode == True:
+			continue
+
+		# Save off all lines when we are not in delete mode
+		passLineL += aLine
+	f.close()
+
+	# Write the updated file
+	f = open(verFile, 'w')
+	for aLine in passLineL:
+		f.write(aLine + '\n')
+	f.close()
+
+
+def addRelease(appName, version, buildDate, isLegacyJre):
 	# Check to see if the deployed location already exists
-	installPath = os.path.join(rootPath, appName)
-	if os.path.isdir(installPath) == False:
+	deployPath = os.path.join(rootPath, appName)
+	if os.path.isdir(deployPath) == False:
 		print('Application ' + appName + ' has never been deployed to the root location: ' + args.deployRoot)
 		print('Create a new release of the application at the specified location?')
 		input = raw_input('--> ').upper()
@@ -105,10 +230,10 @@ def addRelease(appName, version, buildDate):
 			exit()
 
 		# Build the deployed location
-		os.makedirs(installPath)
+		os.makedirs(deployPath, 0o755)
 
 	# Check to see if the deploy version already exists
-	versionPath = os.path.join(installPath, version)
+	versionPath = os.path.join(deployPath, version)
 	if os.path.isdir(versionPath) == True:
 		print('Application ' + appName + ' with version, ' + version + ', has already been deployed.')
 		print('Release will not be made for app ' + appName)
@@ -123,22 +248,23 @@ def addRelease(appName, version, buildDate):
 			os.chmod(os.path.join(root, d), 0o755)
 		for f in files:
 			os.chmod(os.path.join(root, f), 0o644)
+	os.chmod(versionPath, 0o755)
 
 	# Update the version info
-	addReleaseInfo(installPath, appName, version, buildDate)
+	addReleaseInfo(deployPath, appName, version, buildDate, isLegacyJre)
 	print('Application {} ({}) has been deployed to location: {}'.format(appName, version, args.deployRoot))
 
 
 def delRelease(appName, version, buildDate):
 	# Check to see if the deployed location already exists
-	installPath = os.path.join(rootPath, appName)
-	if os.path.isdir(installPath) == False:
+	deployPath = os.path.join(rootPath, appName)
+	if os.path.isdir(deployPath) == False:
 		print('Application ' + appName + ' has never been deployed to the root location: ' + args.deployRoot)
 		print('There are no releases to remove. ')
 		exit()
 
 	# Check to see if the deploy version already exists
-	versionPath = os.path.join(installPath, version)
+	versionPath = os.path.join(deployPath, version)
 	if os.path.isdir(versionPath) == False:
 		print('Application ' + appName + ' with version, ' + version + ', has not been deployed.')
 		print('Release will not be removed for app ' + appName)
@@ -148,13 +274,10 @@ def delRelease(appName, version, buildDate):
 	shutil.rmtree(versionPath)
 
 	# Update the version info
-	delReleaseInfo(installPath, appName, version, buildDate)
+	delReleaseInfo(deployPath, appName, version, buildDate)
 
 
 if __name__ == "__main__":
-	argv = sys.argv;
-	argc = len(argv);
-
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, handleSignal)
 
@@ -170,10 +293,10 @@ if __name__ == "__main__":
 	parser.add_argument('distLoc', nargs='?', default=scriptPath, help='The location of the distribution to deploy.')
 
 	# Intercept any request for a  help message and bail
-	for aArg in argv:
-		if aArg == '-h' or aArg == '-help':
-			parser.print_help()
-			exit()
+	argv = sys.argv;
+	if '-h' in argv or '-help' in argv:
+		parser.print_help()
+		exit()
 
 	# Parse the args
 	parser.formatter_class.max_help_position = 50
@@ -189,11 +312,11 @@ if __name__ == "__main__":
 		exit()
 
 	# Determine the appName, version, and buildDate of the distribution
-	(appName, version, buildDate) = getDistInfo(distPath)
+	(appName, version, buildDate, isLegacyJre) = getDistInfo(distPath)
 
 	# Uninstall the app, if remove argument is specified
 	if args.remove == True:
 		delRelease(appName, version, buildDate)
 	else:
-		addRelease(appName, version, buildDate)
+		addRelease(appName, version, buildDate, isLegacyJre)
 
