@@ -1,30 +1,14 @@
 #! /usr/bin/env python
 
-import fnmatch
+import argparse
 import glob
 import os
-import subprocess
 import shutil
 import signal
+import subprocess
 import sys
-import time
 
-# Globals
-# The default version of DistMaker
-version = '0.47'
-
-
-def logAndPrint(message="", indent=0, showTime=False):
-	while indent > 0:
-		indent -= 1
-		message = '   ' + message
-	if showTime == True:
-		message = '[' + getCurrTimeStr() + '] ' + message;
-# 	logging.info(message)
-	print(message)
-
-
-def buildRelease(version, doNotClean=False):
+def getDistMakerVersion():
 	# Retrieve the install path
 	installPath = getInstallRoot()
 	installPath = os.path.dirname(installPath)
@@ -32,15 +16,38 @@ def buildRelease(version, doNotClean=False):
 	# Check for distMaker.jar library prerequisite
 	testPath = os.path.join(installPath, 'lib', 'distMaker.jar')
 	if os.path.exists(testPath) == False:
-		logAndPrint('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
-		logAndPrint('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		errPrintln('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
+		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
 		exit(-1)
+
+	try:
+		exeCmd = ['java', '-cp', 'lib/distMaker.jar', 'distMaker.DistApp', '--version']
+		output = subprocess.check_output(exeCmd).decode('utf-8')
+		version = output.split()[1]
+		return version
+	except:
+		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		exit(-1)
+
+
+def errPrintln(message="", indent=0):
+	"""Print the specified string with a trailing newline to stderr."""
+	while indent > 0:
+		indent -= 1
+		message = '   ' + message
+	sys.stderr.write(message + '\n')
+
+
+def buildRelease(version, doNotClean=False):
+	# Retrieve the install path
+	installPath = getInstallRoot()
+	installPath = os.path.dirname(installPath)
 
 	# Check for static jre prerequisites
 	isPass = os.path.exists(os.path.join(installPath, 'jre'))
 	if isPass == False:
-		logAndPrint('Aborting DistMaker release build. The jre path is not properly configured.', indent=1)
-		logAndPrint('Please setup the jre path properly. A quick fix is to copy the jre tree from a previous release of DistMaker.', indent=1)
+		errPrintln('Aborting DistMaker release build. The jre path is not properly configured.', indent=1)
+		errPrintln('Please setup the jre path properly. A quick fix is to copy the jre tree from a previous release of DistMaker.', indent=1)
 		exit(-1)
 
 	# Determine the workPath
@@ -49,12 +56,12 @@ def buildRelease(version, doNotClean=False):
 
 	# Bail if the work folder for which we compose the release already exists
 	if os.path.exists(workPath) == True:
-		logAndPrint('Aborting DistMaker release build. Release folder already exists: ' + workPath, indent=1)
+		errPrintln('Aborting DistMaker release build. Release folder already exists: ' + workPath, indent=1)
 		exit(-1)
 
 	# Bail if the release already exists
 	if os.path.exists(destFileGZ) == True:
-		logAndPrint('Aborting DistMaker release build. Release already exists. File: ' + destFileGZ, indent=1)
+		errPrintln('Aborting DistMaker release build. Release already exists. File: ' + destFileGZ, indent=1)
 		exit(-1)
 
 	# Laydown the structure, and let the user know of the version we are building
@@ -113,16 +120,6 @@ def getInstallRoot():
 	return installRoot
 
 
-def printUsage():
-	scriptName = os.path.split(sys.argv[0])[1]
-	print(scriptName + ' [-help,-doNotClean,-full],[-version <aVersion>]')
-	print('      -help:       Show this help message and exit.')
-	print('      -version:    Version to build. Default is: ' + version)
-	print('      -doNotClean: Do NOT remove temporary work folder created while generating release.')
-	print('      -full:       Force a full build of the main jar file. (Unsupported action)')
-	exit(-1)
-
-
 def handleSignal(signal, frame):
 		"""Signal handler, typically used to capture ctrl-c."""
 		print('User aborted processing!')
@@ -130,43 +127,31 @@ def handleSignal(signal, frame):
 
 
 if __name__ == "__main__":
-	argv = sys.argv
-	argc = len(argv)
-
-	# Intercept any request for a  help message and bail
-	for aArg in argv:
-		if aArg == '-h' or aArg == '-help':
-			printUsage()
-			exit()
-
-	doFullBuild = False
-	doNotClean = False
-	skipNext = False;
-	for currIdx in xrange(1, len(argv)):
-		aArg = argv[currIdx]
-		if skipNext == True:
-			skipNext = False
-			continue
-		if aArg == '-full':
-			doFullBuild = True
-		elif aArg == '-doNotClean':
-			doNotClean = True
-		elif aArg == '-version':
-			if currIdx == argc - 1:
-				print('\tPlease specify an actual version when using -version')
-				exit(-1)
-			else:
-				version = argv[currIdx + 1]
-				skipNext = True
-		else:
-			print('   Unrecognized argument: ' + aArg)
-			printUsage()
-
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, handleSignal)
 
-	# TODO: Finish this functionality
-	if doFullBuild == True:
-		print("Unsupported action: [-full]. Skipping...")
+	tmpDescr = 'Utility to build a DistMaker release\n'
+	parser = argparse.ArgumentParser(prefix_chars='-', description=tmpDescr, add_help=False, fromfile_prefix_chars='@')
+	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
+	parser.add_argument('-doNotClean', default=False, action='store_true', help='Do NOT remove temporary work folder created while generating release.')
+	parser.add_argument('-doFullBuild', default=False, action='store_true', help='Force a full build of the main jar file. (Unsupported action)')
 
-	buildRelease(version, doNotClean)
+	# Intercept any request for a  help message and bail
+	argv = sys.argv;
+	if '-h' in argv or '-help' in argv:
+		parser.print_help()
+		exit()
+
+	# Parse the args
+	parser.formatter_class.max_help_position = 50
+	args = parser.parse_args()
+
+	# Get the version of DistMaker we are building
+	version = getDistMakerVersion()
+	print('DistMaker version: ' + version)
+
+	# TODO: Finish this functionality
+	if args.doFullBuild == True:
+		print("Unsupported action: [-doFullBuild]. Skipping...")
+
+	buildRelease(version, args.doNotClean)

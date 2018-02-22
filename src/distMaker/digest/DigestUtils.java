@@ -3,7 +3,7 @@ package distMaker.digest;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
+import com.google.common.io.BaseEncoding;
 
 /**
  * Collection of utility methods to ease working with the MessageDigest and associated classes.
@@ -44,24 +44,24 @@ public class DigestUtils
 	}
 
 	/**
-	 * Utility method that returns the hex string corresponding to the byte array.
+	 * Utility method that returns the (lower case) hex string corresponding to the byte array.
+	 * <P>
+	 * Delegates to {@link BaseEncoding.base16().lowerCase().encode(CharSequence)}
 	 */
 	public static String byteArr2HexStr(byte[] aByteArr)
 	{
-		String retStr;
-
-		retStr = (new HexBinaryAdapter()).marshal(aByteArr).toLowerCase();
+		String retStr = BaseEncoding.base16().lowerCase().encode(aByteArr);
 		return retStr;
 	}
 
 	/**
 	 * Utility method that returns a byte array corresponding to the hex string.
+	 * <P>
+	 * Delegates to {@link BaseEncoding.base16().lowerCase().decode(CharSequence)}
 	 */
 	public static byte[] hexStr2ByteArr(String aHexStr)
 	{
-		byte[] retArr;
-
-		retArr = (new HexBinaryAdapter()).unmarshal(aHexStr);
+		byte[] retArr = BaseEncoding.base16().lowerCase().decode(aHexStr);
 		return retArr;
 	}
 

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import distMaker.*;
+import distMaker.jre.JreUtils;
 import distMaker.jre.JreVersion;
 
 public class LinuxUtils
@@ -15,8 +16,8 @@ public class LinuxUtils
 	 * <P>
 	 * If there are multiple launch scripts then this method may grab the wrong file and fail.
 	 * <P>
-	 * TODO: In the future the launch script should pass itself as an argument to the JVM and DistMaker should keep track of that. If the script is significantly
-	 * manipulated from the original the launch file may be improperly detected.
+	 * TODO: In the future the launch script should pass itself as an argument to the JVM and DistMaker should keep track
+	 * of that. If the script is significantly manipulated from the original the launch file may be improperly detected.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
@@ -45,7 +46,7 @@ public class LinuxUtils
 		if (retFile.isFile() == false)
 			throw new ErrorDM("The script file is NOT a regular file.");
 
-		// Ensure the file is executable. If this is really the script file used to launch us then it should be executable!
+		// Ensure the file is executable. If this is the script file used to launch us then it should be executable!
 		if (Files.isExecutable(retFile.toPath()) == false)
 			throw new ErrorDM("The script file is NOT executable.");
 
@@ -107,7 +108,7 @@ public class LinuxUtils
 
 		// Update the script
 		if (targLineNum != -1)
-			inputList.set(targLineNum, "javaExe=../jre" + aJreVersion.getLabel() + "/bin/java");
+			inputList.set(targLineNum, "javaExe=../" + JreUtils.getExpandJrePath(aJreVersion) + "/bin/java");
 		else
 			throw new ErrorDM("[" + aScriptFile + "] The script does not specify 'javaExe'.");
 
@@ -118,11 +119,11 @@ public class LinuxUtils
 	/**
 	 * Utility method to update the specified maxMem var in the script (aFile) to the requested number of bytes.
 	 * <P>
-	 * Note this method assumes the specified file is a shell script built by DistMaker where the var maxMem holds the proper (right side) specification for the
-	 * JVM's -Xmx value.
+	 * Note this method assumes the specified file is a shell script built by DistMaker where the var maxMem holds the
+	 * proper (right side) specification for the JVM's -Xmx value.
 	 * <P>
-	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method will (silently) fail to configure the
-	 * value needed to launch the JVM.
+	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method
+	 * will (silently) fail to configure the value needed to launch the JVM.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
@@ -135,11 +136,11 @@ public class LinuxUtils
 	/**
 	 * Utility method to update the specified maxMem var in the script (aFile) to the requested number of bytes.
 	 * <P>
-	 * Note this method assumes the specified file is a shell script built by DistMaker where the var maxMem holds the proper (right side) specification for the
-	 * JVM's -Xmx value.
+	 * Note this method assumes the specified file is a shell script built by DistMaker where the var maxMem holds the
+	 * proper (right side) specification for the JVM's -Xmx value.
 	 * <P>
-	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method will (silently) fail to configure the
-	 * value needed to launch the JVM.
+	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method
+	 * will (silently) fail to configure the value needed to launch the JVM.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */

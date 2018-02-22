@@ -84,7 +84,7 @@ public final class DeployUtils {
 		
 		updateButton.addActionListener(new ActionListener() {
 			@Override
-			public void actionPerformed(@SuppressWarnings("unused") ActionEvent e)
+			public void actionPerformed(ActionEvent e)
 			{
 				UpdateCheckListener listener = new UpdateCheckListener() {
 					@Override
@@ -105,7 +105,7 @@ public final class DeployUtils {
 		
 		configureMemoryButton.addActionListener(new ActionListener() {
 			@Override
-			public void actionPerformed(@SuppressWarnings("unused") ActionEvent e)
+			public void actionPerformed(ActionEvent e)
 			{
 				if(DistUtils.isDevelopersEnvironment()) {
 					JOptionPane.showMessageDialog(parentFrame, "Cannot configure memory in a developer environment.");

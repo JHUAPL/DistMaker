@@ -11,12 +11,19 @@ public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 	private final String appName;
 	private final String version;
 	private final long buildTime;
+	private final String infoMsg;
 
-	public AppRelease(String aAppName, String aVersion, long aBuildTime)
+	public AppRelease(String aAppName, String aVersion, long aBuildTime, String aInfoMsg)
 	{
 		appName = aAppName;
 		version = aVersion;
 		buildTime = aBuildTime;
+		infoMsg = aInfoMsg;
+	}
+	
+	public AppRelease(String aAppName, String aVersion, long aBuildTime)
+	{
+		this(aAppName, aVersion, aBuildTime, null);
 	}
 
 	/**
@@ -41,6 +48,16 @@ public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 	public long getBuildTime()
 	{
 		return buildTime;
+	}
+	
+	/**
+	 * Returns the info message associated with this release.
+	 * <P>
+	 * Returns null if no infoMsg has been specified.
+	 */
+	public String getInfoMsg()
+	{
+		return infoMsg;
 	}
 
 	@Override

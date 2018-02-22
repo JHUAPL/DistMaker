@@ -34,7 +34,7 @@ public class MiscUtils
 	 */
 	public static String convertUnixModeToStr(int aMode)
 	{
-		char permArr[] = { 'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x' };
+		char permArr[] = {'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x'};
 
 		for (int c1 = 8; c1 >= 0; c1--)
 		{
@@ -87,7 +87,8 @@ public class MiscUtils
 	/**
 	 * Helper method that prints the exception of ErrorDM in an intelligent fashion to the specified task.
 	 * <P>
-	 * All ErrorDM exceptions (and their causes) will be printed. If the cause is not of type ErrorDM then the stack trace will be printed as well.
+	 * All ErrorDM exceptions (and their causes) will be printed. If the cause is not of type ErrorDM then the stack
+	 * trace will be printed as well.
 	 */
 	public static void printErrorDM(Task aTask, ErrorDM aErrorDM, int numTabs)
 	{
@@ -123,16 +124,15 @@ public class MiscUtils
 	 * Source based off of:<BR>
 	 * http://stackoverflow.com/questions/315618/how-do-i-extract-a-tar-file-in-java/7556307#7556307
 	 * <P>
-	 * 
-	 * The output file is created in the output folder, having the same name as the input file, minus the '.tar' extension.
+	 * The output file is created in the output folder, having the same name as the input file, minus the '.tar'
+	 * extension.
 	 * 
 	 * @param inputFile
-	 *           the input .tar file
+	 *        the input .tar file
 	 * @param aDestPath
-	 *           The destination folder where the content will be dumped.
+	 *        The destination folder where the content will be dumped.
 	 * @throws IOException
 	 * @throws FileNotFoundException
-	 * 
 	 * @return The {@link List} of {@link File}s with the untared content.
 	 * @throws ArchiveException
 	 */
@@ -176,6 +176,9 @@ public class MiscUtils
 			}
 			else if (entry.isSymbolicLink() == true)
 			{
+				// Ensure the parent folders exist
+				outputFile.getParentFile().mkdirs();
+
 				File tmpFile = new File(entry.getLinkName());
 				Files.createSymbolicLink(outputFile.toPath(), tmpFile.toPath());
 
@@ -194,7 +197,11 @@ public class MiscUtils
 			}
 			else if (entry.isFile() == true)
 			{
-				final OutputStream outputFileStream = new FileOutputStream(outputFile);
+				// Ensure the parent folders exist
+				outputFile.getParentFile().mkdirs();
+
+				// Copy over the file
+				OutputStream outputFileStream = new FileOutputStream(outputFile);
 				IOUtils.copy(debInputStream, outputFileStream);
 				outputFileStream.close();
 

@@ -4,8 +4,7 @@ import java.io.File;
 
 import distMaker.DistUtils;
 import distMaker.ErrorDM;
-import distMaker.jre.JreRelease;
-import distMaker.jre.JreVersion;
+import distMaker.jre.*;
 import distMaker.node.AppRelease;
 
 public class PlatformUtils
@@ -45,22 +44,22 @@ public class PlatformUtils
 	 */
 	public static File getJreLocation(JreVersion aJreVersion)
 	{
-		String platform, versionStr;
-		File jrePath, installPath;
+		String platform, relJrePathStr;
+		File installPath, retJrePath;
 
-		jrePath = null;
+		retJrePath = null;
 		installPath = DistUtils.getAppPath();
-		versionStr = aJreVersion.getLabel();
+		relJrePathStr = JreUtils.getExpandJrePath(aJreVersion);
 
 		platform = PlatformUtils.getPlatform().toUpperCase();
 		if (platform.equals("APPLE") == true)
-			jrePath = new File(installPath.getParentFile(), "PlugIns/jre" + versionStr);
+			retJrePath = new File(installPath.getParentFile(), "PlugIns/" + relJrePathStr);
 		else if (platform.equals("LINUX") == true)
-			jrePath = new File(installPath.getParentFile(), "jre" + versionStr);
+			retJrePath = new File(installPath.getParentFile(), relJrePathStr);
 		else if (platform.equals("WINDOWS") == true)
-			jrePath = new File(installPath.getParentFile(), "jre" + versionStr);
+			retJrePath = new File(installPath.getParentFile(), relJrePathStr);
 
-		return jrePath;
+		return retJrePath;
 	}
 
 	/**
@@ -82,24 +81,6 @@ public class PlatformUtils
 	}
 
 	/**
-	 * Returns the platform of the JRE file.
-	 * <P>
-	 * This only examines the filename to determine the platform.
-	 */
-	public static String getPlatformOfJreTarGz(String aFileName)
-	{
-		aFileName = aFileName.toUpperCase();
-		if (aFileName.contains("LINUX") == true)
-			return "Linux";
-		if (aFileName.contains("MACOSX") == true)
-			return "Apple";
-		if (aFileName.contains("WINDOWS") == true)
-			return "Windows";
-
-		return null;
-	}
-
-	/**
 	 * Utility method to configure the JRE version used by the (active) DistMaker distribution.
 	 * <P>
 	 * Note this will only take effect after the application has been restarted.
@@ -107,7 +88,7 @@ public class PlatformUtils
 	 * On failure this method will throw an exception of type ErrorDM.
 	 * 
 	 * @param aJrePath
-	 *           Path to top of the JRE.
+	 *        Path to top of the JRE.
 	 */
 	public static void setJreVersion(JreVersion aJreVersion)
 	{
@@ -133,7 +114,7 @@ public class PlatformUtils
 	 * On failure this method will throw an exception of type ErrorDM.
 	 * 
 	 * @param maxMemSize
-	 *           Maximum heap memory in bytes.
+	 *        Maximum heap memory in bytes.
 	 */
 	public static void setMaxHeapMem(long maxMemSize)
 	{

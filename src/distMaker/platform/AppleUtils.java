@@ -13,6 +13,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.*;
 
 import distMaker.*;
+import distMaker.jre.JreUtils;
 import distMaker.jre.JreVersion;
 
 /**
@@ -54,8 +55,8 @@ public class AppleUtils
 	/**
 	 * Utility method to update the specified version in the plist file (pFile) to the new version.
 	 * <P>
-	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately follows the node with a value of
-	 * CFBundleVersion. TODO: Consider reducing brittleness.
+	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately
+	 * follows the node with a value of CFBundleVersion. TODO: Consider reducing brittleness.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
@@ -68,8 +69,8 @@ public class AppleUtils
 	/**
 	 * Utility method to update the specified version in the plist file (pFile) to the new version.
 	 * <P>
-	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately follows the node with a value of
-	 * CFBundleVersion. TODO: Consider reducing brittleness.
+	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately
+	 * follows the node with a value of CFBundleVersion. TODO: Consider reducing brittleness.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
@@ -170,7 +171,7 @@ public class AppleUtils
 
 		// Update the pFile
 		String regex = "<string>(.*?)</string>";
-		String repStr = "<string>jre" + aJreVersion.getLabel() + "</string>";
+		String repStr = "<string>" + JreUtils.getExpandJrePath(aJreVersion) + "</string>";
 		if (targLineNum == -1)
 			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'JVMRuntime' section.");
 		else if (targLineNum >= inputList.size())
@@ -183,10 +184,11 @@ public class AppleUtils
 	}
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the system plist file to the specified maxMemVal.
+	 * Utility method to update the specified max memory (-Xmx) value in the system plist file to the specified
+	 * maxMemVal.
 	 * <P>
-	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
-	 * may be empty but must be specified.
+	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string
+	 * elements of JVM arguments. The array element may be empty but must be specified.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
@@ -197,10 +199,11 @@ public class AppleUtils
 	}
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the plist file (pFile) to the specified maxMemVal.
+	 * Utility method to update the specified max memory (-Xmx) value in the plist file (pFile) to the specified
+	 * maxMemVal.
 	 * <P>
-	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string elements of JVM arguments. The array element
-	 * may be empty but must be specified.
+	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string
+	 * elements of JVM arguments. The array element may be empty but must be specified.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */

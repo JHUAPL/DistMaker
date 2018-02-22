@@ -1,14 +1,46 @@
 package distMaker.jre;
 
+import java.util.ArrayList;
+
+import com.google.common.collect.ImmutableList;
+
+import distMaker.utils.Version;
 import glum.gui.GuiUtil;
 
-public class JreVersion implements Comparable<JreVersion>
+/**
+ * Immutable class which defines a Java version.
+ */
+public class JreVersion implements Comparable<JreVersion>, Version
 {
-	private String version;
+	/** String used to construct this JreVersion */
+	private final String label;
 
-	public JreVersion(String aVersion)
+	/** List of integers corresponding to the various components of the JRE version. */
+	private final ImmutableList<Integer> compL;
+
+	/** Flag for legacy JRE versions. JRE versions prior to 9.0 are considered legacy. */
+	private final boolean isLegacy;
+
+	public JreVersion(String aLabel)
 	{
-		version = aVersion;
+		label = aLabel;
+
+		String[] tokenArr = label.split("[._]");
+		ArrayList<Integer> workL = new ArrayList<>();
+		for (String aStr : tokenArr)
+		{
+			int tmpVal = GuiUtil.readInt(aStr, Integer.MIN_VALUE);
+			if (tmpVal == Integer.MIN_VALUE)
+				break;
+
+			workL.add(tmpVal);
+		}
+		compL = ImmutableList.copyOf(workL);
+
+		if (compL.size() >= 2 && compL.get(0) == 1)
+			isLegacy = true;
+		else
+			isLegacy = false;
 	}
 
 	/**
@@ -16,7 +48,7 @@ public class JreVersion implements Comparable<JreVersion>
 	 */
 	public String getLabel()
 	{
-		return version;
+		return label;
 	}
 
 	/**
@@ -29,41 +61,76 @@ public class JreVersion implements Comparable<JreVersion>
 	public static JreVersion getBetterVersion(JreVersion verA, JreVersion verB)
 	{
 		JreVersion defaultVer;
-		String[] tokenA, tokenB;
 		int valA, valB, idxCnt;
-
-		tokenA = verA.getLabel().split("[._]");
-		tokenB = verB.getLabel().split("[._]");
 
 		// Default JreVersion is the version that is more specific
 		defaultVer = null;
-		if (tokenA.length < tokenB.length)
+		if (verA.compL.size() < verB.compL.size())
 			defaultVer = verB;
-		else if (tokenB.length < tokenA.length)
+		else if (verB.compL.size() < verA.compL.size())
 			defaultVer = verA;
 
 		// Set the idxCnt to the less specific JreVersion
-		idxCnt = tokenA.length;
-		if (tokenB.length < tokenA.length)
-			idxCnt = tokenB.length;
+		idxCnt = Math.min(verA.compL.size(), verB.compL.size());
 
-		// Compare each component of the version string. Each component should be separated by '.'
-		// Assume each component is an integer where larger values correspond to later versions
+		// Compare each integral component (which originated from the label)
+		// Assume higher values correspond to later versions
 		for (int c1 = 0; c1 < idxCnt; c1++)
 		{
-			valA = GuiUtil.readInt(tokenA[c1], -1);
-			valB = GuiUtil.readInt(tokenB[c1], -1);
-			if (valA == -1 && valB == -1)
-				return null;
-
-			if (valB == -1 || valA > valB)
+			valA = verA.compL.get(c1);
+			valB = verB.compL.get(c1);
+			if (valA > valB)
 				return verA;
-			if (valA == -1 || valB > valA)
+			if (valB > valA)
 				return verB;
 		}
 
-		// Defaults to verA
+		// Defaults to the defaultVer
 		return defaultVer;
+	}
+
+	@Override
+	public int getMajorVersion()
+	{
+		if (isLegacy == true)
+			return compL.get(1);
+
+		if (compL.size() >= 1)
+			return compL.get(0);
+
+		return 0;
+	}
+
+	@Override
+	public int getMinorVersion()
+	{
+		if (isLegacy == true)
+		{
+			if (compL.size() >= 3)
+				return compL.get(2);
+			return 0;
+		}
+
+		if (compL.size() >= 2)
+			return compL.get(1);
+
+		return 0;
+	}
+
+	@Override
+	public int getPatchVersion()
+	{
+		if (isLegacy == true)
+		{
+			if (compL.size() >= 4)
+				return compL.get(3);
+			return 0;
+		}
+
+		if (compL.size() >= 3)
+			return compL.get(2);
+
+		return 0;
 	}
 
 	@Override

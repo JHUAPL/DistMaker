@@ -1,6 +1,7 @@
 package distMaker.jre;
 
 import distMaker.digest.Digest;
+import distMaker.utils.Version;
 
 /**
  * Immutable class that describes a JRE Release.
@@ -9,19 +10,39 @@ import distMaker.digest.Digest;
  */
 public class JreRelease implements Comparable<JreRelease>
 {
-	private String platform;
-	private JreVersion version;
-	private Digest digest;
-	private String fileName;
-	private long fileLen;
+	private final Version alMinVer;
+	private final Version alMaxVer;
+	private final String platform;
+	private final JreVersion version;
+	private final Digest digest;
+	private final String fileName;
+	private final long fileLen;
 
-	public JreRelease(String aPlatform, String aVersion, String aFileName, Digest aDigest, long aFileLen)
+	public JreRelease(String aPlatform, String aVersion, String aFileName, Digest aDigest, long aFileLen, Version aAlMinVer, Version aAlMaxVer)
 	{
 		platform = aPlatform;
 		version = new JreVersion(aVersion);
 		fileName = aFileName;
 		digest = aDigest;
 		fileLen = aFileLen;
+		alMinVer = aAlMinVer;
+		alMaxVer = aAlMaxVer;
+	}
+
+	/**
+	 * Returns the minimum AppLauncher version compatible with this JRE release.
+	 */
+	public Version getAppLauncherMinVersion()
+	{
+		return alMinVer;
+	}
+
+	/**
+	 * Returns the maximum AppLauncher version compatible with this JRE release.
+	 */
+	public Version getAppLauncherMaxVersion()
+	{
+		return alMaxVer;
 	}
 
 	/**

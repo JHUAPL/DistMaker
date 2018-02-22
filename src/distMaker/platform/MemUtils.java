@@ -15,8 +15,8 @@ public class MemUtils
 	public static final long GB_SIZE = 1024 * 1024 * 1024;
 
 	/**
-	 * Utility method that attempts to compute the installed system memory (ram). If the installed system ram can not be computed, then the system is assumed to
-	 * have 4 GB.
+	 * Utility method that attempts to compute the installed system memory (ram). If the installed system ram can not be
+	 * computed, then the system is assumed to have 4 GB.
 	 */
 	public static long getInstalledSystemMemory()
 	{
@@ -57,7 +57,8 @@ public class MemUtils
 	}
 
 	/**
-	 * Utility method that takes an inputStr, locates the fragment -Xmx*, and replaces the fragment with the appropriate -Xmx with respect to numBytes.
+	 * Utility method that takes an inputStr, locates the fragment -Xmx*, and replaces the fragment with the appropriate
+	 * -Xmx with respect to numBytes.
 	 * <P>
 	 * This method is a bit brittle in that it assumes the -Xmx string is surrounded with 1 white space character.
 	 * <P>

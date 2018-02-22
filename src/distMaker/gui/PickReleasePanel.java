@@ -28,15 +28,17 @@ import distMaker.node.AppRelease;
 
 public class PickReleasePanel extends GlassPanel implements ActionListener, ListSelectionListener
 {
-   private static final long serialVersionUID = 1L;
+	// Constants
+	private static final long serialVersionUID = 1L;
+	private static final Color ColorFail = Color.red.darker().darker();
 
-   // GUI vars
+	// GUI vars
 	private JLabel titleL;
 	private JRadioButton newestRB, olderRB;
 	private ItemListPanel<AppRelease> listPanel;
 	private QueryTableCellRenderer col0Renderer, col1Renderer;
 	private JButton abortB, proceedB;
-	private JTextArea infoTA, warnTA;
+	private JTextArea headTA, infoTA;
 	private Font smallFont;
 
 	// State vars
@@ -57,7 +59,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		// Build the actual GUI
 		smallFont = (new JTextField()).getFont();
 		buildGuiArea();
-		setPreferredSize(new Dimension(250, getPreferredSize().height));
+		setPreferredSize(new Dimension(350, getPreferredSize().height));
 
 		// Set up some keyboard shortcuts
 		FocusUtil.addAncestorKeyBinding(this, "ESCAPE", new ClickAction(abortB));
@@ -74,17 +76,17 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	/**
 	 * Sets in the configuration of available versions
 	 */
-	public void setConfiguration(List<AppRelease> itemList)
+	public void setConfiguration(List<AppRelease> aItemList)
 	{
 		DateUnit dateUnit;
 		// String currBuildStr;
 		String lastBuildStr;
 		String currVerStr, lastVerStr;
-		String appName, infoMsg;
+		String appName, headMsg;
 
 		// Sort the items, and isolate the newest item
 		LinkedList<AppRelease> linkedList;
-		linkedList = new LinkedList<>(itemList);
+		linkedList = new LinkedList<>(aItemList);
 		Collections.sort(linkedList);
 		Collections.reverse(linkedList);  // reverse the list to show most recent versions on top
 		newestItem = linkedList.removeFirst();
@@ -104,20 +106,27 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		myItemProcessor.setItems(linkedList);
 
 		// Update the infoTA
-		if (newestItem.equals(installedItem) == true) {
-         titleL.setText(appName + " is up to date.");
-         infoMsg = "You are running the latest release "
-               + " (" + lastVerStr + ") that was built on " + lastBuildStr + ". ";
-         infoMsg += "You may switch to an older release by choosing one of the versions below.";
-		} else {
-         titleL.setText(appName + " needs to be updated.");
-			infoMsg = "You are running version " + currVerStr + ". ";
-         infoMsg += "You may update to the latest release. You may also switch to an "
-               + "older release by choosing another version below. ";
+		if (newestItem.equals(installedItem) == true)
+		{
+			titleL.setText(appName + " is up to date.");
+			headMsg = "You are running the latest release " + " (" + lastVerStr + ") that was built on " + lastBuildStr + ". ";
+			headMsg += "You may switch to an older release by choosing one of the versions below.";
 		}
-		infoMsg += "\n";
+		else if (installedItem.getBuildTime() > newestItem.getBuildTime())
+		{
+			titleL.setText(appName + " (Out-Of-Band Release)");
+			headMsg = "You are running version " + currVerStr + ". This version has never been released! ";
+			headMsg += "You may update to the latest release or switch to an older release by choosing another version below. ";
+		}
+		else
+		{
+			titleL.setText(appName + " needs to be updated.");
+			headMsg = "You are running version " + currVerStr + ". ";
+			headMsg += "You may update to the latest release. You may also switch to an " + "older release by choosing another version below. ";
+		}
+		headMsg += "\n";
 
-		infoTA.setText(infoMsg);
+		headTA.setText(headMsg);
 		updateGui();
 	}
 
@@ -161,38 +170,50 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	 */
 	private void buildGuiArea()
 	{
-		JPanel tmpPanel;
+		JPanel listPanel, mainPanel;
 
 		// Form the layout
-		setLayout(new MigLayout("", "[left][grow][]", "[]25[][][]3[grow]10[]"));
+		setLayout(new MigLayout("", "[left][grow][]", "[]"));
 
-		// Title Area
-		titleL = new JLabel("Please select an update", JLabel.CENTER); // this text gets replaced once the curent version status is known
+		// Title Area: Note that the default text gets replaced once the current version status is known
+		titleL = new JLabel("Please select an update", JLabel.CENTER);
 		add(titleL, "growx,span 2,wrap");
 
-		// Info area
-		infoTA = GuiUtil.createUneditableTextArea(2, 0);
-		add(infoTA, "w 0::,growx,span,wrap");
+		// Header area
+		headTA = GuiUtil.createUneditableTextArea(2, 0);
+		add(headTA, "w 0::,growx,span,wrap");
 
 		// Latest version area
 		newestRB = GuiUtil.createJRadioButton("Unspecified", this, smallFont);
 		newestRB.setSelected(true);
-		add(newestRB, "span,wrap");
 
 		// Older version area
 		olderRB = GuiUtil.createJRadioButton("Select an older release:", this, smallFont);
-		add(olderRB, "span,wrap");
 
-		tmpPanel = buildItemListTablePanel();
-		tmpPanel.setBorder(new EmptyBorder(0, 15, 0, 0));
-		add(tmpPanel, "growx,growy,span,wrap");
+		listPanel = buildItemListTablePanel();
+		listPanel.setBorder(new EmptyBorder(0, 15, 0, 0));
+
+		mainPanel = new JPanel(new MigLayout("", "0[left,grow]", "0[][]3[grow]0"));
+		mainPanel.add(newestRB, "wrap");
+		mainPanel.add(olderRB, "wrap");
+		mainPanel.add(listPanel, "growx,growy");
 
 		// Link the radio buttons
 		GuiUtil.linkRadioButtons(newestRB, olderRB);
 
-		// Warn Area
-		warnTA = GuiUtil.createUneditableTextArea(0, 0);
-		add(warnTA, "w 0::,growx,span,wrap");
+		// Info Area
+		JScrollPane tmpSP;
+		infoTA = GuiUtil.createUneditableTextArea(0, 0);
+		infoTA.setTabSize(3);
+		tmpSP = new JScrollPane(infoTA);
+		tmpSP.setBorder(new EmptyBorder(0, 5, 0, 5));
+
+		JSplitPane tmpPane;
+		tmpPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true, mainPanel, tmpSP);
+		tmpPane.setBorder(null);
+		tmpPane.setResizeWeight(0.15);
+//		tmpPane.setDividerLocation(0.50);
+		add(tmpPane, "growx,growy,pushy,span,wrap");
 
 		// Action area
 		abortB = GuiUtil.createJButton("Abort", this, smallFont);
@@ -208,26 +229,26 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	 */
 	private JPanel buildItemListTablePanel()
 	{
-		QueryComposer<LookUp> aComposer;
-		QueryItemHandler<AppRelease> aItemHandler;
+		QueryComposer<LookUp> tmpComposer;
+		QueryItemHandler<AppRelease> tmpIH;
 		DateUnit dateUnit;
 
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm");
 
-		aComposer = new QueryComposer<LookUp>();
-		aComposer.addAttribute(LookUp.Version, String.class, "Version", null);
-		aComposer.addAttribute(LookUp.BuildTime, new ConstUnitProvider(dateUnit), "Build Date", null);
+		tmpComposer = new QueryComposer<LookUp>();
+		tmpComposer.addAttribute(LookUp.Version, String.class, "Version", null);
+		tmpComposer.addAttribute(LookUp.BuildTime, new ConstUnitProvider(dateUnit), "Build Date", null);
 
 		col0Renderer = new QueryTableCellRenderer();
 		col1Renderer = new QueryTableCellRenderer();
 		col1Renderer.setUnit(dateUnit);
-		aComposer.setRenderer(LookUp.Version, col0Renderer);
-		aComposer.setRenderer(LookUp.BuildTime, col1Renderer);
+		tmpComposer.setRenderer(LookUp.Version, col0Renderer);
+		tmpComposer.setRenderer(LookUp.BuildTime, col1Renderer);
 
-		aItemHandler = new QueryItemHandler<AppRelease>(aComposer);
-		myItemProcessor = new StaticItemProcessor<AppRelease>();
+		tmpIH = new QueryItemHandler<AppRelease>(tmpComposer);
+		myItemProcessor = new StaticItemProcessor<>();
 
-		listPanel = new ItemListPanel<AppRelease>(aItemHandler, myItemProcessor, false, false);
+		listPanel = new ItemListPanel<>(tmpIH, myItemProcessor, false, false);
 		listPanel.setSortingEnabled(false);
 		listPanel.addListSelectionListener(this);
 		return listPanel;
@@ -239,7 +260,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	private void updateGui()
 	{
 		AppRelease pickItem;
-		String warnMsg;
+		String failMsg, infoMsg;
 		boolean isEnabled;
 
 		// Determine the selected version
@@ -258,15 +279,39 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		col1Renderer.setEnabled(isEnabled);
 
 		// Determine the warnMsg
-		warnMsg = null;
+		failMsg = null;
+		infoMsg = null;
 		if (pickItem == null)
-			warnMsg = "Select the version you want to switch to.";
+			failMsg = "Select the version you want to switch to.";
 		else if (pickItem.equals(installedItem) == true)
-			warnMsg = "You cannot update to the same version you are running. You can switch to a different version.";
+			failMsg = "You cannot update to the same version you are running. You can switch to a different version.";
 		else if (pickItem.getBuildTime() < installedItem.getBuildTime())
-			warnMsg = "Please note that your current selection will revert back to an older version than the currently installed version.";
+			infoMsg = "Please note that your current selection will revert back to an older version than the currently installed version.";
 
-		warnTA.setText(warnMsg);
+		// Add the app release notes
+		if (pickItem != null)
+		{
+			String noteMsg;
+			noteMsg = pickItem.getInfoMsg();
+			if (noteMsg != null)
+			{
+				if (infoMsg != null)
+					infoMsg += "\n\n" + noteMsg;
+				else
+					infoMsg = noteMsg;
+			}
+		}
+
+		Color tmpColor = Color.BLACK;
+		if (failMsg != null)
+			tmpColor = ColorFail;
+
+		String tmpMsg = failMsg;
+		if (tmpMsg == null)
+			tmpMsg = infoMsg;
+
+		infoTA.setText(tmpMsg);
+		infoTA.setForeground(tmpColor);
 	}
 
 }

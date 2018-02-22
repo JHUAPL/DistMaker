@@ -88,7 +88,7 @@ public class AppCatalog
 	 */
 	public boolean isJreVersionTooNew(JreVersion aJreVer)
 	{
-		// Check to make sure aJreVer is not too old
+		// Check to make sure aJreVer is not too new
 		if (maxJreVer != null && JreVersion.getBetterVersion(maxJreVer, aJreVer) == aJreVer)
 			return true;
 

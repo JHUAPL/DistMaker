@@ -1,21 +1,12 @@
 package distMaker;
 
-import glum.gui.panel.generic.MessagePanel;
-import glum.gui.panel.generic.PromptPanel;
-import glum.gui.panel.task.FullTaskPanel;
-import glum.io.IoUtil;
-import glum.net.Credential;
-import glum.reflect.FunctionRunnable;
-import glum.task.*;
-import glum.unit.DateUnit;
-import glum.util.ThreadUtil;
-
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.*;
 
@@ -30,12 +21,19 @@ import distMaker.gui.PickReleasePanel;
 import distMaker.jre.*;
 import distMaker.node.*;
 import distMaker.platform.PlatformUtils;
+import glum.gui.panel.generic.MessagePanel;
+import glum.gui.panel.generic.PromptPanel;
+import glum.gui.panel.task.FullTaskPanel;
+import glum.io.IoUtil;
+import glum.net.Credential;
+import glum.task.*;
+import glum.unit.DateUnit;
+import glum.util.ThreadUtil;
 
 public class DistMakerEngine
 {
 	// Constants
-	private final String NonDistmakerAppMsg = "This application does not appear to be a properly configured DistMaker application.\n\n"
-			+ "Please check installation configuration.";
+	private final String NonDistmakerAppMsg = "This application does not appear to be a properly configured DistMaker application.\n\n" + "Please check installation configuration.";
 
 	// State vars
 	private URL updateSiteUrl;
@@ -100,7 +98,8 @@ public class DistMakerEngine
 		taskPanel.setVisible(true);
 
 		// Launch the actual checking of updates in a separate worker thread
-		ThreadUtil.launchRunnable(new FunctionRunnable(this, "checkForUpdatesWorker", taskPanel, listener), "thread-checkForUpdates");
+		Runnable tmpRunnable = () -> checkForUpdatesWorker(taskPanel, listener);
+		ThreadUtil.launchRunnable(tmpRunnable, "thread-checkForUpdates");
 	}
 
 	/**
@@ -150,7 +149,8 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Sets in the credentials used to access the update site. If either argument is null, then the credentials will be cleared out.
+	 * Sets in the credentials used to access the update site. If either argument is null, then the credentials will be
+	 * cleared out.
 	 */
 	public void setCredentials(String aUsername, char[] aPassword)
 	{
@@ -243,7 +243,7 @@ public class DistMakerEngine
 
 		// Form the PickReleasePanel
 		pickVersionPanel = new PickReleasePanel(parentFrame, currRelease);
-		pickVersionPanel.setSize(550, 500); // 320, 350);
+		pickVersionPanel.setSize(550, 500);
 
 		// Notify the user of (any) update results
 		showUpdateResults();
@@ -254,7 +254,6 @@ public class DistMakerEngine
 	 * <P>
 	 * This method will be called via reflection.
 	 */
-	@SuppressWarnings("unused")
 	private void checkForUpdatesWorker(FullTaskPanel aTask, UpdateCheckListener listener)
 	{
 		List<AppRelease> fullList;
@@ -308,10 +307,8 @@ public class DistMakerEngine
 		aTask.infoAppendln("Please select the release to install...");
 		try
 		{
-			FunctionRunnable aFuncRunnable;
-
-			aFuncRunnable = new FunctionRunnable(this, "queryUserForInput", aTask, deltaPath, fullList);
-			SwingUtilities.invokeAndWait(aFuncRunnable);
+			Runnable tmpRunnable = () -> queryUserForInput(aTask, deltaPath, fullList);
+			SwingUtilities.invokeAndWait(tmpRunnable);
 		}
 		catch(Exception aExp)
 		{
@@ -348,7 +345,19 @@ public class DistMakerEngine
 		}
 
 		// Download the release
-		isPass = downloadAppRelease(aTask, chosenItem, deltaPath);
+		try
+		{
+			isPass = downloadAppRelease(aTask, chosenItem, deltaPath);
+		}
+		catch(Throwable aThrowable)
+		{
+			IoUtil.deleteDirectory(deltaPath);
+			aTask.infoAppendln("An error occurred while trying to perform an update.");
+			aTask.infoAppendln("Application update aborted.");
+			aTask.infoAppendln("\nStackTrace:\n" + ThreadUtil.getStackTraceClassic(aThrowable));
+			aTask.abort();
+			return;
+		}
 		if (isPass == false || aTask.isActive() == false)
 		{
 			IoUtil.deleteDirectory(deltaPath);
@@ -368,12 +377,9 @@ public class DistMakerEngine
 	 */
 	private void displayNotice(String aMsg)
 	{
-		Runnable silentRunnable = new Runnable() {
-			@Override
-			public void run()
-			{
-				; // Nothing to do
-			}
+		Runnable silentRunnable = () ->
+		{
+			; // Nothing to do
 		};
 
 		// Delegate to displayNoticeAndExecute
@@ -395,7 +401,8 @@ public class DistMakerEngine
 		// If the parentFrame is not visible then execute the code once it is made visible
 		if (parentFrame.isVisible() == false)
 		{
-			parentFrame.addComponentListener(new ComponentAdapter() {
+			parentFrame.addComponentListener(new ComponentAdapter()
+			{
 				@Override
 				public void componentShown(ComponentEvent aEvent)
 				{
@@ -574,7 +581,8 @@ public class DistMakerEngine
 		// Retrieve the reference to the appCfgFile
 		File appCfgFile = PlatformUtils.getConfigurationFile();
 
-		// Create the delta.cmd file which provides the Updater with the clean activities to perform (based on fail / pass conditions)
+		// Create the delta.cmd file which provides the Updater with the clean activities to perform
+		// (based on fail / pass conditions)
 		File deltaCmdFile = new File(destPath, "delta.cmd");
 		try (FileWriter tmpFW = new FileWriter(deltaCmdFile))
 		{
@@ -586,12 +594,12 @@ public class DistMakerEngine
 				tmpFW.write("# Define the fail section (clean up for failure)\n");
 				tmpFW.write("sect,fail\n");
 				tmpFW.write("copy," + "delta/" + appCfgFile.getName() + ".old," + MiscUtils.getRelativePath(rootPath, appCfgFile) + "\n");
-				tmpFW.write("reboot,trash,jre" + targJreVer.getLabel() + "\n");
+				tmpFW.write("reboot,trash," + JreUtils.getExpandJrePath(targJreVer) + "\n");
 				tmpFW.write("exit\n\n");
 
 				tmpFW.write("# Define the pass section (clean up for success)\n");
 				tmpFW.write("sect,pass\n");
-				tmpFW.write("trash,jre" + currJreVer.getLabel() + "\n");
+				tmpFW.write("trash," + JreUtils.getExpandJrePath(currJreVer) + "\n");
 				tmpFW.write("exit\n\n");
 			}
 			else
@@ -626,7 +634,7 @@ public class DistMakerEngine
 
 		// Since an updated JRE was needed...
 		// Moved the JRE (unpacked folder) from its drop path to the proper location
-		File jreDropPath = new File(destPath, "jre" + targJre.getVersion().getLabel());
+		File jreDropPath = new File(destPath, JreUtils.getExpandJrePath(targJre.getVersion()));
 		File jreTargPath = PlatformUtils.getJreLocation(targJre);
 		jreTargPath.getParentFile().setWritable(true);
 		if (jreDropPath.renameTo(jreTargPath) == false)
@@ -688,10 +696,10 @@ public class DistMakerEngine
 			updnStr = "upgraded";
 		aTask.infoAppendln("Your current JRE is not compatible with this release. It will need to be " + updnStr + "!");
 		aTask.infoAppendln("\tCurrent  JRE: " + currJreVer.getLabel());
-		aTask.infoAppendln("\tMinimun  JRE: " + aUpdateCat.getMinJreVersion().getLabel());
+		aTask.infoAppendln("\tMinimum  JRE: " + aUpdateCat.getMinJreVersion().getLabel());
 		JreVersion tmpJreVer = aUpdateCat.getMaxJreVersion();
 		if (tmpJreVer != null)
-			aTask.infoAppendln("\tMaximun  JRE: " + tmpJreVer.getLabel());
+			aTask.infoAppendln("\tMaximum  JRE: " + tmpJreVer.getLabel());
 		aTask.infoAppendln("");
 
 		// Bail if we are running a bundled JRE
@@ -738,6 +746,15 @@ public class DistMakerEngine
 		}
 		JreVersion pickJreVer = pickJre.getVersion();
 
+		// Update the AppLauncher if required
+		AppLauncherRelease pickAppLauncher = null;
+		if (AppLauncherUtils.isAppLauncherUpdateNeeded(aTask, pickJre) == true)
+		{
+			pickAppLauncher = AppLauncherUtils.updateAppLauncher(aTask, pickJre, aDestPath, updateSiteUrl, refCredential);
+			if (pickAppLauncher == null)
+				return null;
+		}
+
 		// Update the number of bytes to be retrieved to take into account the JRE which we will be downloading
 		long tmpFileLen = pickJre.getFileLen();
 		releaseSizeFull += tmpFileLen;
@@ -761,21 +778,21 @@ public class DistMakerEngine
 			aTask.infoAppendln("The download of the JRE appears to be corrupted.");
 			aTask.infoAppendln("\tFile: " + dstFile);
 			aTask.infoAppendln("\t\tExpected " + targDigest.getDescr());
-			aTask.infoAppendln("\t\tRecieved " + testDigest.getDescr() + "\n");
+			aTask.infoAppendln("\t\tReceived " + testDigest.getDescr() + "\n");
 			return null;
 		}
 
 		// Unpack the JRE at the unpack location
 		aTask.infoAppendln("Finshed downloading JRE. Unpacking JRE...");
 		File jreRootPath = null;
-		File jreTargPath = new File(aDestPath, "jre" + pickJreVer.getLabel());
+		File jreTargPath = new File(aDestPath, JreUtils.getExpandJrePath(pickJreVer));
 		try
 		{
 			// Create the working unpack folder where the JRE will be initially unpacked to.
 			File unpackPath = new File(aDestPath, "unpack");
 			unpackPath.mkdirs();
 
-			// Unpack the JRE to the working unpack folder and ensure that the unpacked JRE results in a 1 top level root folder.
+			// Unpack the JRE to the working unpack folder. Ensure that the unpacked JRE results in 1 top level folder.
 			tmpTask = new PartialTask(aTask, aTask.getProgress(), (tmpFileLen * 0.25) / (releaseSizeFull + 0.00));
 			MiscUtils.unTar(tmpTask, dstFile, unpackPath);
 			File[] fileArr = unpackPath.listFiles();
@@ -793,6 +810,9 @@ public class DistMakerEngine
 			aTask.infoAppendln("Failed to properly untar archive. The update has been aborted.");
 			aTask.infoAppendln("\tTar File: " + dstFile);
 			aTask.infoAppendln("\tDestination: " + jreTargPath);
+
+			String errMsg = ThreadUtil.getStackTrace(aExp);
+			aTask.infoAppend("\nStack Trace:\n" + errMsg);
 			return null;
 		}
 
@@ -800,16 +820,17 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration should be in the same state as before an
-	 * update was applied. Reverting consists of the following:
+	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration
+	 * should be in the same state as before an update was applied. Reverting consists of the following:
 	 * <UL>
 	 * <LI>Removal of any downloaded and installed JRE
 	 * <LI>Removing the delta directory
 	 * <LI>Removing the delta.cfg file
 	 * </UL>
 	 * <P>
-	 * There should not be any issues with this roll back process. However if there are a best effort will be made to continue rolling back the updates - note
-	 * that the application might be in an unstable state - and may not be able to be restarted.
+	 * There should not be any issues with this roll back process. However if there are, a best effort will be made to
+	 * continue rolling back the updates - note that the application might be in an unstable state - and may not be able
+	 * to be restarted.
 	 */
 	private void revertUpdate(Task aTask)
 	{
@@ -883,8 +904,9 @@ public class DistMakerEngine
 				if (strArr.length == 1 && cmdStr.equals("exit") == true)
 					break;
 
-				// We are interested only in trash (or reboot,trash) commands. Execute the individual trash (or reboot,trash) commands.
-				// It is safe to execute reboot,trash commands now since the actual update is not running yet.
+				// We are interested only in trash (or reboot,trash) commands. Execute the individual trash (or
+				// reboot,trash) commands. It is safe to execute reboot,trash commands now since the actual update is not
+				// running yet.
 				String delTargStr = null;
 				if (inputStr.startsWith("trash,") == true)
 					delTargStr = inputStr.substring(6);
@@ -935,13 +957,12 @@ public class DistMakerEngine
 	 * <P>
 	 * This method will be called via reflection.
 	 */
-	@SuppressWarnings("unused")
-	private void queryUserForInput(Task aTask, File deltaPath, List<AppRelease> fullList)
+	private void queryUserForInput(Task aTask, File aDeltaPath, List<AppRelease> aFullList)
 	{
 		AppRelease chosenItem;
 
 		// Query the user, if the wish to destroy the old update
-		if (deltaPath.isDirectory() == true)
+		if (aDeltaPath.isDirectory() == true)
 		{
 			promptPanel.setTitle("Overwrite recent update?");
 			promptPanel.setInfo("An update has already been downloaded... If you proceed this update will be removed. Proceed?");
@@ -958,7 +979,7 @@ public class DistMakerEngine
 		}
 
 		// Query the user of the version to update to
-		pickVersionPanel.setConfiguration(fullList);
+		pickVersionPanel.setConfiguration(aFullList);
 		pickVersionPanel.setVisibleAsModal();
 		chosenItem = pickVersionPanel.getChosenItem();
 		if (chosenItem == null)
@@ -970,7 +991,8 @@ public class DistMakerEngine
 	}
 
 	/**
-	 * Notification that the corresponding application has been fully initialized. This helper method will notify the user on the status of any update.
+	 * Notification that the corresponding application has been fully initialized. This helper method will notify the
+	 * user on the status of any update.
 	 */
 	private void showUpdateResults()
 	{
@@ -1000,7 +1022,8 @@ public class DistMakerEngine
 		}
 
 		// Setup the runnable that will clean up our delta folder
-		Runnable cleanDeltaRunnable = new Runnable() {
+		Runnable cleanDeltaRunnable = new Runnable()
+		{
 			@Override
 			public void run()
 			{
