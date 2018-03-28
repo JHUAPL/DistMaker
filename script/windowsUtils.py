@@ -10,7 +10,7 @@ import glob
 
 import jreUtils
 import miscUtils
-
+import deployJreDist
 
 def buildRelease(args, buildPath):
 	# We mutate args - thus make a custom copy
@@ -116,10 +116,10 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 		shutil.copy(srcPath, linkPath)
 
 	# Setup the launcher contents
-	exePath = os.path.join(rootPath, "launcher")
+	dstPath = os.path.join(rootPath, "launcher/" + deployJreDist.getAppLauncherFileName())
 	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
-	os.makedirs(exePath)
-	shutil.copy(srcPath, exePath);
+	os.makedirs(os.path.dirname(dstPath))
+	shutil.copy(srcPath, dstPath);
 
 	# Build the java component of the distribution
 	if args.javaCode != None:
@@ -184,7 +184,7 @@ def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 
 	writeln(f, 1, "<classPath>");
 	writeln(f, 2, "<mainClass>appLauncher.AppLauncher</mainClass>");
-	writeln(f, 2, "<cp>../launcher/appLauncher.jar</cp>");
+	writeln(f, 2, "<cp>../launcher/" + deployJreDist.getAppLauncherFileName() + "</cp>");
 	writeln(f, 1, "</classPath>");
 
 	if args.forceSingleInstance != False:

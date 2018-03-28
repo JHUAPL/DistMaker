@@ -3,18 +3,20 @@ package distMaker.platform;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.*;
 
 import org.w3c.dom.*;
 
 import distMaker.*;
-import distMaker.jre.JreUtils;
-import distMaker.jre.JreVersion;
+import distMaker.jre.*;
 
 /**
  * Utility class which contains a set of methods to interact with an Apple Info.plist file.
@@ -50,20 +52,6 @@ public class AppleUtils
 			throw new ErrorDM("The plist file does not appear to be a regular file: " + pFile);
 
 		return pFile;
-	}
-
-	/**
-	 * Utility method to update the specified version in the plist file (pFile) to the new version.
-	 * <P>
-	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately
-	 * follows the node with a value of CFBundleVersion. TODO: Consider reducing brittleness.
-	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 */
-	public static void updateAppVersion(String aNewVersion)
-	{
-		// Utilize the system pList file and delegate.
-		updateAppVersion(aNewVersion, getPlistFile());
 	}
 
 	/**
@@ -117,51 +105,55 @@ public class AppleUtils
 	}
 
 	/**
-	 * Utility method to update the JRE to point to the specified path in the system plist file.
+	 * Utility method to update the configuration file (pFile) to reflect the specified AppLauncherRelease.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void updateJreVersion(JreVersion aJreVersion)
-	{
-		// Utilize the system pList file and delegate.
-		updateJreVersion(aJreVersion, getPlistFile());
-	}
-
-	/**
-	 * Utility method to update the JRE to point to the specified path in the plist file (pFile).
-	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 */
-	public static void updateJreVersion(JreVersion aJreVersion, File pFile)
+	public static void updateAppLauncher(AppLauncherRelease aRelease, File pFile)
 	{
 		List<String> inputList;
 		String evalStr, tmpStr;
-		int currLineNum, targLineNum;
+		String prevKeyValue;
+		boolean isFound;
 
 		// Bail if the pFile is not writable
 		if (pFile.setWritable(true) == false)
 			throw new ErrorDM("The pFile is not writeable: " + pFile);
+
+		// Define the regex we will be searching for
+		String regex = "<string>(.*?)</string>";
+		Pattern tmpPattern = Pattern.compile(regex);
 
 		// Process our input
 		inputList = new ArrayList<>();
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
 		{
 			// Read the lines
-			currLineNum = 0;
-			targLineNum = -1;
+			isFound = false;
+			prevKeyValue = "";
 			while (true)
 			{
 				evalStr = br.readLine();
 				if (evalStr == null)
 					break;
 
-				// Record the start of the JVMRunitme section. Note the JRE should be specified on the next line
+				// Keep track of the last key element
 				tmpStr = evalStr.trim();
-				if (tmpStr.equals("<key>JVMRuntime</key>") == true)
-					targLineNum = currLineNum + 1;
+				if (tmpStr.startsWith("<key>") == true && tmpStr.endsWith("</key>") == true)
+					prevKeyValue = tmpStr.substring(5, tmpStr.length() - 6).trim();
+
+				// The AppLauncher is specified just after the key element with the value: ClassPath
+				if (prevKeyValue.equals("ClassPath") == true && tmpPattern.matcher(evalStr).find() == true)
+				{
+					// Perform the replacement
+					String repStr = "<string>$JAVAROOT/" + PlatformUtils.getAppLauncherFileName(aRelease.getVersion()) + "</string>";
+					repStr = Matcher.quoteReplacement(repStr);
+					evalStr = tmpPattern.matcher(evalStr).replaceFirst(repStr);
+
+					isFound = true;
+				}
 
 				inputList.add(evalStr);
-				currLineNum++;
 			}
 		}
 		catch(IOException aExp)
@@ -169,33 +161,76 @@ public class AppleUtils
 			throw new ErrorDM(aExp, "Failed while processing the pFile: " + pFile);
 		}
 
-		// Update the pFile
-		String regex = "<string>(.*?)</string>";
-		String repStr = "<string>" + JreUtils.getExpandJrePath(aJreVersion) + "</string>";
-		if (targLineNum == -1)
-			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'JVMRuntime' section.");
-		else if (targLineNum >= inputList.size())
-			throw new ErrorDM("[" + pFile + "] The pFile appears to be incomplete!");
-		else
-			inputList.set(targLineNum, inputList.get(targLineNum).replaceFirst(regex, repStr));
+		// Fail if there was no update performed
+		if (isFound == false)
+			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'ClassPath' section.");
 
 		// Write the pFile
 		MiscUtils.writeDoc(pFile, inputList);
 	}
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the system plist file to the specified
-	 * maxMemVal.
-	 * <P>
-	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string
-	 * elements of JVM arguments. The array element may be empty but must be specified.
+	 * Utility method to update the configuration file (pFile) to reflect the specified JRE version.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void updateMaxMem(long numBytes)
+	public static void updateJreVersion(JreVersion aJreVersion, File pFile)
 	{
-		// Utilize the system pList file and delegate.
-		updateMaxMem(numBytes, getPlistFile());
+		List<String> inputList;
+		String evalStr, tmpStr;
+		String prevKeyValue;
+		boolean isFound;
+
+		// Bail if the pFile is not writable
+		if (pFile.setWritable(true) == false)
+			throw new ErrorDM("The pFile is not writeable: " + pFile);
+
+		// Define the regex we will be searching for
+		String regex = "<string>(.*?)</string>";
+		Pattern tmpPattern = Pattern.compile(regex);
+
+		// Process our input
+		isFound = false;
+		inputList = new ArrayList<>();
+		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
+		{
+			// Read the lines
+			prevKeyValue = "";
+			while (true)
+			{
+				evalStr = br.readLine();
+				if (evalStr == null)
+					break;
+
+				// Keep track of the last key element
+				tmpStr = evalStr.trim();
+				if (tmpStr.startsWith("<key>") == true && tmpStr.endsWith("</key>") == true)
+					prevKeyValue = tmpStr.substring(5, tmpStr.length() - 6).trim();
+
+				// The JRE is specified just after the key element with the value: JVMRuntime
+				if (prevKeyValue.equals("JVMRuntime") == true && tmpPattern.matcher(evalStr).find() == true)
+				{
+					// Perform an inline replacement
+					String repStr = "<string>" + JreUtils.getExpandJrePath(aJreVersion) + "</string>";
+					evalStr = tmpPattern.matcher(evalStr).replaceFirst(repStr);
+
+					isFound = true;
+				}
+
+				inputList.add(evalStr);
+			}
+		}
+		catch(IOException aExp)
+		{
+			throw new ErrorDM(aExp, "Failed while processing the pFile: " + pFile);
+		}
+
+		// Fail if there was no update performed
+		if (isFound == false)
+			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'JVMRuntime' section.");
+
+		// Write the pFile
+		MiscUtils.writeDoc(pFile, inputList);
 	}
 
 	/**
@@ -224,8 +259,23 @@ public class AppleUtils
 		// Load the XML document via the javax.xml.parsers.* package
 		try
 		{
+			// Load the XML document
 			doc = loadDoc(pFile);
 			docElement = doc.getDocumentElement();
+
+			// Clean up the XML to remove spurious empty line nodes. This is needed in Java 9 since the XML processing
+			// is different from Java 8 and prior. Spurious newlines seem to be introduced with Java 9 XML libs.
+			// Source:
+			// http://java9.wtf/xml-transformer/
+			// https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
+			XPath xp = XPathFactory.newInstance().newXPath();
+			NodeList nl = (NodeList)xp.evaluate("//text()[normalize-space(.)='']", doc, XPathConstants.NODESET);
+
+			for (int i = 0; i < nl.getLength(); ++i)
+			{
+				Node node = nl.item(i);
+				node.getParentNode().removeChild(node);
+			}
 		}
 		catch(Exception aExp)
 		{

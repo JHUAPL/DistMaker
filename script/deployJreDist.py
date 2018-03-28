@@ -3,6 +3,7 @@
 from __future__ import print_function
 import argparse
 import getpass
+import glob
 import math
 import os
 import shutil
@@ -13,7 +14,7 @@ import sys
 import jreUtils
 import logUtils
 import miscUtils
-from logUtils import errPrintln
+from logUtils import errPrintln, regPrintln
 from miscUtils import ErrorDM
 
 
@@ -25,11 +26,21 @@ def getAppLauncherSourceFile():
 	return retFile
 
 
+def getAppLauncherFileName():
+	"""Returns the formal file name that the appLauncher.jar should be refered to as. The returned
+	value will contain just the file name with out any folder paths. The returned file name will
+	 be formatted: appLauncher-<version>.jar"""
+	version = getAppLauncherVersion()
+	retFileName = 'appLauncher-' + version + '.jar'
+	return retFileName
+
+
 def getAppLauncherVersion():
+	"""Returns the version of the the appLauncher.jar that is used by this DistMaker release."""
 	# Check for appLauncher.jar prerequisite
 	jarFile = getAppLauncherSourceFile()
 	if os.path.exists(jarFile) == False:
-		errPrintln('This installation of DistMaker appears to be broken. Please ensure there is an appLauncher.jarfile in the template folder.', indent=1)
+		errPrintln('This installation of DistMaker appears to be broken. Please ensure there is an appLauncher.jar file in the template folder.', indent=1)
 		errPrintln('File does not exist: ' + jarFile, indent=1)
 		exit(-1)
 
@@ -59,8 +70,8 @@ def addAppLauncherRelease():
 		os.makedirs(deployPath, 0o755)
 
 	# Determine the file name of the deployed appLauncher.jar file
+	dstFileName = getAppLauncherFileName()
 	version = getAppLauncherVersion()
-	dstFileName = 'appLauncher-' + version + '.jar'
 
 	# Bail if the deployed appLauncher.jar already exists
 	dstFile = os.path.join(deployPath, dstFileName)
@@ -88,8 +99,6 @@ def addAppLauncherRelease():
 	# Copy the src appLauncher.jar file to it's deployed location
 	shutil.copy2(srcFile, dstFile)
 	os.chmod(dstFile, 0o644)
-
-
 
 
 def addRelease(version):
@@ -267,6 +276,92 @@ def delReleaseInfo(installPath, version):
 	f.close()
 
 
+def showReleaseInfo():
+	"""This action will display information on the deployed / undeployed JREs to stdout."""
+	# Header section
+	appInstallRoot = miscUtils.getInstallRoot()
+	appInstallRoot = os.path.dirname(appInstallRoot)
+
+	logUtils.regPrintln('Install Path: ' + os.path.abspath(appInstallRoot))
+	logUtils.regPrintln(' Deploy Root: ' + rootPath + '\n')
+
+	# Validate that the deployRoot location
+	if os.path.exists(rootPath) == False:
+		logUtils.errPrintln('The specified deployRoot does not exits.')
+		exit()
+	if os.path.isdir(rootPath) == False:
+		logUtils.errPrintln('The specified deployRoot does not appear to be a valid folder.')
+		exit()
+
+	# Check to see if the jre folder exists in the deployRoot
+	installPath = os.path.join(rootPath, 'jre')
+	if os.path.isdir(installPath) == False:
+		logUtils.errPrintln('The specified deployRoot does not have any deployed JREs...')
+		exit();
+
+	# Form a dictionary of all the JRE version to corresponding (JRE) tar.gz files
+	# This dictionary will include all the JREs that are known by this release of DistMaker
+	searchName = "jre-*.tar.gz";
+	searchPath = os.path.join(os.path.abspath(appInstallRoot), 'jre', searchName)
+	fullD = dict()
+	for aFile in glob.glob(searchPath):
+		# Skip to next if aFile is not a valid JRE tar.gz file
+		aFile = os.path.basename(aFile)
+		tmpVerArr = jreUtils.getJreTarGzVerArr(aFile)
+		if tmpVerArr == None:
+			continue
+
+		tmpVerStr =  jreUtils.verArrToVerStr(tmpVerArr)
+		fullD.setdefault(tmpVerStr, [])
+		fullD[tmpVerStr].append(aFile)
+
+	# Get the list of available (installable) JREs
+	availablePathL = []
+	for aVer in sorted(fullD.keys()):
+		# Skip to next if this version has already been installed
+		versionPath = os.path.join(installPath, aVer)
+		if os.path.isdir(versionPath) == True:
+			continue
+		availablePathL.append(aVer)
+
+	# Show the list of available (installable) JREs
+	print('Available JREs:')
+	if len(availablePathL) == 0:
+		logUtils.regPrintln('There are no installable JREs.', indent=2)
+	for aVer in availablePathL:
+		logUtils.regPrintln('Version: {}'.format(aVer), indent=1)
+		for aFile in sorted(fullD[aVer]):
+			logUtils.regPrintln('{}'.format(aFile), indent=2)
+	logUtils.regPrintln('')
+
+	# Get the list of all installed (version) folders
+	installedPathL = []
+	searchPath = installPath + '/*'
+	for aFile in glob.glob(searchPath):
+		if os.path.isdir(aFile) == False:
+			continue
+		try:
+			verStr = os.path.basename(aFile)
+		except:
+			continue
+		installedPathL.append(verStr)
+
+	# Show the list of installed JREs
+	print('Installed JREs:')
+	if len(installedPathL) == 0:
+		logUtils.regPrintln('There are no installed JREs.', indent=2)
+	for aVer in sorted(installedPathL):
+		logUtils.regPrintln('Version: {}'.format(aVer), indent=1)
+		for aFile in sorted(glob.glob(os.path.join(installPath, aVer) + '/*')):
+			tmpVerArr = jreUtils.getJreTarGzVerArr(aFile)
+			if tmpVerArr == None:
+				continue;
+			aFile = os.path.basename(aFile)
+			logUtils.regPrintln('{}'.format(aFile), indent=2)
+	logUtils.regPrintln('')
+
+
+
 if __name__ == "__main__":
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, miscUtils.handleSignal)
@@ -276,11 +371,15 @@ if __name__ == "__main__":
 	scriptPath = os.path.dirname(scriptPath)
 
 	# Set up the argument parser
-	parser = argparse.ArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@')
+	tmpDescr = 'Utility that allow JREs to be deployed or removed from the specified deployRoot. The deployRoot is the '
+	tmpDescr += 'top level deployment location. This location is typically made available via a public web server. The ';
+	tmpDescr +=  'deployRoot should NOT refer to the child jre folder but rather the top level folder!'
+	parser = argparse.ArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@', description=tmpDescr)
 	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
-	parser.add_argument('-remove', help='Remove the specified JRE distribution.', action='store_true', default=False)
-	parser.add_argument('-version', help='The fully qualified JRE version to deploy.', required=True)
-	parser.add_argument('deployRoot', help='Root location to deploy the specified JRE distribution.')
+	parser.add_argument('-deploy', metavar='version', help='Deploy the specified JRE distribution to the deployRoot.', action='store', default=None)
+	parser.add_argument('-remove', metavar='version', help='Remove the specified JRE distribution from the deployRoot.', action='store', default=None)
+	parser.add_argument('-status', help='Display stats of all deployed/undeployed JREs relative to the deployRoot.', action='store_true', default=False)
+	parser.add_argument('deployRoot', help='Top level folder to the deployment root.')
 
 	# Intercept any request for a  help message and bail
 	argv = sys.argv;
@@ -292,20 +391,28 @@ if __name__ == "__main__":
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
 
+	# Process the args
 	rootPath = args.deployRoot
 
-	# Uninstall the JRE, if remove argument is specified
-	version = args.version
-	if args.remove == True:
-		try:
-			delRelease(version)
-		except ErrorDM as aExp:
-			print('Failed to remove JREs with version: ' + version)
-			print('  ' + aExp.message, file=sys.stderr)
-	else:
+	if args.status == True:
+		showReleaseInfo()
+		exit()
+	elif args.deploy != None:
+		# Deploy the specified JRE
+		version = args.deploy
 		try:
 			addRelease(version)
 		except ErrorDM as aExp:
 			print('Failed to deploy JREs with version: ' + version)
 			print('  ' + aExp.message, file=sys.stderr)
+	elif args.remove != None:
+		# Remove the specified JRE
+		version = args.remove
+		try:
+			delRelease(version)
+		except ErrorDM as aExp:
+			print('Failed to deploy JREs with version: ' + version)
+			print('  ' + aExp.message, file=sys.stderr)
+	else:
+		print('Please specify one of the valid actions: [-deploy, -remove, -status]')
 

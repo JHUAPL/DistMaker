@@ -21,3 +21,11 @@ def errPrintln(aMsg="", indent=0):
 		aMsg = '   ' + aMsg
 	sys.stderr.write(aMsg + '\n')
 
+
+def regPrintln(aMsg="", indent=0):
+	"""Print the specified string with a trailing newline to stdout."""
+	while indent > 0:
+		indent -= 1
+		aMsg = '   ' + aMsg
+	sys.stdout.write(aMsg + '\n')
+

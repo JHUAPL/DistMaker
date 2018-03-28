@@ -4,10 +4,10 @@ import java.io.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import distMaker.*;
-import distMaker.jre.JreUtils;
-import distMaker.jre.JreVersion;
+import distMaker.jre.*;
 
 public class LinuxUtils
 {
@@ -58,10 +58,58 @@ public class LinuxUtils
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void updateJreVersion(JreVersion aJreVersion)
+	public static void updateAppLauncher(AppLauncherRelease aRelease, File aScriptFile)
 	{
-		// Utilize the system scriptFile and delegate.
-		updateJreVersion(aJreVersion, getScriptFile());
+		List<String> inputList;
+		String evalStr, tmpStr;
+		boolean isFound;
+
+		// Bail if the scritpFile is not writable
+		if (aScriptFile.setWritable(true) == false)
+			throw new ErrorDM("The script file is not writeable: " + aScriptFile);
+
+		// Define the regex we will be searching for
+		Pattern tmpPattern = Pattern.compile("\\-cp[\\s]+.*.jar");
+
+		// Process our input
+		isFound = false;
+		inputList = new ArrayList<>();
+		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aScriptFile))
+		{
+			// Read the lines
+			while (true)
+			{
+				evalStr = br.readLine();
+				if (evalStr == null)
+					break;
+
+				// Locate where the AppLauncher is specified
+				tmpStr = evalStr.trim();
+				if (tmpPattern.matcher(tmpStr).find() == true)
+				{
+					String repStr;
+
+					// Perform an inline replacement
+					repStr = "-cp ../launcher/" + PlatformUtils.getAppLauncherFileName(aRelease.getVersion());
+					evalStr = tmpPattern.matcher(tmpStr).replaceFirst(repStr);
+
+					isFound = true;
+				}
+
+				inputList.add(evalStr);
+			}
+		}
+		catch(IOException aExp)
+		{
+			throw new ErrorDM(aExp, "Failed while processing the script file: " + aScriptFile);
+		}
+
+		// Fail if there was no update performed
+		if (isFound == false)
+			throw new ErrorDM("[" + aScriptFile + "] The script does not specify a valid class path.");
+
+		// Write the scriptFile
+		MiscUtils.writeDoc(aScriptFile, inputList);
 	}
 
 	/**
@@ -73,19 +121,18 @@ public class LinuxUtils
 	{
 		List<String> inputList;
 		String evalStr, tmpStr;
-		int currLineNum, targLineNum;
+		boolean isFound;
 
 		// Bail if the scritpFile is not writable
 		if (aScriptFile.setWritable(true) == false)
 			throw new ErrorDM("The script file is not writeable: " + aScriptFile);
 
 		// Process our input
+		isFound = false;
 		inputList = new ArrayList<>();
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aScriptFile))
 		{
 			// Read the lines
-			currLineNum = 0;
-			targLineNum = -1;
 			while (true)
 			{
 				evalStr = br.readLine();
@@ -95,10 +142,12 @@ public class LinuxUtils
 				// Locate where the java executable is specified
 				tmpStr = evalStr.trim();
 				if (tmpStr.startsWith("javaExe=") == true)
-					targLineNum = currLineNum;
+				{
+					isFound = true;
+					evalStr = "javaExe=../" + JreUtils.getExpandJrePath(aJreVersion) + "/bin/java";
+				}
 
 				inputList.add(evalStr);
-				currLineNum++;
 			}
 		}
 		catch(IOException aExp)
@@ -106,31 +155,12 @@ public class LinuxUtils
 			throw new ErrorDM(aExp, "Failed while processing the script file: " + aScriptFile);
 		}
 
-		// Update the script
-		if (targLineNum != -1)
-			inputList.set(targLineNum, "javaExe=../" + JreUtils.getExpandJrePath(aJreVersion) + "/bin/java");
-		else
-			throw new ErrorDM("[" + aScriptFile + "] The script does not specify 'javaExe'.");
+		// Fail if there was no update performed
+		if (isFound == false)
+			throw new ErrorDM("[" + aScriptFile + "] The script does not specify a valid JRE path.");
 
 		// Write the scriptFile
 		MiscUtils.writeDoc(aScriptFile, inputList);
-	}
-
-	/**
-	 * Utility method to update the specified maxMem var in the script (aFile) to the requested number of bytes.
-	 * <P>
-	 * Note this method assumes the specified file is a shell script built by DistMaker where the var maxMem holds the
-	 * proper (right side) specification for the JVM's -Xmx value.
-	 * <P>
-	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method
-	 * will (silently) fail to configure the value needed to launch the JVM.
-	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 */
-	public static void updateMaxMem(long numBytes)
-	{
-		// Utilize the system scriptFile and delegate.
-		updateMaxMem(numBytes, getScriptFile());
 	}
 
 	/**

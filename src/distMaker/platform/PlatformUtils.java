@@ -2,10 +2,10 @@ package distMaker.platform;
 
 import java.io.File;
 
-import distMaker.DistUtils;
 import distMaker.ErrorDM;
 import distMaker.jre.*;
 import distMaker.node.AppRelease;
+import distMaker.utils.Version;
 
 public class PlatformUtils
 {
@@ -31,35 +31,71 @@ public class PlatformUtils
 	}
 
 	/**
-	 * Utility method that returns the path where the specified JRE should be unpacked to.
+	 * Returns the file name that should be used for a specific AppLauncher version.
+	 * <P>
+	 * Namely legacy AppLauncher versions (versions equal to 0.0.x) will be expanded to:<BR>
+	 * <B>{@code appLauncher.jar}</B><BR>
+	 * while non legacy versions will be expanded to something like:<BR>
+	 * <B>{@code appLauncher-<version>.jar}</B>
 	 */
-	public static File getJreLocation(JreRelease aJreRelease)
+	public static String getAppLauncherFileName(Version aVersion)
 	{
-		// Delegate to actual worker method
-		return getJreLocation(aJreRelease.getVersion());
+		if (aVersion.getMajorVersion() == 0 && aVersion.getMinorVersion() == 0)
+			return "appLauncher.jar";
+
+		return "appLauncher-" + aVersion + ".jar";
 	}
 
 	/**
-	 * Utility method that returns the path where the specified JRE should be unpacked to.
+	 * Utility method that returns the relative path where the specified AppLauncher is installed.
+	 * <P>
+	 * The returned path will be relative to the top of the application's DistMaker root rather than the applications
+	 * Java run path.
 	 */
-	public static File getJreLocation(JreVersion aJreVersion)
+	public static String getAppLauncherLocation(Version aVersion)
 	{
-		String platform, relJrePathStr;
-		File installPath, retJrePath;
+		String platform, tmpPathName, retPath;
 
-		retJrePath = null;
-		installPath = DistUtils.getAppPath();
-		relJrePathStr = JreUtils.getExpandJrePath(aJreVersion);
+		retPath = null;
+		tmpPathName = getAppLauncherFileName(aVersion);
 
 		platform = PlatformUtils.getPlatform().toUpperCase();
 		if (platform.equals("APPLE") == true)
-			retJrePath = new File(installPath.getParentFile(), "PlugIns/" + relJrePathStr);
+			retPath = "Java/" + tmpPathName;
 		else if (platform.equals("LINUX") == true)
-			retJrePath = new File(installPath.getParentFile(), relJrePathStr);
+			retPath = "launcher/" + tmpPathName;
 		else if (platform.equals("WINDOWS") == true)
-			retJrePath = new File(installPath.getParentFile(), relJrePathStr);
+			retPath = "launcher/" + tmpPathName;
+		else
+			throw new ErrorDM("Unsupported platform: " + platform);
 
-		return retJrePath;
+		return retPath;
+	}
+
+	/**
+	 * Utility method that returns the relative path where the specified JRE should be unpacked to.
+	 * <P>
+	 * The returned path will be relative to the top of the application's DistMaker root rather than the applications
+	 * Java run path.
+	 */
+	public static String getJreLocation(JreVersion aJreVersion)
+	{
+		String platform, tmpPathName, retPath;
+
+		retPath = null;
+		tmpPathName = JreUtils.getExpandJrePath(aJreVersion);
+
+		platform = PlatformUtils.getPlatform().toUpperCase();
+		if (platform.equals("APPLE") == true)
+			retPath = "PlugIns/" + tmpPathName;
+		else if (platform.equals("LINUX") == true)
+			retPath = tmpPathName;
+		else if (platform.equals("WINDOWS") == true)
+			retPath = tmpPathName;
+		else
+			throw new ErrorDM("Unsupported platform: " + platform);
+
+		return retPath;
 	}
 
 	/**
@@ -81,6 +117,36 @@ public class PlatformUtils
 	}
 
 	/**
+	 * Utility method to configure the AppLauncher used by the (active) DistMaker distribution.
+	 * <P>
+	 * Note this will only take effect after the application has been restarted.
+	 * <P>
+	 * On failure this method will throw an exception of type ErrorDM.
+	 * 
+	 * @param aRelease
+	 *        The AppLauncher release that will be utilized.
+	 */
+	public static void setAppLauncher(AppLauncherRelease aRelease)
+	{
+		String platform;
+		File cfgFile;
+
+		// Retrieve the appropriate configuration file
+		cfgFile = PlatformUtils.getConfigurationFile();
+
+		// Delegate to the proper platform code
+		platform = PlatformUtils.getPlatform().toUpperCase();
+		if (platform.equals("APPLE") == true)
+			AppleUtils.updateAppLauncher(aRelease, cfgFile);
+		else if (platform.equals("LINUX") == true)
+			LinuxUtils.updateAppLauncher(aRelease, cfgFile);
+		else if (platform.equals("WINDOWS") == true)
+			WindowsUtils.updateAppLauncher(aRelease, cfgFile);
+		else
+			throw new ErrorDM("Unrecognized platform: " + platform);
+	}
+
+	/**
 	 * Utility method to configure the JRE version used by the (active) DistMaker distribution.
 	 * <P>
 	 * Note this will only take effect after the application has been restarted.
@@ -93,15 +159,19 @@ public class PlatformUtils
 	public static void setJreVersion(JreVersion aJreVersion)
 	{
 		String platform;
+		File cfgFile;
+
+		// Retrieve the appropriate configuration file
+		cfgFile = PlatformUtils.getConfigurationFile();
 
 		// Delegate to the proper platform code
 		platform = PlatformUtils.getPlatform().toUpperCase();
 		if (platform.equals("APPLE") == true)
-			AppleUtils.updateJreVersion(aJreVersion);
+			AppleUtils.updateJreVersion(aJreVersion, cfgFile);
 		else if (platform.equals("LINUX") == true)
-			LinuxUtils.updateJreVersion(aJreVersion);
+			LinuxUtils.updateJreVersion(aJreVersion, cfgFile);
 		else if (platform.equals("WINDOWS") == true)
-			WindowsUtils.updateJreVersion(aJreVersion);
+			WindowsUtils.updateJreVersion(aJreVersion, cfgFile);
 		else
 			throw new ErrorDM("Unrecognized platform: " + platform);
 	}
@@ -119,15 +189,19 @@ public class PlatformUtils
 	public static void setMaxHeapMem(long maxMemSize)
 	{
 		String platform;
+		File cfgFile;
+
+		// Retrieve the appropriate configuration file
+		cfgFile = PlatformUtils.getConfigurationFile();
 
 		// Delegate to the proper platform code
 		platform = PlatformUtils.getPlatform().toUpperCase();
 		if (platform.equals("APPLE") == true)
-			AppleUtils.updateMaxMem(maxMemSize);
+			AppleUtils.updateMaxMem(maxMemSize, cfgFile);
 		else if (platform.equals("LINUX") == true)
-			LinuxUtils.updateMaxMem(maxMemSize);
+			LinuxUtils.updateMaxMem(maxMemSize, cfgFile);
 		else if (platform.equals("WINDOWS") == true)
-			WindowsUtils.updateMaxMem(maxMemSize);
+			WindowsUtils.updateMaxMem(maxMemSize, cfgFile);
 		else
 			throw new ErrorDM(null, "Unrecognized platform: " + platform, "Unsupported Platform");
 	}
@@ -142,11 +216,15 @@ public class PlatformUtils
 	public static void updateAppRelease(AppRelease aRelease)
 	{
 		String platform;
+		File cfgFile;
+
+		// Retrieve the appropriate configuration file
+		cfgFile = PlatformUtils.getConfigurationFile();
 
 		// Delegate to the proper platform code
 		platform = getPlatform().toUpperCase();
 		if (platform.equals("APPLE") == true)
-			AppleUtils.updateAppVersion(aRelease.getVersion());
+			AppleUtils.updateAppVersion(aRelease.getVersion(), cfgFile);
 	}
 
 }

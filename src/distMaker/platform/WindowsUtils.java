@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import distMaker.*;
+import distMaker.jre.AppLauncherRelease;
 import distMaker.jre.JreVersion;
 
 public class WindowsUtils
@@ -66,14 +67,14 @@ public class WindowsUtils
 	}
 
 	/**
-	 * Utility method to update the configuration to reflect the specified JRE version.
+	 * Utility method to update the configuration to reflect the specified AppLauncher version.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void updateJreVersion(JreVersion aJreVersion)
+	public static void updateAppLauncher(AppLauncherRelease aRelease, File aConfigFile)
 	{
-		// Utilize the system configFile and delegate.
-		updateJreVersion(aJreVersion, getConfigFile());
+		int zzz_incomplete_logic;
+		throw new ErrorDM("The logic is incomplete.");
 	}
 
 	/**
@@ -88,24 +89,11 @@ public class WindowsUtils
 	}
 
 	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified maxMemVal.
+	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified
+	 * maxMemVal.
 	 * <P>
-	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in the script. It assumes this string will
-	 * be surrounded by a single space character on each side.
-	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 */
-	public static void updateMaxMem(long numBytes)
-	{
-		// Utilize the system configFile and delegate.
-		updateMaxMem(numBytes, getConfigFile());
-	}
-
-	/**
-	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified maxMemVal.
-	 * <P>
-	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in the script. It assumes this string will
-	 * be surrounded by a single space character on each side.
+	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in
+	 * the script. It assumes this string will be surrounded by a single space character on each side.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
@@ -116,7 +104,6 @@ public class WindowsUtils
 		boolean isProcessed;
 
 		// Bail if the configFile is not writable
-		aConfigFile = getConfigFile();
 		if (aConfigFile.setWritable(true) == false)
 			throw new ErrorDM("The config file is not writeable: " + aConfigFile);
 

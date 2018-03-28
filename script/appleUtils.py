@@ -12,6 +12,7 @@ import glob
 
 import jreUtils
 import miscUtils
+import deployJreDist
 
 
 def buildRelease(args, buildPath):
@@ -66,13 +67,13 @@ def buildRelease(args, buildPath):
 		# Build the contents of the distribution folder
 		buildDistTree(buildPath, tmpPath, args, aJreTarGzFile)
 
-		# Create the DMG image via genisoimage
+		# Create the DMG image via genisoimage or hdiutil
 		dmgFile = os.path.join(buildPath, aDistName + '.dmg')
-#		cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
 		if platform.system() == 'Darwin':
 #			cmd = ['hdiutil', 'create', '-fs', 'HFS+'  '-o', dmgFile, '-quiet', '-volname', appName, '-srcfolder', tmpPath]
 			cmd = ['hdiutil', 'makehybrid', '-hfs', '-o', dmgFile, '-default-volume-name', appName, tmpPath]
 		else:
+#			cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
 			cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
 		print('\tForming DMG image. File: ' + dmgFile)
 		proc = miscUtils.executeAndLog(cmd, "\t\tgenisoimage: ")
@@ -212,10 +213,10 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 
 
 	# Setup the launcher contents
-	exePath = os.path.join(payloadPath, 'Java')
+	dstPath = os.path.join(payloadPath, "Java/" + deployJreDist.getAppLauncherFileName())
 	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
-	os.makedirs(exePath)
-	shutil.copy(srcPath, exePath);
+	os.makedirs(os.path.dirname(dstPath))
+	shutil.copy(srcPath, dstPath);
 
 	# Build the java component of the distribution
 	if args.javaCode != None:
@@ -307,13 +308,6 @@ def buildPListInfoShared(destFile, args):
 	if args.icnsFile != None:
 		icnsStr = os.path.basename(args.icnsFile)
 
-	classPathStr = '$JAVAROOT/appLauncher.jar'
-#	classPathStr = ''
-#	for aStr in args.classPath:
-#		classPathStr += '$JAVAROOT/' + aStr + ':'
-#	if len(classPathStr) > 0:
-#		classPathStr = classPathStr[0:-1]
-
 	jvmArgsStr = ''
 	for aStr in args.jvmArgs:
 		jvmArgsStr += aStr + ' '
@@ -344,6 +338,8 @@ def buildPListInfoShared(destFile, args):
 	# JVM configuration
 	writeln(f, 2, '<key>Java</key>')
 	writeln(f, 2, '<dict>')
+
+	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
 
 	tupList = []
 	tupList.append(('JVMVersion', '1.7+'))
@@ -431,12 +427,7 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 	writeln(f, 2, '<key>Java</key>')
 	writeln(f, 2, '<dict>')
 
-	classPathStr = '$JAVAROOT/appLauncher.jar'
-#	classPathStr = ''
-#	for aStr in args.classPath:
-#		classPathStr += '$JAVAROOT/' + aStr + ':'
-#	if len(classPathStr) > 0:
-#		classPathStr = classPathStr[0:-1]
+	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
 
 	tupList = []
 	tupList.append(('ClassPath', classPathStr))
@@ -453,7 +444,7 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 
 
 def checkSystemEnvironment():
-	"""Checks to ensure that all system application / environment variables needed to build a Windows distribution are installed
+	"""Checks to ensure that all system application / environment variables needed to build a Apple distribution are installed
 	and properly configured. Returns False if the system environment is insufficient"""
 	return True
 

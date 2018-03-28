@@ -78,7 +78,7 @@ public class AppLauncherUtils
 				String[] tokens;
 				tokens = strLine.split(",", 5);
 				if (tokens.length == 2 && tokens[0].equals("name") == true && tokens[1].equals("AppLauncher") == true)
-					; // Nothing to do - we just entered the "JRE" section
+					; // Nothing to do - we just entered the "AppLauncher" section
 				// Logic to handle the 'exit' command
 				else if (tokens.length >= 1 && tokens[0].equals("exit") == true)
 				{
@@ -244,12 +244,9 @@ public class AppLauncherUtils
 		Version pickVer = pickRelease.getVersion();
 		long fileLen = pickRelease.getFileLen();
 
-		// Define the path to the launcher
-		File launcherPath;
-		if (PlatformUtils.getPlatform().equals("Apple") == true)
-			launcherPath = new File(aDestPath.getParentFile(), "Java");
-		else
-			launcherPath = new File(aDestPath.getParentFile(), "launcher");
+		// Retrieve the relative path to the launcher
+		String relLauncherPath;
+		relLauncherPath = PlatformUtils.getAppLauncherLocation(pickVer);
 
 		// Download the AppLauncher
 		Digest targDigest, testDigest;
@@ -257,9 +254,8 @@ public class AppLauncherUtils
 		targDigest = pickRelease.getDigest();
 		msgDigest = DigestUtils.getDigest(targDigest.getType());
 		aTask.infoAppendln("Downloading AppLauncher... Version: " + pickVer);
-		URL srcUrl = IoUtil.createURL(updateSiteUrl.toString() + "/launcher/appLauncher-" + pickVer + ".jar");
-		File dstFile = new File(launcherPath, pickRelease.getFileName());
-		int zios_2018Feb15; // TODO: Consider refactoring this code and making it cleaner...
+		URL srcUrl = IoUtil.createURL(updateSiteUrl.toString() + "/launcher/" + pickRelease.getFileName());
+		File dstFile = new File(aDestPath.getParentFile(), relLauncherPath);
 		Task tmpTask = new PartialTask(aTask, aTask.getProgress(), 0.01);
 //		Task tmpTask = new PartialTask(aTask, aTask.getProgress(), (tmpFileLen * 0.75) / (releaseSizeFull + 0.00));
 //		Task tmpTask = new SilentTask();
@@ -267,7 +263,7 @@ public class AppLauncherUtils
 		{
 			aTask.infoAppendln("Failed to download updated AppLauncher.");
 			aTask.infoAppendln("\tSource: " + srcUrl);
-			aTask.infoAppendln("\tFile: " + dstFile + "\n");
+			aTask.infoAppendln("\tFile: " + dstFile);
 			return null;
 		}
 
@@ -278,60 +274,12 @@ public class AppLauncherUtils
 			aTask.infoAppendln("The download of the AppLauncher appears to be corrupted.");
 			aTask.infoAppendln("\tFile: " + dstFile);
 			aTask.infoAppendln("\t\tExpected " + targDigest.getDescr());
-			aTask.infoAppendln("\t\tReceived " + testDigest.getDescr() + "\n");
+			aTask.infoAppendln("\t\tReceived " + testDigest.getDescr());
 			return null;
 		}
 
-		// Update the appLauncher.jar file
-		File targFile = new File(launcherPath, "appLauncher.jar");
-		boolean isPass;
-
-		// Back up the "original" targFile (only if a backup has not already already been made). In case
-		// there are multiple updates we do not want to overwrite the "real" original
-		boolean isOriginalBackedUp = false;
-		File origFile = new File(launcherPath, "appLauncher.jar.orig");
-		if (origFile.exists() == false)
-		{
-			isPass = targFile.renameTo(origFile);
-			if (isPass == false)
-			{
-				aTask.infoAppendln("Failed to rename: " + targFile + " to " + origFile);
-			}
-			else
-			{
-				isOriginalBackedUp = true;
-				aTask.infoAppendln("Original file has been backed up.");
-				aTask.infoAppendln("\t" + targFile + " ---> " + origFile);
-			}
-		}
-
-		// Update the targFile with the newly downloaded file
-		isPass = dstFile.renameTo(targFile);
-//		targFile.renameTo(origFile);
-		if (isPass == false)
-		{
-			aTask.infoAppendln("Failed to rename: " + dstFile + " to " + targFile);
-			aTask.infoAppendln("Update is being aborted");
-
-			// We need to revert to the original backup
-			if (isOriginalBackedUp == true)
-			{
-				isPass = origFile.renameTo(targFile);
-				if (isPass == false)
-				{
-					aTask.infoAppendln("Failed to revert to the orginal AppLauncher.");
-					aTask.infoAppendln("\t" + targFile);
-					aTask.infoAppendln("Update has FAILED and left application in an invalid state.\n");
-				}
-			}
-
-			return null;
-		}
-		else
-		{
-			aTask.infoAppendln("Success updating AppLauncher... ");
-			aTask.infoAppendln("\t" + dstFile + " ---> " + targFile + "\n");
-		}
+		// Log the success
+		aTask.infoAppendln("Success updating AppLauncher...");
 
 		return pickRelease;
 	}

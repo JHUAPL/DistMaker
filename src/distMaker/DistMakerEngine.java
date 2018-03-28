@@ -21,6 +21,7 @@ import distMaker.gui.PickReleasePanel;
 import distMaker.jre.*;
 import distMaker.node.*;
 import distMaker.platform.PlatformUtils;
+import distMaker.utils.Version;
 import glum.gui.panel.generic.MessagePanel;
 import glum.gui.panel.generic.PromptPanel;
 import glum.gui.panel.task.FullTaskPanel;
@@ -442,7 +443,7 @@ public class DistMakerEngine
 	 * <P>
 	 * Returns true if the release was downloaded properly.
 	 */
-	private boolean downloadAppRelease(Task aTask, AppRelease aRelease, File destPath)
+	private boolean downloadAppRelease(Task aTask, AppRelease aRelease, File aDestPath)
 	{
 		AppCatalog staleCat, updateCat;
 		Node staleNode, updateNode;
@@ -471,7 +472,7 @@ public class DistMakerEngine
 			return false;
 
 		// Download the update app catalog to the (local) delta location (Progress -> [0% - 1%])
-		File appNewPath = new File(destPath, "app");
+		File appNewPath = new File(aDestPath, "app");
 		appNewPath.mkdirs();
 		catUrl = IoUtil.createURL(updateUrl.toString() + "/catalog.txt");
 		catalogFile = new File(appNewPath, "catalog.txt");
@@ -496,13 +497,19 @@ public class DistMakerEngine
 
 		// Ensure our JRE version is compatible for this release
 		JreRelease targJre = null;
+		AppLauncherRelease targAppLauncher = null;
 		JreVersion currJreVer = DistUtils.getJreVersion();
+		Version currAppLauncherVer = DistUtils.getAppLauncherVersion();
 		if (updateCat.isJreVersionCompatible(currJreVer) == false)
 		{
 			// Bail if we failed to download a compatible JRE
-			targJre = downloadJreUpdate(mainTask, updateCat, destPath, releaseSizeFull);
-			if (targJre == null)
+			JreUpdateResult tmpJreUpdateResult;
+			tmpJreUpdateResult = downloadJreUpdate(mainTask, updateCat, aDestPath, releaseSizeFull);
+			if (tmpJreUpdateResult == null)
 				return false;
+
+			targJre = tmpJreUpdateResult.targJre;
+			targAppLauncher = tmpJreUpdateResult.targAppLauncher;
 
 			// Update the progress to reflect the downloaded / updated JRE
 			releaseSizeCurr += targJre.getFileLen();
@@ -583,40 +590,42 @@ public class DistMakerEngine
 
 		// Create the delta.cmd file which provides the Updater with the clean activities to perform
 		// (based on fail / pass conditions)
-		File deltaCmdFile = new File(destPath, "delta.cmd");
+		File deltaCmdFile = new File(aDestPath, "delta.cmd");
 		try (FileWriter tmpFW = new FileWriter(deltaCmdFile))
 		{
+			File rootPath = DistUtils.getAppPath().getParentFile();
+
+			// Write the section: fail
+			tmpFW.write("# Define the fail section (clean up for failure)\n");
+			tmpFW.write("sect,fail\n");
 			if (targJre != null)
 			{
-				File rootPath = DistUtils.getAppPath().getParentFile();
-
 				JreVersion targJreVer = targJre.getVersion();
-				tmpFW.write("# Define the fail section (clean up for failure)\n");
-				tmpFW.write("sect,fail\n");
 				tmpFW.write("copy," + "delta/" + appCfgFile.getName() + ".old," + MiscUtils.getRelativePath(rootPath, appCfgFile) + "\n");
-				tmpFW.write("reboot,trash," + JreUtils.getExpandJrePath(targJreVer) + "\n");
-				tmpFW.write("exit\n\n");
-
-				tmpFW.write("# Define the pass section (clean up for success)\n");
-				tmpFW.write("sect,pass\n");
-				tmpFW.write("trash," + JreUtils.getExpandJrePath(currJreVer) + "\n");
-				tmpFW.write("exit\n\n");
+				tmpFW.write("reboot,trash," + PlatformUtils.getJreLocation(targJreVer) + "\n");
 			}
-			else
+			if (targAppLauncher != null)
 			{
-				tmpFW.write("# Define the fail section (clean up for failure)\n");
-				tmpFW.write("sect,fail\n");
-				tmpFW.write("exit\n\n");
-
-				tmpFW.write("# Define the pass section (clean up for success)\n");
-				tmpFW.write("sect,pass\n");
-				tmpFW.write("exit\n\n");
+				Version targAppLauncherVer = targAppLauncher.getVersion();
+				tmpFW.write("reboot,trash," + PlatformUtils.getAppLauncherLocation(targAppLauncherVer) + "\n");
 			}
+			tmpFW.write("exit\n\n");
 
+			// Write the section: pass
+			tmpFW.write("# Define the pass section (clean up for success)\n");
+			tmpFW.write("sect,pass\n");
+			if (targJre != null)
+				tmpFW.write("trash," + PlatformUtils.getJreLocation(currJreVer) + "\n");
+			if (targAppLauncher != null)
+				tmpFW.write("trash," + PlatformUtils.getAppLauncherLocation(currAppLauncherVer) + "\n");
+			tmpFW.write("exit\n\n");
+
+			// Write the section: reboot
 			tmpFW.write("# Define the reboot section\n");
 			tmpFW.write("sect,reboot\n");
 			tmpFW.write("exit\n\n");
 
+			// Write the section: test
 			tmpFW.write("# Define the test section\n");
 			tmpFW.write("sect,test\n");
 			tmpFW.write("exit\n\n");
@@ -634,8 +643,10 @@ public class DistMakerEngine
 
 		// Since an updated JRE was needed...
 		// Moved the JRE (unpacked folder) from its drop path to the proper location
-		File jreDropPath = new File(destPath, JreUtils.getExpandJrePath(targJre.getVersion()));
-		File jreTargPath = PlatformUtils.getJreLocation(targJre);
+		JreVersion targJreVer = targJre.getVersion();
+		File installPath = DistUtils.getAppPath();
+		File jreDropPath = new File(aDestPath, JreUtils.getExpandJrePath(targJreVer));
+		File jreTargPath = new File(installPath.getParentFile(), PlatformUtils.getJreLocation(targJreVer));
 		jreTargPath.getParentFile().setWritable(true);
 		if (jreDropPath.renameTo(jreTargPath) == false)
 		{
@@ -646,13 +657,14 @@ public class DistMakerEngine
 		}
 
 		// Backup the application configuration
+		File origAppCfgFile = new File(aDestPath, appCfgFile.getName() + ".old");
 		try
 		{
-			Files.copy(appCfgFile.toPath(), new File(destPath, appCfgFile.getName() + ".old").toPath(), StandardCopyOption.COPY_ATTRIBUTES);
+			Files.copy(appCfgFile.toPath(), origAppCfgFile.toPath(), StandardCopyOption.COPY_ATTRIBUTES);
 		}
 		catch(IOException aExp)
 		{
-			aTask.infoAppendln("Failed to backup application configuration file: " + deltaCmdFile);
+			aTask.infoAppendln("Failed to backup application configuration file: " + appCfgFile);
 			aTask.infoAppendln(ThreadUtil.getStackTrace(aExp));
 			return false;
 		}
@@ -661,6 +673,8 @@ public class DistMakerEngine
 		try
 		{
 			PlatformUtils.setJreVersion(targJre.getVersion());
+			if (targAppLauncher != null)
+				PlatformUtils.setAppLauncher(targAppLauncher);
 		}
 		catch(ErrorDM aExp)
 		{
@@ -672,6 +686,16 @@ public class DistMakerEngine
 			// Remove the just installed JRE
 			IoUtil.deleteDirectory(jreTargPath);
 
+			// Restore the application configuration
+			try
+			{
+				Files.copy(origAppCfgFile.toPath(), appCfgFile.toPath(), StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+			}
+			catch(IOException aExp2)
+			{
+				throw new ErrorDM(aExp2, "Failed to restore application configuration. Application may be unstable!");
+			}
+
 			return false;
 		}
 
@@ -679,11 +703,29 @@ public class DistMakerEngine
 	}
 
 	/**
+	 * Class used to store a complex 'tuple' value.
+	 * <P>
+	 * This object is used to store the results of a successful JRE update.
+	 */
+	private class JreUpdateResult
+	{
+		// Attributes
+		public final JreRelease targJre;
+		public final AppLauncherRelease targAppLauncher;
+
+		private JreUpdateResult(JreRelease aJreRelease, AppLauncherRelease aAppLauncherRelease)
+		{
+			targJre = aJreRelease;
+			targAppLauncher = aAppLauncherRelease;
+		}
+	}
+
+	/**
 	 * Helper method to download a compatible JreRelease for the AppCatalog to the specified destPath.
 	 * <P>
 	 * On success the JreVersion that was downloaded is returned.
 	 */
-	private JreRelease downloadJreUpdate(Task aTask, AppCatalog aUpdateCat, File aDestPath, long releaseSizeFull)
+	private JreUpdateResult downloadJreUpdate(Task aTask, AppCatalog aUpdateCat, File aDestPath, long releaseSizeFull)
 	{
 		List<JreRelease> jreList;
 
@@ -753,6 +795,7 @@ public class DistMakerEngine
 			pickAppLauncher = AppLauncherUtils.updateAppLauncher(aTask, pickJre, aDestPath, updateSiteUrl, refCredential);
 			if (pickAppLauncher == null)
 				return null;
+			aTask.infoAppendln("");
 		}
 
 		// Update the number of bytes to be retrieved to take into account the JRE which we will be downloading
@@ -816,14 +859,21 @@ public class DistMakerEngine
 			return null;
 		}
 
-		return pickJre;
+		// Return the results
+		return new JreUpdateResult(pickJre, pickAppLauncher);
 	}
 
 	/**
 	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration
-	 * should be in the same state as before an update was applied. Reverting consists of the following:
+	 * should be in the same state as before an update was applied.
+	 * <P>
+	 * It is necessary to do this, since the user may later cancel the update request and it is important to leave the
+	 * program and configuration files in a stable state.
+	 * <P>
+	 * An update will be reverted by doing:
 	 * <UL>
-	 * <LI>Removal of any downloaded and installed JRE
+	 * <LI>Reverting the configuration to the currently running JRE and AppRelease
+	 * <LI>Executing the 'fail' section of the file: delta/delta.cfg
 	 * <LI>Removing the delta directory
 	 * <LI>Removing the delta.cfg file
 	 * </UL>
@@ -863,9 +913,6 @@ public class DistMakerEngine
 		File rootPath = DistUtils.getAppPath().getParentFile();
 		File deltaPath = new File(rootPath, "delta");
 
-		// It is necessary to do this, since the user may later cancel the update request and it is important to
-		// leave the program and configuration files in a stable state.
-
 		// Execute any trash commands from the "fail" section of the delta.cmd file
 		File deltaCmdFile = new File(deltaPath, "delta.cmd");
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(deltaCmdFile))
@@ -904,39 +951,92 @@ public class DistMakerEngine
 				if (strArr.length == 1 && cmdStr.equals("exit") == true)
 					break;
 
-				// We are interested only in trash (or reboot,trash) commands. Execute the individual trash (or
-				// reboot,trash) commands. It is safe to execute reboot,trash commands now since the actual update is not
-				// running yet.
-				String delTargStr = null;
-				if (inputStr.startsWith("trash,") == true)
-					delTargStr = inputStr.substring(6);
-				else if (inputStr.startsWith("reboot,trash,") == true)
-					delTargStr = inputStr.substring(13);
-				else
-					continue;
-
-				// Ensure we are not looking at a "hollow" trash command
-				if (delTargStr.isEmpty() == true)
-					throw new ErrorDM("File (" + deltaCmdFile + ") has invalid input: " + inputStr);
-
-				// Resolve the argument to the corresponding file and ensure it is relative to our rootPath
-				File trashFile = new File(rootPath, delTargStr).getCanonicalFile();
-				if (MiscUtils.getRelativePath(rootPath, trashFile) == null)
-					throw new ErrorDM("File (" + trashFile + ") is not relative to folder: " + rootPath);
-
-				if (trashFile.isFile() == true)
+				// Strip off the reboot command and get the actual command. It is safe to
+				// execute reboot,* commands now since the actual update is not running yet.
+				if (inputStr.startsWith("reboot,") == true)
 				{
-					if (trashFile.delete() == false)
-						throw new ErrorDM("Failed to delete file: " + trashFile);
+					strArr = inputStr.substring(7).split(",");
+					cmdStr = strArr[0];
 				}
-				else if (trashFile.isDirectory() == true)
+
+				// Handle the trash command
+				if (cmdStr.equals("trash") == true && strArr.length == 2)
 				{
-					if (IoUtil.deleteDirectory(trashFile) == false)
-						throw new ErrorDM("Failed to delete folder: " + trashFile);
+					String delTargStr = strArr[1];
+
+					// Ensure we are not looking at a "hollow" trash command
+					if (delTargStr.isEmpty() == true)
+						throw new ErrorDM("File (" + deltaCmdFile + ") has invalid input: " + inputStr);
+
+					// Resolve the argument to the corresponding file and ensure it is relative to our rootPath
+					File trashFile = new File(rootPath, delTargStr).getCanonicalFile();
+					if (MiscUtils.getRelativePath(rootPath, trashFile) == null)
+						throw new ErrorDM("File (" + trashFile + ") is not relative to folder: " + rootPath);
+
+					if (trashFile.isFile() == true)
+					{
+						if (trashFile.delete() == false)
+							throw new ErrorDM("Failed to delete file: " + trashFile);
+					}
+					else if (trashFile.isDirectory() == true)
+					{
+						if (IoUtil.deleteDirectory(trashFile) == false)
+							throw new ErrorDM("Failed to delete folder: " + trashFile);
+					}
+					else
+					{
+						throw new ErrorDM("File type is not recognized: " + trashFile);
+					}
 				}
+
+				// Handle the copy command
+				else if (cmdStr.equals("copy") == true && strArr.length == 3)
+				{
+					// Resolve the arguments to the corresponding files
+					File srcFile = new File(rootPath, strArr[1]).getCanonicalFile();
+					File dstFile = new File(rootPath, strArr[2]).getCanonicalFile();
+
+					// Ensure we will only change files relative to our rootPath
+					if (MiscUtils.getRelativePath(rootPath, srcFile) == null)
+						throw new ErrorDM("Source file (" + srcFile + ") is not relative to folder: " + rootPath);
+					if (MiscUtils.getRelativePath(rootPath, dstFile) == null)
+						throw new ErrorDM("Destination file (" + srcFile + ") is not relative to folder: " + rootPath);
+
+					// Copy the srcFile to the (non existing) dstFile
+					if (srcFile.exists() == false)
+						throw new ErrorDM("Source file does not exist: " + srcFile);
+					if (dstFile.exists() == true && dstFile.delete() == false)
+						throw new ErrorDM("Failed to remove prexisting file at destination: " + dstFile);
+					if (srcFile.renameTo(dstFile) == false)
+						throw new ErrorDM("Failed to copy source (" + srcFile + ") to destination: " + dstFile);
+				}
+
+				// Handle the move command
+				else if (cmdStr.equals("move") == true && strArr.length == 3)
+				{
+					// Resolve the arguments to the corresponding files
+					File srcFile = new File(rootPath, strArr[1]).getCanonicalFile();
+					File dstFile = new File(rootPath, strArr[2]).getCanonicalFile();
+
+					// Ensure we will only change files relative to our rootPath
+					if (MiscUtils.getRelativePath(rootPath, srcFile) == null)
+						throw new ErrorDM("Source (" + srcFile + ") is not relative to folder: " + rootPath);
+					if (MiscUtils.getRelativePath(rootPath, dstFile) == null)
+						throw new ErrorDM("Destination (" + srcFile + ") is not relative to folder: " + rootPath);
+
+					// Move the srcFile to the (folder) dstFile
+					if (srcFile.exists() == false)
+						throw new ErrorDM("Source file does not exist: " + srcFile);
+					if (dstFile.isDirectory() == true)
+						dstFile = new File(dstFile, srcFile.getName());
+					if (srcFile.renameTo(dstFile) == false)
+						throw new ErrorDM("Failed to move source (" + srcFile + ") to destination: " + dstFile);
+				}
+
+				// Unrecognized command
 				else
 				{
-					throw new ErrorDM("File type is not recognized: " + trashFile);
+					throw new ErrorDM("Input string is not recognized: " + inputStr);
 				}
 			}
 		}

@@ -9,6 +9,7 @@ import glob
 
 import jreUtils
 import miscUtils
+import deployJreDist
 
 
 def buildRelease(args, buildPath):
@@ -91,10 +92,10 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 		shutil.copy(srcPath, linkPath)
 
 	# Setup the launcher contents
-	exePath = os.path.join(rootPath, "launcher")
+	dstPath = os.path.join(rootPath, "launcher/" + deployJreDist.getAppLauncherFileName())
 	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
-	os.makedirs(exePath)
-	shutil.copy(srcPath, exePath);
+	os.makedirs(os.path.dirname(dstPath))
+	shutil.copy(srcPath, dstPath);
 
 	# Build the java component of the distribution
 	if args.javaCode != None:
@@ -163,8 +164,8 @@ def buildBashScript(destFile, args, jreTarGzFile):
 	f.write('  xmxStr=\'-Xmx\'$maxMem\n')
 	f.write('fi\n\n')
 
-	exeCmd = '$javaExe ' + jvmArgsStr + '$xmxStr '
-	exeCmd = exeCmd + '-Djava.system.class.loader=appLauncher.RootClassLoader -cp ../launcher/appLauncher.jar appLauncher.AppLauncher $*'
+	exeCmd = '$javaExe ' + jvmArgsStr + '$xmxStr -Djava.system.class.loader=appLauncher.RootClassLoader '
+	exeCmd = exeCmd + '-cp ../launcher/' + deployJreDist.getAppLauncherFileName() + ' appLauncher.AppLauncher $*'
 	f.write('# Run the application\n')
 	f.write(exeCmd + '\n\n')
 

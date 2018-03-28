@@ -254,13 +254,13 @@ public class MiscUtils
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void writeDoc(File aFile, List<String> strList)
+	public static void writeDoc(File aFile, List<String> aStrList)
 	{
 		// Output the strList
 		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(aFile)));)
 		{
 			// Write the lines
-			for (String aStr : strList)
+			for (String aStr : aStrList)
 				bw.write(aStr + '\n');
 		}
 		catch(IOException aExp)
