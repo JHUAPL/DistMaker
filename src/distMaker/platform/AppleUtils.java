@@ -3,7 +3,6 @@ package distMaker.platform;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -111,62 +110,72 @@ public class AppleUtils
 	 */
 	public static void updateAppLauncher(AppLauncherRelease aRelease, File pFile)
 	{
-		List<String> inputList;
-		String evalStr, tmpStr;
-		String prevKeyValue;
-		boolean isFound;
+		// Note the JavaAppLauncher executable appears to no longer support specifying the class path
+		// Thus there is nothing to update as the AppLauncherRelease is implicitly loaded by it being in
+		// the path <AppName>/Contents/Java/ folder.
+		//
+		// Be aware of one big caveat - if there are multiple AppLauncher jars in the implicit location it
+		// is not clear which one will be selected!
+		//
+		// Change made as of 2018Apr11
+		return;
 
-		// Bail if the pFile is not writable
-		if (pFile.setWritable(true) == false)
-			throw new ErrorDM("The pFile is not writeable: " + pFile);
-
-		// Define the regex we will be searching for
-		String regex = "<string>(.*?)</string>";
-		Pattern tmpPattern = Pattern.compile(regex);
-
-		// Process our input
-		inputList = new ArrayList<>();
-		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
-		{
-			// Read the lines
-			isFound = false;
-			prevKeyValue = "";
-			while (true)
-			{
-				evalStr = br.readLine();
-				if (evalStr == null)
-					break;
-
-				// Keep track of the last key element
-				tmpStr = evalStr.trim();
-				if (tmpStr.startsWith("<key>") == true && tmpStr.endsWith("</key>") == true)
-					prevKeyValue = tmpStr.substring(5, tmpStr.length() - 6).trim();
-
-				// The AppLauncher is specified just after the key element with the value: ClassPath
-				if (prevKeyValue.equals("ClassPath") == true && tmpPattern.matcher(evalStr).find() == true)
-				{
-					// Perform the replacement
-					String repStr = "<string>$JAVAROOT/" + PlatformUtils.getAppLauncherFileName(aRelease.getVersion()) + "</string>";
-					repStr = Matcher.quoteReplacement(repStr);
-					evalStr = tmpPattern.matcher(evalStr).replaceFirst(repStr);
-
-					isFound = true;
-				}
-
-				inputList.add(evalStr);
-			}
-		}
-		catch(IOException aExp)
-		{
-			throw new ErrorDM(aExp, "Failed while processing the pFile: " + pFile);
-		}
-
-		// Fail if there was no update performed
-		if (isFound == false)
-			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'ClassPath' section.");
-
-		// Write the pFile
-		MiscUtils.writeDoc(pFile, inputList);
+//		List<String> inputList;
+//		String evalStr, tmpStr;
+//		String prevKeyValue;
+//		boolean isFound;
+//
+//		// Bail if the pFile is not writable
+//		if (pFile.setWritable(true) == false)
+//			throw new ErrorDM("The pFile is not writeable: " + pFile);
+//
+//		// Define the regex we will be searching for
+//		String regex = "<string>(.*?)</string>";
+//		Pattern tmpPattern = Pattern.compile(regex);
+//
+//		// Process our input
+//		inputList = new ArrayList<>();
+//		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
+//		{
+//			// Read the lines
+//			isFound = false;
+//			prevKeyValue = "";
+//			while (true)
+//			{
+//				evalStr = br.readLine();
+//				if (evalStr == null)
+//					break;
+//
+//				// Keep track of the last key element
+//				tmpStr = evalStr.trim();
+//				if (tmpStr.startsWith("<key>") == true && tmpStr.endsWith("</key>") == true)
+//					prevKeyValue = tmpStr.substring(5, tmpStr.length() - 6).trim();
+//
+//				// The AppLauncher is specified just after the key element with the value: ClassPath
+//				if (prevKeyValue.equals("ClassPath") == true && tmpPattern.matcher(evalStr).find() == true)
+//				{
+//					// Perform the replacement
+//					String repStr = "<string>$JAVAROOT/" + PlatformUtils.getAppLauncherFileName(aRelease.getVersion()) + "</string>";
+//					repStr = Matcher.quoteReplacement(repStr);
+//					evalStr = tmpPattern.matcher(evalStr).replaceFirst(repStr);
+//
+//					isFound = true;
+//				}
+//
+//				inputList.add(evalStr);
+//			}
+//		}
+//		catch(IOException aExp)
+//		{
+//			throw new ErrorDM(aExp, "Failed while processing the pFile: " + pFile);
+//		}
+//
+//		// Fail if there was no update performed
+//		if (isFound == false)
+//			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'ClassPath' section.");
+//
+//		// Write the pFile
+//		MiscUtils.writeDoc(pFile, inputList);
 	}
 
 	/**

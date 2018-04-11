@@ -371,7 +371,6 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 
 	f = open(destFile, 'wb')
 	writeln(f, 0, '<?xml version="1.0" ?>')
-#	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
 	writeln(f, 0, '<plist version="1.0">')
 	writeln(f, 1, '<dict>')
 
@@ -423,20 +422,20 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 		writeln(f, 3, '<string>' + aStr + '</string>')
 	writeln(f, 2, '</array>')
 
-	# JVM configuration
-	writeln(f, 2, '<key>Java</key>')
-	writeln(f, 2, '<dict>')
-
-	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
-
-	tupList = []
-	tupList.append(('ClassPath', classPathStr))
-
-	for (key, val) in tupList:
-		writeln(f, 3, '<key>' + key + '</key>')
-		writeln(f, 3, '<string>' + str(val) + '</string>')
-
-	writeln(f, 2, '</dict>')
+#	# ClassPath: AppLauncher
+#	writeln(f, 2, '<key>Java</key>')
+#	writeln(f, 2, '<dict>')
+#
+#	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
+#
+#	tupList = []
+#	tupList.append(('ClassPath', classPathStr))
+#
+#	for (key, val) in tupList:
+#		writeln(f, 3, '<key>' + key + '</key>')
+#		writeln(f, 3, '<string>' + str(val) + '</string>')
+#
+#	writeln(f, 2, '</dict>')
 	writeln(f, 1, '</dict>')
 	writeln(f, 0, '</plist>')
 

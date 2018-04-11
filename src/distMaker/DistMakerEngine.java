@@ -63,7 +63,7 @@ public class DistMakerEngine
 	/**
 	 * Method that will notify the user that updates are being checked for
 	 */
-	public void checkForUpdates(UpdateCheckListener listener)
+	public void checkForUpdates(UpdateCheckListener aListener)
 	{
 		FullTaskPanel taskPanel;
 		File installPath;
@@ -99,7 +99,7 @@ public class DistMakerEngine
 		taskPanel.setVisible(true);
 
 		// Launch the actual checking of updates in a separate worker thread
-		Runnable tmpRunnable = () -> checkForUpdatesWorker(taskPanel, listener);
+		Runnable tmpRunnable = () -> checkForUpdatesWorker(taskPanel, aListener);
 		ThreadUtil.launchRunnable(tmpRunnable, "thread-checkForUpdates");
 	}
 
@@ -255,7 +255,7 @@ public class DistMakerEngine
 	 * <P>
 	 * This method will be called via reflection.
 	 */
-	private void checkForUpdatesWorker(FullTaskPanel aTask, UpdateCheckListener listener)
+	private void checkForUpdatesWorker(FullTaskPanel aTask, UpdateCheckListener aListener)
 	{
 		List<AppRelease> fullList;
 		AppRelease chosenItem;
@@ -281,7 +281,7 @@ public class DistMakerEngine
 		}
 
 		// a successful test has been done, so notify the listener
-		listener.checkForNewVersionsPerformed();
+		aListener.checkForNewVersionsPerformed();
 
 		// In case there is only the current version, don't show the update selection panel.
 		// Just show a short message that everything is up to date, and abort.

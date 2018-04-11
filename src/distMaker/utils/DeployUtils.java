@@ -86,19 +86,12 @@ public final class DeployUtils {
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
-				UpdateCheckListener listener = new UpdateCheckListener() {
-					@Override
-					public void checkForNewVersionsPerformed()
-					{
-						//autoUpdateCheckSettings.updateAutoCheckWithCurrentTime();
-					}
-				};
 				if(DistUtils.isDevelopersEnvironment()) {
 					JOptionPane.showMessageDialog(parentFrame, "Cannot update tool in a developer environment.");
 				} else if (dme == null) {
 			    	JOptionPane.showMessageDialog(parentFrame, "Unable to locate updates.");
 				} else {
-					dme.checkForUpdates(listener);
+					dme.checkForUpdates(UpdateCheckListener.None);
 				}
 			}
 		});

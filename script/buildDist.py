@@ -185,7 +185,7 @@ if __name__ == "__main__":
 	parser.add_argument('-version', default='0.0.1', help='The version of the application.')
 	parser.add_argument('-mainClass', help='Application main entry point.')
 	parser.add_argument('-appArgs', help='Application arguments. Note that this argument must ALWAYS be the last specified!', nargs=argparse.REMAINDER, default=[])
-	parser.add_argument('-dataCode', '-dc', help='A list of supporting folders for the application.', nargs='+', default=[])
+	parser.add_argument('-dataCode', '-dc', help='A list of supporting files or folders for the application. All items will be copied to the data folder. Symbolic links will not be presereved.', nargs='+', default=[])
 	parser.add_argument('-javaCode', '-jc', help='A folder which contains the Java build.')
 	parser.add_argument('-jreVersion', dest='jreVerSpec', help='JRE version to utilize. This should be either 1 or 2 values where each value should be something like 1.7 or 1.8 or 1.8.0_34. '
 							+ 'If 2 values are specified than the second value must be later than the first value. Any static build will be built with the latest allowable JRE.'
@@ -301,16 +301,36 @@ if __name__ == "__main__":
 	deltaCodePath = os.path.join(deltaPath, "code")
 	deltaDataPath = os.path.join(deltaPath, "data")
 
+	# Ensure the user does not specify the top level data folder so that a ~/data/data folder is not inadvertently created
+	if len(args.dataCode) == 1 and args.dataCode[0].rstrip('/').endswith('data'):
+		srcPath = args.dataCode[0].rstrip('/')
+		print('   [ERROR] The specified dataCode path will result in a data folder inside another data folder. Refusing action. Please specify the individual data files/folders.')
+		print('           Consider using:')
+		print('               -dataCode ' + srcPath + '/*')
+		print('            instead of:')
+		print('               -dataCode ' + args.dataCode[0] + '\n')
+		shutil.rmtree(buildPath)
+		exit(-1)
+
 	# Copy the dataCode to the delta location
 	os.makedirs(deltaDataPath)
-	for aPath in args.dataCode:
-		srcPath = aPath
-		if os.path.isdir(srcPath) == False:
-			print('   [ERROR] The dataCode path does not exist. Path: ' + srcPath + '\n')
+	for aSrcPath in args.dataCode:
+		if os.path.exists(aSrcPath) == False:
+			print('   [ERROR] The dataCode path does not exist. Path: ' + aSrcPath + '\n')
 			shutil.rmtree(buildPath)
 			exit(-1)
-		dstPath = os.path.join(deltaDataPath, os.path.basename(aPath))
-		shutil.copytree(srcPath, dstPath, symlinks=False)
+		elif os.path.isfile(aSrcPath):
+			dstPath = os.path.join(deltaDataPath, os.path.basename(aSrcPath))
+			shutil.copy(aSrcPath, dstPath)
+			continue
+		elif os.path.isdir(aSrcPath):
+			aSrcPath = aSrcPath.rstrip('/')
+			dstPath = os.path.join(deltaDataPath, os.path.basename(aSrcPath))
+			shutil.copytree(aSrcPath, dstPath, symlinks=False)
+		else:
+			print('   [ERROR] The dataCode path is not a valid file or folder. Path: ' + aSrcPath + '\n')
+			shutil.rmtree(buildPath)
+			exit(-1)
 
 	# Build the java component of the distribution
 	if args.javaCode != None:
