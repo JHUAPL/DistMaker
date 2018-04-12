@@ -75,9 +75,9 @@ public class MemUtils
 
 		// Determine the memStr to use
 		if (numBytes % GB_SIZE == 0)
-			memStr = "-Xmx" + (numBytes / GB_SIZE) + "G";
+			memStr = "-Xmx" + (numBytes / GB_SIZE) + "g";
 		else
-			memStr = "-Xmx" + (numBytes / MB_SIZE) + "M";
+			memStr = "-Xmx" + (numBytes / MB_SIZE) + "m";
 
 		// Tokenize the input on space characters
 		evalArr = inputStr.split(" ");

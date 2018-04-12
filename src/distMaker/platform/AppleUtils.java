@@ -77,6 +77,9 @@ public class AppleUtils
 		{
 			doc = loadDoc(pFile);
 			docElement = doc.getDocumentElement();
+
+			// Clean the XML doc (due to defective Java 9 implementation)
+			cleanDoc(doc);
 		}
 		catch(Exception aExp)
 		{
@@ -272,19 +275,8 @@ public class AppleUtils
 			doc = loadDoc(pFile);
 			docElement = doc.getDocumentElement();
 
-			// Clean up the XML to remove spurious empty line nodes. This is needed in Java 9 since the XML processing
-			// is different from Java 8 and prior. Spurious newlines seem to be introduced with Java 9 XML libs.
-			// Source:
-			// http://java9.wtf/xml-transformer/
-			// https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
-			XPath xp = XPathFactory.newInstance().newXPath();
-			NodeList nl = (NodeList)xp.evaluate("//text()[normalize-space(.)='']", doc, XPathConstants.NODESET);
-
-			for (int i = 0; i < nl.getLength(); ++i)
-			{
-				Node node = nl.item(i);
-				node.getParentNode().removeChild(node);
-			}
+			// Clean the XML doc (due to defective Java 9 implementation)
+			cleanDoc(doc);
 		}
 		catch(Exception aExp)
 		{
@@ -381,7 +373,39 @@ public class AppleUtils
 	}
 
 	/**
-	 * Helper method to load a Document from the specified file.
+	 * Utility helper method to clean up the specified XML document.
+	 * <P>
+	 * Clean up the XML to remove spurious empty line nodes. This is needed in Java 9 since the XML processing is
+	 * different from Java 8 and prior. Spurious newlines seem to be introduced with Java 9 XML libs.
+	 * <P>
+	 * Source:
+	 * <UL>
+	 * <LI>http://java9.wtf/xml-transformer/
+	 * <LI>https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
+	 * </UL>
+	 * 
+	 * @param aDoc
+	 * @throws XPathExpressionException
+	 */
+	private static void cleanDoc(Document aDoc) throws XPathExpressionException
+	{
+		// Clean up the XML to remove spurious empty line nodes. This is needed in Java 9 since the XML processing
+		// is different from Java 8 and prior. Spurious newlines seem to be introduced with Java 9 XML libs.
+		// Source:
+		// http://java9.wtf/xml-transformer/
+		// https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
+		XPath xp = XPathFactory.newInstance().newXPath();
+		NodeList nl = (NodeList)xp.evaluate("//text()[normalize-space(.)='']", aDoc, XPathConstants.NODESET);
+
+		for (int i = 0; i < nl.getLength(); ++i)
+		{
+			Node node = nl.item(i);
+			node.getParentNode().removeChild(node);
+		}
+	}
+
+	/**
+	 * Utility helper method to load a Document from the specified file.
 	 */
 	private static Document loadDoc(File aFile) throws Exception
 	{
@@ -398,7 +422,7 @@ public class AppleUtils
 	}
 
 	/**
-	 * Helper method to output aDoc to the specified file.
+	 * Utility helper method to output aDoc to the specified file.
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
