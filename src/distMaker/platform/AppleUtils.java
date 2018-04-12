@@ -67,6 +67,7 @@ public class AppleUtils
 		Element docElement;
 		NodeList nodeList;
 		Node keyNode, strNode;
+		String valStr;
 
 		// Bail if the pFile is not writable.
 		if (pFile.setWritable(true) == false)
@@ -90,15 +91,22 @@ public class AppleUtils
 		for (int c1 = 0; c1 < nodeList.getLength(); c1++)
 		{
 			keyNode = nodeList.item(c1).getFirstChild();
-			if (keyNode != null && keyNode.getNodeValue().equals("CFBundleVersion") == true)
+			if (keyNode == null)
+				continue;
+
+			valStr = keyNode.getNodeValue();
+			if (valStr == null)
+				continue;
+
+			if (valStr.equals("CFBundleVersion") == true)
 			{
 				System.out.println("Updating contents of file: " + pFile);
 
 				strNode = nodeList.item(c1 + 1).getFirstChild();
-				System.out.println("  Old Version: " + strNode.getNodeValue());
+				System.out.println("  Old App Version: " + strNode.getNodeValue());
 
 				strNode.setNodeValue(aNewVersin);
-				System.out.println("  New Version: " + strNode.getNodeValue());
+				System.out.println("  New App Version: " + strNode.getNodeValue());
 			}
 		}
 
