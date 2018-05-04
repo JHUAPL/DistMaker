@@ -48,7 +48,7 @@ def buildRelease(args, buildPath):
 		if jreTarGzFile == None:
 			# Let the user know that a compatible JRE was not found - thus no static release will be made.
 			print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
-			# Let the user know that a compatible JRE was not found - and thus no Apple builds will be made
+#			# Let the user know that a compatible JRE was not found - and thus no Apple builds will be made
 			print('Only static Apple distributions are supported - thus there will be no Apple distribution of the application: ' + appName + '\n')
 			return
 		else:
@@ -144,124 +144,6 @@ def buildRelease(args, buildPath):
 #	os.rmdir(tmpPath)
 
 
-def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
-	# Retrieve vars of interest
-	appInstallRoot = miscUtils.getInstallRoot()
-	appInstallRoot = os.path.dirname(appInstallRoot)
-	appTemplatePath = os.path.join(appInstallRoot, 'template')
-	appName = args.name
-	bgFile = args.bgFile
-	icnsFile = args.icnsFile
-
-	# Form the symbolic link which points to /Applications
-	srcPath = '/Applications'
-	dstPath = os.path.join(rootPath, 'Applications');
-	os.symlink(srcPath, dstPath)
-
-	# Construct the app folder
-	appNodes = ['MacOS', 'Resources']
-	if jreTarGzFile != None:
-		appNodes.append('PlugIns')
-	for aPath in appNodes:
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', aPath)
-		os.makedirs(dstPath)
-
-	if jreTarGzFile != None:
-		# Copy over the executable launcher
-		srcPath = os.path.join(appTemplatePath, 'apple', 'JavaAppLauncher')
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
-		shutil.copy(srcPath, dstPath)
-
-		# Unpack the JRE and set up the JRE tree
-		destPath = os.path.join(rootPath, appName + '.app', 'Contents', 'PlugIns')
-		jreUtils.unpackAndRenameToStandard(jreTarGzFile, destPath)
-	else:
-		# Copy over the executable launcher
-		srcPath = os.path.join(appTemplatePath, 'apple', 'JavaApplicationStub')
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
-		shutil.copy(srcPath, dstPath)
-
-	# Write out the PkgInfo file
-	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', "PkgInfo")
-	f = open(dstPath, 'wb')
-	f.write('APPL????')
-	f.close()
-
-	# Determine the payloadPath for where to store the appLauncher
-	payloadPath = os.path.join(rootPath, appName + '.app', 'Contents')
-	if jreTarGzFile == None:
-		payloadPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources')
-
-	# Form the app contents folder
-	srcPath = os.path.join(buildPath, "delta")
-	dstPath = os.path.join(payloadPath, 'app')
-	shutil.copytree(srcPath, dstPath, symlinks=True)
-
-	# Link dlls to the MacOS directory so they can be found at launch
-	jarDir = os.path.join(rootPath, appName + '.app', 'Contents', 'app', 'code', 'osx')
-	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
-	for jniPath in glob.iglob(os.path.join(jarDir, "*.jnilib")):
-		jniFileName = os.path.basename(jniPath)
-		srcPath = os.path.join('..', 'app', 'code', 'osx', jniFileName)
-		linkPath = os.path.join(dstPath, jniFileName)
-		os.symlink(srcPath, linkPath)
-	for dylPath in glob.iglob(os.path.join(jarDir, "*.dylib")):
-		dylFileName = os.path.basename(dylPath)
-		srcPath = os.path.join('..', 'app', 'code', 'osx', dylFileName)
-		linkPath = os.path.join(dstPath, dylFileName)
-		os.symlink(srcPath, linkPath)
-
-
-	# Setup the launcher contents
-	dstPath = os.path.join(payloadPath, "Java/" + deployJreDist.getAppLauncherFileName())
-	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
-	os.makedirs(os.path.dirname(dstPath))
-	shutil.copy(srcPath, dstPath);
-
-	# Build the java component of the distribution
-	if args.javaCode != None:
-		# Form the Info.plist file
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Info.plist')
-		if jreTarGzFile != None:
-			buildPListInfoStatic(dstPath, args, jreTarGzFile)
-		else:
-			buildPListInfoShared(dstPath, args)
-
-	# Copy over the icon file *.icns
-	if icnsFile != None and os.path.exists(icnsFile) == True:
-		srcPath = icnsFile
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources')
-		shutil.copy(srcPath, dstPath)
-
-	# Copy over the background file
-	srcPath = bgFile
-	if srcPath == None:
-		srcPath = os.path.join(appTemplatePath, 'background', 'background.png');
-	dstPath = os.path.join(rootPath, '.background')
-	os.mkdir(dstPath)
-	dstPath = os.path.join(rootPath, '.background', 'background.png')
-	shutil.copy(srcPath, dstPath)
-
-	# Copy over the .DS_Store
-	srcPath = os.path.join(appTemplatePath, '.DS_Store.template')
-	dstPath = os.path.join(rootPath, '.DS_Store')
-	shutil.copy(srcPath, dstPath)
-
-	# Update the .DS_Store file to reflect the new volume name
-	srcPath = os.path.join(rootPath, '.DS_Store')
-	classPath = appInstallRoot + '/lib/glum.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
-	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
-	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
-	if proc.returncode != 0:
-		print('\tError: Failed to update .DS_Store. Return code: ' + str(proc.returncode))
-
-
-
-
-
-
-
-
 def normGuid(mountPt):
 	# Ensure we are running as root
 	miscUtils.checkRoot()
@@ -302,74 +184,119 @@ def umount(mountPt):
 	subprocess.call(cmd, stderr=subprocess.STDOUT)
 
 
-def buildPListInfoShared(destFile, args):
+
+
+
+def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	# Retrieve vars of interest
-	icnsStr = None
-	if args.icnsFile != None:
-		icnsStr = os.path.basename(args.icnsFile)
+	appInstallRoot = miscUtils.getInstallRoot()
+	appInstallRoot = os.path.dirname(appInstallRoot)
+	appTemplatePath = os.path.join(appInstallRoot, 'template')
+	appName = args.name
+	bgFile = args.bgFile
+	icnsFile = args.icnsFile
 
-	jvmArgsStr = ''
-	for aStr in args.jvmArgs:
-		jvmArgsStr += aStr + ' '
-	jvmArgsStr += '-Djava.system.class.loader=appLauncher.RootClassLoader'
+	# Form the symbolic link which points to /Applications
+	srcPath = '/Applications'
+	dstPath = os.path.join(rootPath, 'Applications');
+	os.symlink(srcPath, dstPath)
 
-	f = open(destFile, 'wb')
-	writeln(f, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
-#	writeln(f, 0, '<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">')
-	writeln(f, 0, '<plist version="1.0">')
-	writeln(f, 1, '<dict>')
+	# Construct the app folder
+	appNodes = ['MacOS', 'Resources']
+	for aPath in appNodes:
+		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', aPath)
+		os.makedirs(dstPath)
 
-	tupList = []
-	tupList.append(('CFBundleExecutable', 'JavaApplicationStub'))
-	tupList.append(('CFBundleGetInfoString', args.company))
-	tupList.append(('CFBundleInfoDictionaryVersion', 6.0))
-	tupList.append(('CFBundleIconFile', icnsStr))
-	tupList.append(('CFBundleIdentifier', args.name.lower()))
-	tupList.append(('CFBundleName', args.name))
-	tupList.append(('CFBundlePackageType', 'APPL'))
-	tupList.append(('CFBundleSignature', '????'))
-	tupList.append(('CFBundleVersion', args.version))
+	# Copy over the executable launcher
+	srcPath = os.path.join(appTemplatePath, 'apple', 'JavaAppLauncher')
+	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
+	shutil.copy(srcPath, dstPath)
 
-	# Application configuration
-	for (key, val) in tupList:
-		writeln(f, 2, '<key>' + key + '</key>')
-		writeln(f, 2, '<string>' + str(val) + '</string>')
+	# Unpack the JRE and set up the JRE tree
+	if jreTarGzFile != None:
+		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'PlugIns')
+		os.makedirs(dstPath)
+		jreUtils.unpackAndRenameToStandard(jreTarGzFile, dstPath)
 
-	# JVM configuration
-	writeln(f, 2, '<key>Java</key>')
-	writeln(f, 2, '<dict>')
-
-	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
-
-	tupList = []
-	tupList.append(('JVMVersion', '1.7+'))
-	tupList.append(('MainClass', 'appLauncher.AppLauncher'))
-	tupList.append(('WorkingDirectory', '$APP_PACKAGE/Contents/Resources/app'))
-	tupList.append(('ClassPath', classPathStr))
-	tupList.append(('VMOptions', jvmArgsStr))
-
-	for (key, val) in tupList:
-		writeln(f, 3, '<key>' + key + '</key>')
-		writeln(f, 3, '<string>' + str(val) + '</string>')
-
-	writeln(f, 3, '<key>Arguments</key>')
-	writeln(f, 3, '<array>')
-#	for aStr in args.appArgs:
-#		writeln(f, 4, '<string>' + aStr + '</string>')
-	writeln(f, 3, '</array>')
-	writeln(f, 2, '</dict>')
-	writeln(f, 1, '</dict>')
-	writeln(f, 0, '</plist>')
-
+	# Write out the PkgInfo file
+	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', "PkgInfo")
+	f = open(dstPath, 'wb')
+	f.write('APPL????')
 	f.close()
 
-def buildPListInfoStatic(destFile, args, jreTarGzFile):
+	# Define the payloadPath for where to store the appLauncher
+	payloadPath = os.path.join(rootPath, appName + '.app', 'Contents')
+
+	# Form the app contents folder
+	srcPath = os.path.join(buildPath, "delta")
+	dstPath = os.path.join(payloadPath, 'app')
+	shutil.copytree(srcPath, dstPath, symlinks=True)
+
+	# Link dlls to the MacOS directory so they can be found at launch
+	jarDir = os.path.join(rootPath, appName + '.app', 'Contents', 'app', 'code', 'osx')
+	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
+	for jniPath in glob.iglob(os.path.join(jarDir, "*.jnilib")):
+		jniFileName = os.path.basename(jniPath)
+		srcPath = os.path.join('..', 'app', 'code', 'osx', jniFileName)
+		linkPath = os.path.join(dstPath, jniFileName)
+		os.symlink(srcPath, linkPath)
+	for dylPath in glob.iglob(os.path.join(jarDir, "*.dylib")):
+		dylFileName = os.path.basename(dylPath)
+		srcPath = os.path.join('..', 'app', 'code', 'osx', dylFileName)
+		linkPath = os.path.join(dstPath, dylFileName)
+		os.symlink(srcPath, linkPath)
+
+	# Setup the launcher contents
+	dstPath = os.path.join(payloadPath, "Java/" + deployJreDist.getAppLauncherFileName())
+	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
+	os.makedirs(os.path.dirname(dstPath))
+	shutil.copy(srcPath, dstPath);
+
+	# Build the java component of the distribution
+	if args.javaCode != None:
+		# Form the Info.plist file
+		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Info.plist')
+		buildPListInfo(dstPath, args, jreTarGzFile)
+
+	# Copy over the icon file *.icns
+	if icnsFile != None and os.path.exists(icnsFile) == True:
+		srcPath = icnsFile
+		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources')
+		shutil.copy(srcPath, dstPath)
+
+	# Copy over the background file
+	srcPath = bgFile
+	if srcPath == None:
+		srcPath = os.path.join(appTemplatePath, 'background', 'background.png');
+	dstPath = os.path.join(rootPath, '.background')
+	os.mkdir(dstPath)
+	dstPath = os.path.join(rootPath, '.background', 'background.png')
+	shutil.copy(srcPath, dstPath)
+
+	# Copy over the .DS_Store
+	srcPath = os.path.join(appTemplatePath, '.DS_Store.template')
+	dstPath = os.path.join(rootPath, '.DS_Store')
+	shutil.copy(srcPath, dstPath)
+
+	# Update the .DS_Store file to reflect the new volume name
+	srcPath = os.path.join(rootPath, '.DS_Store')
+	classPath = appInstallRoot + '/lib/glum.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
+	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
+	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
+	if proc.returncode != 0:
+		print('\tError: Failed to update .DS_Store. Return code: ' + str(proc.returncode))
+
+
+def buildPListInfo(destFile, args, jreTarGzFile):
+	"""Method that will construct and populate the Info.plist file. This file
+	defines the attributes associated with the (Apple) app."""
 	# Retrieve vars of interest
 	icnsStr = None
 	if args.icnsFile != None:
 		icnsStr = os.path.basename(args.icnsFile)
 
 	f = open(destFile, 'wb')
+#	writeln(f, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
 	writeln(f, 0, '<?xml version="1.0" ?>')
 	writeln(f, 0, '<plist version="1.0">')
 	writeln(f, 1, '<dict>')
@@ -389,12 +316,18 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 	tupList.append(('NSHighResolutionCapable', 'true'))
 	tupList.append(('NSHumanReadableCopyright', ''))
 
-	jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
-	tupList.append(('JVMRuntime', jrePath))
+	# Define the JVM that is to be uesd
+	if jreTarGzFile != None:
+		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
+		tupList.append(('JVMRuntime', jrePath))
+	else:
+#		tupList.append(('JVMVersion', '1.7+'))
+		raise Exception('Support for utilizing the system JRE has not been added yet.')
 
+	# Define the main entry point (AppLauncher) and the working directory
 	tupList.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
 
-	cwdPath = os.path.join('/Applications', args.name + '.app', 'Contents', 'app')
+	cwdPath = os.path.join('$APP_ROOT', 'Contents', 'app')
 	tupList.append(('WorkingDirectory', cwdPath))
 
 	# Application configuration
@@ -443,8 +376,9 @@ def buildPListInfoStatic(destFile, args, jreTarGzFile):
 
 
 def checkSystemEnvironment():
-	"""Checks to ensure that all system application / environment variables needed to build a Apple distribution are installed
-	and properly configured. Returns False if the system environment is insufficient"""
+	"""Checks to ensure that all system application / environment variables
+	needed to build a Apple distribution are installed	and properly configured.
+	Returns False if the system environment is insufficient"""
 	return True
 
 

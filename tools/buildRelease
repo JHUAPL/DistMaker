@@ -8,47 +8,14 @@ import signal
 import subprocess
 import sys
 
-def getDistMakerVersion():
-	# Retrieve the install path
-	installPath = getInstallRoot()
-	installPath = os.path.dirname(installPath)
-
-	# Check for distMaker.jar library prerequisite
-	testPath = os.path.join(installPath, 'lib', 'distMaker.jar')
-	if os.path.exists(testPath) == False:
-		errPrintln('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
-		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
-		exit(-1)
-
-	try:
-		exeCmd = ['java', '-cp', 'lib/distMaker.jar', 'distMaker.DistApp', '--version']
-		output = subprocess.check_output(exeCmd).decode('utf-8')
-		version = output.split()[1]
-		return version
-	except:
-		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
-		exit(-1)
-
-
-def errPrintln(message="", indent=0):
-	"""Print the specified string with a trailing newline to stderr."""
-	while indent > 0:
-		indent -= 1
-		message = '   ' + message
-	sys.stderr.write(message + '\n')
-
-
 def buildRelease(version, doNotClean=False):
+	"""Method that builds a release of DistMaker. Upon sucessful execution, a
+	tar.gz archive will be generated named: 'DistMaker-<version>.tar.gz'. Note
+	that releases of DistMaker version 0.50 or later (2018May01+) will no longer
+	include static JREs."""
 	# Retrieve the install path
 	installPath = getInstallRoot()
 	installPath = os.path.dirname(installPath)
-
-	# Check for static jre prerequisites
-	isPass = os.path.exists(os.path.join(installPath, 'jre'))
-	if isPass == False:
-		errPrintln('Aborting DistMaker release build. The jre path is not properly configured.', indent=1)
-		errPrintln('Please setup the jre path properly. A quick fix is to copy the jre tree from a previous release of DistMaker.', indent=1)
-		exit(-1)
 
 	# Determine the workPath
 	workPath = os.path.join(installPath, 'release', 'DistMaker-' + version)
@@ -82,19 +49,12 @@ def buildRelease(version, doNotClean=False):
 		srcPath = os.path.join(installPath, 'script', aScript)
 		shutil.copy2(srcPath, dstPath)
 
-	# Copy the (tar.gz) JREs
-	globPath = os.path.join(installPath, 'jre/jre-*.tar.gz')
-	dstPath = os.path.join(workPath, 'jre')
-	os.mkdir(dstPath)
-	for aFile in glob.glob(globPath):
-		shutil.copy2(aFile, dstPath)
-
 	# Setup the template tree
 	dstPath = os.path.join(workPath, 'template')
 	os.makedirs(dstPath + '/apple')
 	os.makedirs(dstPath + '/background')
 	os.makedirs(dstPath + '/launch4j')
-	for aFile in ['appLauncher.jar', '.DS_Store.template', 'apple/JavaAppLauncher', 'apple/JavaApplicationStub', 'background/background.png', 'launch4j/launch4j-3.8-linux.tgz', 'launch4j/launch4j-3.8-macosx-x86-10.8.tgz']:
+	for aFile in ['appLauncher.jar', '.DS_Store.template', 'apple/JavaAppLauncher', 'background/background.png', 'launch4j/launch4j-3.8-linux.tgz', 'launch4j/launch4j-3.8-macosx-x86-10.8.tgz']:
 		srcPath = os.path.join(installPath, 'template', aFile)
 		shutil.copy2(srcPath, dstPath + '/' + aFile)
 
@@ -112,6 +72,40 @@ def buildRelease(version, doNotClean=False):
 	print('DistMaker release ' + version + ' built.')
 
 
+def errPrintln(message="", indent=0):
+	"""Print the specified string with a trailing newline to stderr."""
+	while indent > 0:
+		indent -= 1
+		message = '   ' + message
+	sys.stderr.write(message + '\n')
+
+
+def getDistMakerVersion():
+	"""Method that will return the version of the distMaker.jar file that resides
+	in the library path. The version of the DistMaker release is defined by the
+	value associated with the disMaker.jar file. Any failures will result in the
+	abrupt exit of this script."""
+	# Retrieve the install path
+	installPath = getInstallRoot()
+	installPath = os.path.dirname(installPath)
+
+	# Check for distMaker.jar library prerequisite
+	testPath = os.path.join(installPath, 'lib', 'distMaker.jar')
+	if os.path.exists(testPath) == False:
+		errPrintln('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
+		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		exit(-1)
+
+	try:
+		exeCmd = ['java', '-cp', 'lib/distMaker.jar', 'distMaker.DistApp', '--version']
+		output = subprocess.check_output(exeCmd).decode('utf-8')
+		version = output.split()[1]
+		return version
+	except:
+		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		exit(-1)
+
+
 def getInstallRoot():
 	"""Returns the root path where the running script is installed."""
 	argv = sys.argv;
@@ -121,9 +115,9 @@ def getInstallRoot():
 
 
 def handleSignal(signal, frame):
-		"""Signal handler, typically used to capture ctrl-c."""
-		print('User aborted processing!')
-		sys.exit(0)
+	"""Signal handler, typically used to capture ctrl-c."""
+	print('User aborted processing!')
+	sys.exit(0)
 
 
 if __name__ == "__main__":

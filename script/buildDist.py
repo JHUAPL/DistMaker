@@ -214,6 +214,29 @@ if __name__ == "__main__":
 	# Check to ensure all of the required applications are installed before proceeding
 	checkForRequiredApplicationsAndExit()
 
+	# Check to ensure that the JRE path is a folder (or symbolic link to a folder)
+	installRoot = miscUtils.getInstallRoot()
+	installRoot = os.path.dirname(installRoot)
+	jrePath = os.path.join(installRoot, 'jre')
+	if os.path.islink(jrePath) == True and os.path.exists(jrePath) == False:
+		print('The specified JRE path refers to a broken symbol link. Please fix the JRE path to reflect a proper location.')
+		print('   The broken JRE symbolic link is at: {}'.format(jrePath))
+		print()
+		exit()
+	if os.path.exists(jrePath) == False:
+		print('The JRE folder does not exist. Please create a JRE folder (or a symolic link to a proper JRE folder).')
+		print('   The JRE path should be at: {}'.format(jrePath))
+		print('   Populate the folder with the JRE tar.gz release files for each platform of interest.')
+		print('   JRE tar.gz files may be acquired from: {}'.format('http://www.oracle.com/technetwork/java/javase/downloads'))
+		print()
+		exit()
+	if os.path.isdir(jrePath) == False:
+		print('The specified JRE path does not refer to a folder.')
+		print('   The JRE path should be a folder which contains the proper JRE tar.gz files.')
+		print('   The JRE folder should be located at: {}'.format(jrePath))
+		print()
+		exit()
+
 	# Parse the args
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
