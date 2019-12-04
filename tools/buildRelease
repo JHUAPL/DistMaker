@@ -54,7 +54,7 @@ def buildRelease(version, doNotClean=False):
 	os.makedirs(dstPath + '/apple')
 	os.makedirs(dstPath + '/background')
 	os.makedirs(dstPath + '/launch4j')
-	for aFile in ['appLauncher.jar', '.DS_Store.template', 'apple/JavaAppLauncher', 'background/background.png', 'launch4j/launch4j-3.8-linux.tgz', 'launch4j/launch4j-3.8-macosx-x86-10.8.tgz']:
+	for aFile in ['appLauncher.jar', '.DS_Store.template', 'apple/JavaAppLauncher', 'background/background.png', 'launch4j/launch4j-3.12-linux-x64.tgz', 'launch4j/launch4j-3.12-macosx-x86.tgz']:
 		srcPath = os.path.join(installPath, 'template', aFile)
 		shutil.copy2(srcPath, dstPath + '/' + aFile)
 
@@ -124,15 +124,23 @@ if __name__ == "__main__":
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, handleSignal)
 
+	# Ensure we are running version 2.7 or greater
+	targVer = (2, 7)
+	if sys.version_info < targVer:
+		print('The installed version of python is too old. Please upgrade.')
+		print('   Current version: ' + '.'.join(str(i) for i in sys.version_info))
+		print('   Require version: ' + '.'.join(str(i) for i in targVer))
+		sys.exit(-1)
+
 	tmpDescr = 'Utility to build a DistMaker release\n'
 	parser = argparse.ArgumentParser(prefix_chars='-', description=tmpDescr, add_help=False, fromfile_prefix_chars='@')
-	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
-	parser.add_argument('-doNotClean', default=False, action='store_true', help='Do NOT remove temporary work folder created while generating release.')
-	parser.add_argument('-doFullBuild', default=False, action='store_true', help='Force a full build of the main jar file. (Unsupported action)')
+	parser.add_argument('--help', '-h', help='Show this help message and exit.', action='help')
+	parser.add_argument('--doNotClean', default=False, action='store_true', help='Do NOT remove temporary work folder created while generating release.')
+	parser.add_argument('--doFullBuild', default=False, action='store_true', help='Force a full build of the main jar file. (Unsupported action)')
 
 	# Intercept any request for a  help message and bail
 	argv = sys.argv;
-	if '-h' in argv or '-help' in argv:
+	if '-h' in argv or '-help' in argv or '--help' in argv:
 		parser.print_help()
 		exit()
 
@@ -146,6 +154,6 @@ if __name__ == "__main__":
 
 	# TODO: Finish this functionality
 	if args.doFullBuild == True:
-		print("Unsupported action: [-doFullBuild]. Skipping...")
+		print("Unsupported action: [--doFullBuild]. Skipping...")
 
 	buildRelease(version, args.doNotClean)
