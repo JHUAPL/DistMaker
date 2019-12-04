@@ -99,7 +99,22 @@ public class PlatformUtils
 	}
 
 	/**
-	 * Returns the platform (Apple, Linux, or Windows) on which the current JRE is running on.
+	 * Returns the architecture the current JRE is running on.
+	 * <P>
+	 * This always returns x64.
+	 * <P>
+	 * TODO: In the future update the code to return the architecture rather than assume x64!
+	 */
+	public static String getArchitecture()
+	{
+		// TODO: In the future update the code to return the architecture rather than assume x64!
+		return "x64";
+	}
+
+	/**
+	 * Returns the platform (Linux, Macosx, or Windows) on which the current JRE is running on.
+	 * <P>
+	 * If the platform is not recognized the a {@link ErrorDM} will be thrown.
 	 */
 	public static String getPlatform()
 	{
@@ -108,12 +123,12 @@ public class PlatformUtils
 		osName = System.getProperty("os.name").toUpperCase();
 		if (osName.startsWith("LINUX") == true)
 			return "Linux";
-		if (osName.startsWith("MAC OS X") == true)
-			return "Apple";
-		if (osName.startsWith("WINDOWS") == true)
+		else if (osName.startsWith("MAC OS X") == true)
+			return "Macosx";
+		else if (osName.startsWith("WINDOWS") == true)
 			return "Windows";
 
-		return System.getProperty("os.name");
+		throw new ErrorDM("Unrecognized os.name: " + osName);
 	}
 
 	/**

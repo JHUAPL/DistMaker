@@ -21,6 +21,9 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	/** Flag for legacy JRE versions. JRE versions prior to 9.0 are considered legacy. */
 	private final boolean isLegacy;
 
+	/**
+	 * Standard Constructor
+	 */
 	public JreVersion(String aLabel)
 	{
 		label = aLabel;

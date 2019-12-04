@@ -744,7 +744,7 @@ public class DistMakerEngine
 			aTask.infoAppendln("\tMaximum  JRE: " + tmpJreVer.getLabel());
 		aTask.infoAppendln("");
 
-		// Bail if we are running a bundled JRE
+		// Bail if we are running a non-bundled JRE
 		if (DistUtils.isJreBundled() == false)
 		{
 			aTask.infoAppend("This is the non bundled JRE version of the application. You are running the system JRE. ");
@@ -768,11 +768,12 @@ public class DistMakerEngine
 		}
 
 		// Retrieve the latest appropriate JreRelease
-		String platform = PlatformUtils.getPlatform();
-		jreList = JreUtils.getMatchingPlatforms(jreList, platform);
+		String archStr = PlatformUtils.getArchitecture();
+		String platStr = PlatformUtils.getPlatform();
+		jreList = JreUtils.getMatchingPlatforms(jreList, archStr, platStr);
 		if (jreList.size() == 0)
 		{
-			aTask.infoAppendln("There are no JRE releases available for the platform: " + platform + "!");
+			aTask.infoAppendln("There are no JRE releases available for platform: (" + archStr + ") " + platStr + "!");
 			return null;
 		}
 

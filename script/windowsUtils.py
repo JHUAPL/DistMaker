@@ -53,9 +53,9 @@ def buildRelease(args, buildPath):
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	l4jPath = os.path.join(appInstallRoot, 'template', 'launch4j')
 	if platform.system() == 'Darwin':
-		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.8-macosx-x86-10.8.tgz']
+		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-macosx-x86.tgz']
 	else:
-		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.8-linux.tgz']
+		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-linux-x64.tgz']
 	retCode = subprocess.call(exeCmd)
 	if retCode != 0:
 		print('Failed to extract launch4j package...')

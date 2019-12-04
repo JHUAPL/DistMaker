@@ -230,12 +230,12 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	private JPanel buildItemListTablePanel()
 	{
 		QueryComposer<LookUp> tmpComposer;
-		QueryItemHandler<AppRelease> tmpIH;
+		QueryItemHandler<AppRelease, LookUp> tmpIH;
 		DateUnit dateUnit;
 
 		dateUnit = new DateUnit("", "yyyyMMMdd HH:mm");
 
-		tmpComposer = new QueryComposer<LookUp>();
+		tmpComposer = new QueryComposer<>();
 		tmpComposer.addAttribute(LookUp.Version, String.class, "Version", null);
 		tmpComposer.addAttribute(LookUp.BuildTime, new ConstUnitProvider(dateUnit), "Build Date", null);
 
@@ -245,10 +245,10 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		tmpComposer.setRenderer(LookUp.Version, col0Renderer);
 		tmpComposer.setRenderer(LookUp.BuildTime, col1Renderer);
 
-		tmpIH = new QueryItemHandler<AppRelease>(tmpComposer);
+		tmpIH = new QueryItemHandler<>(tmpComposer);
 		myItemProcessor = new StaticItemProcessor<>();
 
-		listPanel = new ItemListPanel<>(tmpIH, myItemProcessor, false, false);
+		listPanel = new ItemListPanel<>(tmpIH, myItemProcessor, false);
 		listPanel.setSortingEnabled(false);
 		listPanel.addListSelectionListener(this);
 		return listPanel;

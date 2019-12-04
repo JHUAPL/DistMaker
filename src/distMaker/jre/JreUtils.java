@@ -65,7 +65,7 @@ public class JreUtils
 		PlainVersion alMinVer = PlainVersion.Zero;
 		PlainVersion alMaxVer = PlainVersion.AbsMax;
 		DigestType digestType = DigestType.MD5;
-		String version = null;
+		JreVersion version = null;
 
 		inStream = null;
 		bufReader = null;
@@ -89,12 +89,11 @@ public class JreUtils
 				if (strLine.isEmpty() == true || strLine.startsWith("#") == true)
 					continue;
 
-				String[] tokens;
-				tokens = strLine.split(",", 5);
-				if (tokens.length == 2 && tokens[0].equals("name") == true && tokens[1].equals("JRE") == true)
+				String[] tokens = strLine.split(",", 5);
+				if (tokens[0].equals("name") == true && tokens.length == 2 && tokens[1].equals("JRE") == true)
 					; // Nothing to do - we just entered the "JRE" section
 				// Logic to handle the 'exit' command
-				else if (tokens.length >= 1 && tokens[0].equals("exit") == true)
+				else if (tokens[0].equals("exit") == true && tokens.length >= 1)
 				{
 					// We support exit commands with 3 tokens. All others
 					// we will just exit.
@@ -107,27 +106,25 @@ public class JreUtils
 						break;
 				}
 				// Logic to handle the 'digest' command
-				else if (tokens.length == 2 && tokens[0].equals("digest") == true)
+				else if (tokens[0].equals("digest") == true && tokens.length == 2)
 				{
-					DigestType tmpDigestType;
-
-					tmpDigestType = DigestType.parse(tokens[1]);
+					DigestType tmpDigestType = DigestType.parse(tokens[1]);
 					if (tmpDigestType == null)
 						aTask.infoAppendln("Failed to locate DigestType for: " + tokens[1]);
 					else
 						digestType = tmpDigestType;
 				}
 				// Logic to handle the 'jre' command
-				else if (tokens.length == 2 && tokens[0].equals("jre") == true)
+				else if (tokens[0].equals("jre") == true && tokens.length == 2)
 				{
-					version = tokens[1];
+					version = new JreVersion(tokens[1]);
 
 					// On any new JRE version reset the default required AppLauncher versions
 					alMinVer = PlainVersion.Zero;
 					alMaxVer = new PlainVersion(0, 99, 0);
 				}
 				// Logic to handle the 'require' command: JRE File
-				else if (tokens.length >= 3 && tokens[0].equals("require") == true)
+				else if (tokens[0].equals("require") == true && tokens.length >= 3)
 				{
 					String target;
 
@@ -146,11 +143,8 @@ public class JreUtils
 					aTask.infoAppendln("Unreconized line: " + strLine);
 				}
 				// Logic to handle the 'F' command: JRE File
-				else if (tokens.length == 5 && tokens[0].equals("F") == true)
+				else if (tokens[0].equals("F") == true && tokens.length >= 4 && tokens.length <= 6)
 				{
-					String platform, filename, digestStr;
-					long fileLen;
-
 					if (version == null)
 					{
 						aTask.infoAppendln("Skipping input: " + strLine);
@@ -158,42 +152,47 @@ public class JreUtils
 						continue;
 					}
 
-					// Form the JreRelease
-					digestStr = tokens[1];
-					fileLen = GuiUtil.readLong(tokens[2], -1);
-					platform = tokens[3];
-					filename = tokens[4];
+					// Parse the JRE release
+					String archStr, platStr, filename, digestStr;
+					long fileLen;
 
+					if (tokens.length == 6)
+					{
+						archStr = tokens[1];
+						platStr = tokens[2];
+						filename = tokens[3];
+						digestStr = tokens[4];
+						fileLen = GuiUtil.readLong(tokens[5], -1);
+					}
+					else if (tokens.length == 5)
+					{
+						archStr = "x64";
+						digestStr = tokens[1];
+						fileLen = GuiUtil.readLong(tokens[2], -1);
+						platStr = tokens[3];
+						if (platStr.equalsIgnoreCase("apple") == true)
+							platStr = "macosx";
+						filename = tokens[4];
+					}
+					else // tokens.length == 4
+					{
+						archStr = "x64";
+						digestStr = tokens[1];
+						fileLen = GuiUtil.readLong(tokens[2], -1);
+						filename = tokens[3];
+
+						platStr = JreUtils.getPlatformOfJreTarGz(filename);
+						if (platStr == null)
+						{
+							aTask.infoAppendln("Skipping input: " + strLine);
+							aTask.infoAppendln("\tFailed to determine the target platform of the JRE.");
+							continue;
+						}
+					}
+
+					// Form the JreRelease
 					Digest tmpDigest = new Digest(digestType, digestStr);
-					retList.add(new JreRelease(platform, version, filename, tmpDigest, fileLen, alMinVer, alMaxVer));
-				}
-				// Legacy Logic to handle the 'F' command: JRE File (pre DistMaker 0.50)
-				else if (tokens.length == 4 && tokens[0].equals("F") == true)
-				{
-					String platform, filename, digestStr;
-					long fileLen;
-
-					if (version == null)
-					{
-						aTask.infoAppendln("Skipping input: " + strLine);
-						aTask.infoAppendln("\tJRE version has not been specifed. Missing input line: jre,<jreVersion>");
-						continue;
-					}
-
-					// Form the JreRelease
-					digestStr = tokens[1];
-					fileLen = GuiUtil.readLong(tokens[2], -1);
-					filename = tokens[3];
-
-					platform = JreUtils.getPlatformOfJreTarGz(filename);
-					if (platform == null)
-					{
-						aTask.infoAppendln("Skipping input: " + strLine);
-						aTask.infoAppendln("\tFailed to determine the target platform of the JRE.");
-						continue;
-					}
-
-					retList.add(new JreRelease(platform, version, filename, new Digest(digestType, digestStr), fileLen, alMinVer, alMaxVer));
+					retList.add(new JreRelease(archStr, platStr, version, filename, tmpDigest, fileLen, alMinVer, alMaxVer));
 				}
 				else
 				{
@@ -235,7 +234,7 @@ public class JreUtils
 	 * Utility method that returns a list of matching JREs. The list will be sorted in order from newest to oldest. All
 	 * returned JREs will have a platform that matches aPlatform.
 	 */
-	public static List<JreRelease> getMatchingPlatforms(List<JreRelease> aJreList, String aPlatform)
+	public static List<JreRelease> getMatchingPlatforms(List<JreRelease> aJreList, String aArchStr, String aPlatStr)
 	{
 		List<JreRelease> retList;
 
@@ -243,7 +242,7 @@ public class JreUtils
 		retList = new ArrayList<>();
 		for (JreRelease aRelease : aJreList)
 		{
-			if (aRelease.isPlatformMatch(aPlatform) == false)
+			if (aRelease.isSystemMatch(aArchStr, aPlatStr) == false)
 				continue;
 
 			retList.add(aRelease);
@@ -270,7 +269,7 @@ public class JreUtils
 		if (aFileName.contains("LINUX") == true)
 			return "Linux";
 		if (aFileName.contains("MACOSX") == true)
-			return "Apple";
+			return "Macosx";
 		if (aFileName.contains("WINDOWS") == true)
 			return "Windows";
 

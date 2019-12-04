@@ -10,23 +10,29 @@ import distMaker.utils.Version;
  */
 public class JreRelease implements Comparable<JreRelease>
 {
+	private final JreVersion version;
 	private final Version alMinVer;
 	private final Version alMaxVer;
-	private final String platform;
-	private final JreVersion version;
-	private final Digest digest;
+
+	private final String archStr;
+	private final String platStr;
+
 	private final String fileName;
+	private final Digest digest;
 	private final long fileLen;
 
-	public JreRelease(String aPlatform, String aVersion, String aFileName, Digest aDigest, long aFileLen, Version aAlMinVer, Version aAlMaxVer)
+	public JreRelease(String aArchStr, String aPlatStr, JreVersion aVersion, String aFileName, Digest aDigest, long aFileLen, Version aAlMinVer, Version aAlMaxVer)
 	{
-		platform = aPlatform;
-		version = new JreVersion(aVersion);
+		version = aVersion;
+		alMinVer = aAlMinVer;
+		alMaxVer = aAlMaxVer;
+
+		archStr = aArchStr.toLowerCase();
+		platStr = aPlatStr.toLowerCase();
+	
 		fileName = aFileName;
 		digest = aDigest;
 		fileLen = aFileLen;
-		alMinVer = aAlMinVer;
-		alMaxVer = aAlMaxVer;
 	}
 
 	/**
@@ -62,22 +68,28 @@ public class JreRelease implements Comparable<JreRelease>
 	}
 
 	/**
-	 * Returns true if the specified platform matches our platform.
+	 * Returns true if the specified system matches the JRE's system.
+	 * 
+	 * @param aArchStr
+	 *        Architecture of the relevant system. (Ex: x64)
+	 * @param aPlatStr
+	 *        Platform of the relevant system. (Ex: linux)
+	 * @return
 	 */
-	public boolean isPlatformMatch(String aPlatform)
+	public boolean isSystemMatch(String aArchStr, String aPlatStr)
 	{
-		String platformStr;
+		aArchStr = aArchStr.toLowerCase();
+		aPlatStr = aPlatStr.toLowerCase();
+		
+		// Ensure the architecture matches
+		if (archStr.equals(aArchStr) == false)
+			return false;
+		
+		// Ensure the platform matches
+		if (platStr.equals(aPlatStr) == false)
+			return false;
 
-		// Consider this JreRelease a match if our platform is contained within aPlatform
-		platformStr = platform.toUpperCase();
-		if (aPlatform.toUpperCase().contains(platformStr) == true)
-			return true;
-
-		// If our platform == APPLE - then check to see if aPlatform mathes against 'MACOSX'
-		if (platformStr.equals("APPLE") == true && aPlatform.toUpperCase().contains("MACOSX") == true)
-			return true;
-
-		return false;
+		return true;
 	}
 
 	/**
@@ -101,7 +113,11 @@ public class JreRelease implements Comparable<JreRelease>
 	{
 		int cmpVal;
 
-		cmpVal = platform.compareTo(aItem.platform);
+		cmpVal = archStr.compareTo(aItem.archStr);
+		if (cmpVal != 0)
+			return cmpVal;
+
+		cmpVal = platStr.compareTo(aItem.platStr);
 		if (cmpVal != 0)
 			return cmpVal;
 
