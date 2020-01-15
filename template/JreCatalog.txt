@@ -1,0 +1,53 @@
+# DistMaker 0.55 JRE Catalog
+#
+# This file defines the JREs that DistMaker can utilize when building DistMaker
+# enabled applications.
+#
+# JREs are specified by groups. A group of JREs are specified starting with the
+# following line:
+# jre,<VERSION>
+#    where
+#       <VERSION>: Version of all JREs specified in this group. Legacy versions
+#                  of the JRE (Java 1.8.* or earlier) must specify a version
+#                  with exactly 4 components. JRE versions post Java 8 must
+#                  specify at least 3 components, but are free to specify more.
+#
+#
+# The following lines defines the available JREs associated with this group. Each
+# individual JRE in the group is specified with a single line that has the following
+# format:
+# F,<ARCH>,<PLAT>,<PATH>
+#    where
+#       <ARCH>: Architecture of the JRE. Currently the following is supported:
+#                  x64
+#       <PLAT>: Operating system of the JRE. Currently the following is supported:
+#                  linux, macosx, windows
+#       <PATH>: Path to packaged JRE file. Currently tar.gz or zip files are
+#               supported.
+
+
+# ------------------------------------------------------------------------------
+# Below is an example configuration. This will need to be customized to match
+# your particular configuration.
+# ------------------------------------------------------------------------------
+
+jre,1.8.0.77
+F,x64,linux,/download/java/8u77/jre/jre-8u77-linux-x64.tar.gz
+F,x64,macosx,/download/java/8u77/jre/jre-8u77-macosx-x64.tar.gz
+F,x64,windows,/download/java/8u77/jre/jre-8u77-windows-x64.tar.gz
+
+jre,1.8.0.192
+F,x64,linux,/download/java/8u192/jre/jre-8u192-linux-x64.tar.gz
+F,x64,macosx,/download/java/8u192/jre/jre-8u192-macosx-x64.tar.gz
+F,x64,windows,/download/java/8u192/jre/jre-8u192-windows-x64.tar.gz
+
+jre,9.0.4
+F,x64,linux,/download/java/9.0.4/jre/jre-9.0.4_linux-x64_bin.tar.gz
+F,x64,macosx,/download/java/9.0.4/jre/jre-9.0.4_osx-x64_bin.tar.gz
+F,x64,windows,/download/java/9.0.4/jre/jre-9.0.4_windows-x64_bin.tar.gz
+
+jre,13.0.1
+F,x64,linux,/download/java/13.0.1/jre/OpenJDK13U-jre_x64_linux_hotspot_13.0.1_9.tar.gz
+F,x64,macosx,/download/java/13.0.1/jre/OpenJDK13U-jre_x64_mac_hotspot_13.0.1_9.tar.gz
+F,x64,windows,/download/java/13.0.1/jre/OpenJDK13U-jre_x64_windows_hotspot_13.0.1_9.zip
+
