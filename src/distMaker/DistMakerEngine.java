@@ -33,9 +33,6 @@ import glum.util.ThreadUtil;
 
 public class DistMakerEngine
 {
-	// Constants
-	private final String NonDistmakerAppMsg = "This application does not appear to be a properly configured DistMaker application.\n\n" + "Please check installation configuration.";
-
 	// State vars
 	private URL updateSiteUrl;
 	private AppRelease currRelease;
@@ -75,7 +72,7 @@ public class DistMakerEngine
 			if (DistUtils.isDevelopersEnvironment() == true)
 				displayNotice("Updates are not possible in a developer environment.");
 			else
-				displayNotice(NonDistmakerAppMsg);
+				displayNotice(ErrorMsg.NonDistmakerApp);
 			return;
 		}
 		appName = currRelease.getName();
@@ -187,7 +184,7 @@ public class DistMakerEngine
 		{
 			// Alert the user to the incongruence if this is not a developer's build
 			if (DistUtils.isDevelopersEnvironment() == false)
-				displayNotice(NonDistmakerAppMsg);
+				displayNotice(ErrorMsg.NonDistmakerApp);
 
 			return;
 		}
@@ -228,7 +225,7 @@ public class DistMakerEngine
 
 		if (appName == null || verName == null)
 		{
-			displayNotice(NonDistmakerAppMsg);
+			displayNotice(ErrorMsg.NonDistmakerApp);
 			System.err.println("Failed to properly parse DistMaker config file: " + cfgFile);
 			return;
 		}
@@ -757,13 +754,13 @@ public class DistMakerEngine
 		if (jreList == null)
 		{
 			aTask.infoAppendln("The update site has not had any JREs deployed.");
-			aTask.infoAppendln("Please contact the update site adminstartor.");
+			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 		if (jreList.size() == 0)
 		{
 			aTask.infoAppendln("No JRE releases found!");
-			aTask.infoAppendln("Please contact the update site adminstartor.");
+			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 
@@ -784,7 +781,7 @@ public class DistMakerEngine
 			aTask.infoAppendln("There are no compatible JREs found on the deploy site. Available JREs: " + jreList.size());
 			for (JreRelease aJreRelease : jreList)
 				aTask.infoAppendln("\t" + aJreRelease.getFileName() + "   --->   (JRE: " + aJreRelease.getVersion().getLabel() + ")");
-			aTask.infoAppendln("\nPlease contact the update site adminstartor.");
+			aTask.infoAppendln("\n" + ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 		JreVersion pickJreVer = pickJre.getVersion();
@@ -838,7 +835,7 @@ public class DistMakerEngine
 
 			// Unpack the JRE to the working unpack folder. Ensure that the unpacked JRE results in 1 top level folder.
 			tmpTask = new PartialTask(aTask, aTask.getProgress(), (tmpFileLen * 0.25) / (releaseSizeFull + 0.00));
-			MiscUtils.unTar(tmpTask, dstFile, unpackPath);
+			MiscUtils.unPack(tmpTask, dstFile, unpackPath);
 			File[] fileArr = unpackPath.listFiles();
 			if (fileArr.length != 1 && fileArr[0].isDirectory() == false)
 				throw new Exception("Expected only one (top level) folder to be unpacked. Items extracted: " + fileArr.length + "   Path: " + unpackPath);
@@ -1123,19 +1120,15 @@ public class DistMakerEngine
 		}
 
 		// Setup the runnable that will clean up our delta folder
-		Runnable cleanDeltaRunnable = new Runnable()
+		Runnable cleanDeltaRunnable = () ->
 		{
-			@Override
-			public void run()
-			{
-				// Remove the delta folder (if it exists)
-				File deltaPath = new File(DistUtils.getAppPath().getParentFile(), "delta");
-				if (deltaPath.isDirectory() == false)
-					return;
+			// Remove the delta folder (if it exists)
+			File deltaPath = new File(DistUtils.getAppPath().getParentFile(), "delta");
+			if (deltaPath.isDirectory() == false)
+				return;
 
-				if (IoUtil.deleteDirectory(deltaPath) == false)
-					System.err.println("Failed to remove delta path. Cleanup after update was not fully completed.");
-			}
+			if (IoUtil.deleteDirectory(deltaPath) == false)
+				System.err.println("Failed to remove delta path. Cleanup after update was not fully completed.");
 		};
 
 		// Show the message panel and execute cleanDeltaRunnable

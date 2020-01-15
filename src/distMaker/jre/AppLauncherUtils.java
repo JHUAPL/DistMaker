@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import distMaker.DistUtils;
+import distMaker.ErrorMsg;
 import distMaker.digest.Digest;
 import distMaker.digest.DigestType;
 import distMaker.digest.DigestUtils;
@@ -206,14 +207,14 @@ public class AppLauncherUtils
 		if (availList == null)
 		{
 			aTask.infoAppendln("The update site does not have any deployed AppLaunchers.");
-			aTask.infoAppendln("Please contact the update site adminstartor.");
+			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 
 		if (availList.size() == 0)
 		{
 			aTask.infoAppendln("No AppLauncher releases found!");
-			aTask.infoAppendln("Please contact the update site adminstartor.");
+			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 
@@ -236,7 +237,7 @@ public class AppLauncherUtils
 		if (pickRelease == null)
 		{
 			aTask.infoAppendln("No compatible AppLauncher releases have been deployed!");
-			aTask.infoAppendln("Please contact the update site adminstartor.");
+			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 

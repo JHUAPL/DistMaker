@@ -1,8 +1,5 @@
 package distMaker;
 
-import glum.task.Task;
-import glum.util.ThreadUtil;
-
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,15 +7,18 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipInputStream;
 
-import org.apache.commons.compress.archivers.ArchiveException;
-import org.apache.commons.compress.archivers.ArchiveStreamFactory;
+import org.apache.commons.compress.archivers.*;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.compress.utils.IOUtils;
 
 import com.google.common.base.Strings;
 import com.google.common.io.CountingInputStream;
+
+import glum.task.Task;
+import glum.util.ThreadUtil;
 
 /**
  * Collection of generic utility methods that should be migrated to another library / class.
@@ -119,7 +119,7 @@ public class MiscUtils
 	}
 
 	/**
-	 * Untar an input file into an output file.
+	 * Unpacks an input file into an output file.
 	 * <P>
 	 * Source based off of:<BR>
 	 * http://stackoverflow.com/questions/315618/how-do-i-extract-a-tar-file-in-java/7556307#7556307
@@ -128,7 +128,7 @@ public class MiscUtils
 	 * extension.
 	 * 
 	 * @param inputFile
-	 *        the input .tar file
+	 *        the input .tar.gz or zip file
 	 * @param aDestPath
 	 *        The destination folder where the content will be dumped.
 	 * @throws IOException
@@ -136,7 +136,7 @@ public class MiscUtils
 	 * @return The {@link List} of {@link File}s with the untared content.
 	 * @throws ArchiveException
 	 */
-	public static List<File> unTar(Task aTask, final File inputFile, final File aDestPath) throws FileNotFoundException, IOException, ArchiveException
+	public static List<File> unPack(Task aTask, final File inputFile, final File aDestPath) throws FileNotFoundException, IOException, ArchiveException
 	{
 		Map<File, Long> pathMap;
 		InputStream iStream;
@@ -147,11 +147,21 @@ public class MiscUtils
 		// Open up the stream to the tar file (set up a counting stream to allow for progress updates)
 		CountingInputStream cntStream = new CountingInputStream(new FileInputStream(inputFile));
 		iStream = cntStream;
-		if (inputFile.getName().toUpperCase().endsWith(".GZ") == true)
+
+		String archiverName;
+		if (inputFile.getName().toUpperCase().endsWith(".ZIP") == false)
+		{
+			archiverName = "tar";
 			iStream = new GZIPInputStream(iStream);
+		}
+		else
+		{
+			archiverName = "zip";
+//			iStream = new ZipInputStream(iStream);
+		}
 
 		pathMap = new LinkedHashMap<>();
-		final TarArchiveInputStream debInputStream = (TarArchiveInputStream)new ArchiveStreamFactory().createArchiveInputStream("tar", iStream);
+		final ArchiveInputStream debInputStream = new ArchiveStreamFactory().createArchiveInputStream(archiverName, iStream);
 		TarArchiveEntry entry = null;
 		while ((entry = (TarArchiveEntry)debInputStream.getNextEntry()) != null)
 		{
