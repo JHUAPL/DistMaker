@@ -12,18 +12,19 @@ import miscUtils
 import deployJreDist
 
 
-def buildRelease(args, buildPath):
+def buildRelease(aArgs, aBuildPath, aJreNodeL):
 	# We mutate args - thus make a custom copy
-	args = copy.copy(args)
+	args = copy.copy(aArgs)
 
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
 	jreVerSpec = args.jreVerSpec
-	platformStr = 'linux'
+	archStr = 'x64'
+	platStr = 'linux'
 
 	# Determine the types of builds we should do
-	platformType = miscUtils.getPlatformTypes(args.platform, platformStr)
+	platformType = miscUtils.getPlatformTypes(args.platform, platStr)
 	if platformType.nonJre == False and platformType.withJre == False:
 		return;
 
@@ -32,37 +33,37 @@ def buildRelease(args, buildPath):
 		return
 
 	# Form the list of distributions to build (dynamic and static JREs)
-	distList = []
+	distL = []
 	if platformType.nonJre == True:
-		distList = [(appName + '-' + version, None)]
+		distL = [(appName + '-' + version, None)]
 	if platformType.withJre == True:
-		# Select the jreTarGzFile to utilize for static releases
-		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
-		if jreTarGzFile == None:
+		# Select the JreNode to utilize for static releases
+		tmpJreNode = jreUtils.getJreNode(aJreNodeL, archStr, platStr, jreVerSpec)
+		if tmpJreNode == None:
 			# Let the user know that a compatible JRE was not found - thus no static release will be made.
-			print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
+			print('[Warning] No compatible JRE ({}) is available for the ({}) {} platform. A static release will not be provided for the platform.'.format(jreVerSpec, archStr, platStr.capitalize()))
 		else:
-			distList.append((appName + '-' + version + '-jre', jreTarGzFile))
+			distL.append((appName + '-' + version + '-jre', tmpJreNode))
 
 	# Create a tmp (working) folder
-	tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
+	tmpPath = tempfile.mkdtemp(prefix=platStr, dir=aBuildPath)
 
 	# Create the various distributions
-	for (aDistName, aJreTarGzFile) in distList:
-		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
+	for (aDistName, aJreNode) in distL:
+		print('Building {} distribution: {}'.format(platStr.capitalize(), aDistName))
 		# Let the user know of the JRE release we are going to build with
-		if aJreTarGzFile != None:
-			print('\tUtilizing JRE: ' + aJreTarGzFile)
+		if aJreNode != None:
+			print('\tUtilizing JRE: ' + aJreNode.getFile())
 
 		# Create the (top level) distribution folder
 		dstPath = os.path.join(tmpPath, aDistName)
 		os.mkdir(dstPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(buildPath, dstPath, args, aJreTarGzFile)
+		buildDistTree(aBuildPath, dstPath, args, aJreNode)
 
 		# Create the tar.gz archive
-		tarFile = os.path.join(buildPath, aDistName + '.tar.gz')
+		tarFile = os.path.join(aBuildPath, aDistName + '.tar.gz')
 		print('\tForming tar.gz file: ' + tarFile)
 		childPath = aDistName
 		subprocess.check_call(["tar", "-czf", tarFile, "-C", tmpPath, childPath], stderr=subprocess.STDOUT)
@@ -72,19 +73,19 @@ def buildRelease(args, buildPath):
 	shutil.rmtree(tmpPath)
 
 
-def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
+def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
-	appName = args.name
+	appName = aArgs.name
 
 	# Form the app contents folder
-	srcPath = os.path.join(buildPath, "delta")
-	dstPath = os.path.join(rootPath, "app")
+	srcPath = os.path.join(aBuildPath, "delta")
+	dstPath = os.path.join(aRootPath, "app")
 	shutil.copytree(srcPath, dstPath, symlinks=True)
 
 	# Copy libs to the app directory so they can be found at launch
-	soDir = os.path.join(rootPath, 'app', 'code', 'linux')
+	soDir = os.path.join(aRootPath, 'app', 'code', 'linux')
 	for libPath in glob.iglob(os.path.join(soDir, "*.so")):
 		libFileName = os.path.basename(libPath)
 		srcPath = os.path.join(soDir, libFileName)
@@ -92,34 +93,34 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 		shutil.copy(srcPath, linkPath)
 
 	# Setup the launcher contents
-	dstPath = os.path.join(rootPath, "launcher/" + deployJreDist.getAppLauncherFileName())
+	dstPath = os.path.join(aRootPath, "launcher/" + deployJreDist.getAppLauncherFileName())
 	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
 	os.makedirs(os.path.dirname(dstPath))
 	shutil.copy(srcPath, dstPath);
 
 	# Build the java component of the distribution
-	if args.javaCode != None:
+	if aArgs.javaCode != None:
 		# Form the executable bash script
-		dstPath = os.path.join(rootPath, 'run' + appName)
-		buildBashScript(dstPath, args, jreTarGzFile)
+		dstPath = os.path.join(aRootPath, 'run' + appName)
+		buildBashScript(dstPath, aArgs, aJreNode)
 
 	# Unpack the JRE and set up the JRE tree
-	if jreTarGzFile != None:
-		jreUtils.unpackAndRenameToStandard(jreTarGzFile, rootPath)
+	if aJreNode != None:
+		jreUtils.unpackAndRenameToStandard(aJreNode, aRootPath)
 
 
-def buildBashScript(destFile, args, jreTarGzFile):
+def buildBashScript(aDestFile, aArgs, aJreNode):
 	# Form the jvmArgStr but strip away the -Xmx* component if it is specified
 	# since the JVM maxMem is dynamically configurable (via DistMaker)
 	maxMem = None
 	jvmArgsStr = ''
-	for aStr in args.jvmArgs:
+	for aStr in aArgs.jvmArgs:
 		if aStr.startswith('-Xmx'):
 			maxMem = aStr[4:]
 		else:
 			jvmArgsStr += aStr + ' '
 
-	f = open(destFile, 'wb')
+	f = open(aDestFile, 'wb')
 #	f.write('#!/bin/bash\n')
 	f.write('#!/usr/bin/env bash\n')
 
@@ -128,10 +129,10 @@ def buildBashScript(destFile, args, jreTarGzFile):
 	f.write('{    # Do not remove this bracket! \n\n')
 
 	f.write('# Define where the Java executable is located\n')
-	if jreTarGzFile == None:
+	if aJreNode == None:
 		f.write('javaExe=java\n\n')
 	else:
-		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
+		jrePath = jreUtils.getBasePathFor(aJreNode)
 		f.write('javaExe=../' + jrePath + '/bin/java\n\n')
 
 	f.write('# Define the maximum memory to allow the application to utilize\n')
@@ -141,9 +142,9 @@ def buildBashScript(destFile, args, jreTarGzFile):
 		f.write('maxMem=' + maxMem + '\n\n')
 
 	f.write('# Get the installation path\n')
-	f.write('# We support the Apple / Linux variants explicitly and then default back to Linux\n')
+	f.write('# We support the Linux / Macosx variants explicitly and then default back to Linux\n')
 	f.write('if [ "$(uname -s)" == "Darwin" ]; then\n')
-	f.write('  # Apple platform: We assume the coreutils package has been installed...\n')
+	f.write('  # Macosx platform: We assume the coreutils package has been installed...\n')
 	f.write('  installPath=$(greadlink -f "$BASH_SOURCE")\n')
 	f.write('elif [ "$(uname -s)" == "Linux" ]; then\n')
 	f.write('  # Linux platform\n')
@@ -175,7 +176,7 @@ def buildBashScript(destFile, args, jreTarGzFile):
 	f.close()
 
 	# Make the script executable
-	os.chmod(destFile, 00755)
+	os.chmod(aDestFile, 00755)
 
 
 def checkSystemEnvironment():

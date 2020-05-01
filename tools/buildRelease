@@ -8,37 +8,37 @@ import signal
 import subprocess
 import sys
 
-def buildRelease(version, doNotClean=False):
+def buildRelease(aVersion, aDoNotClean=False):
 	"""Method that builds a release of DistMaker. Upon sucessful execution, a
-	tar.gz archive will be generated named: 'DistMaker-<version>.tar.gz'. Note
-	that releases of DistMaker version 0.50 or later (2018May01+) will no longer
+	tar.gz archive will be generated named: 'DistMaker-<aVersion>.tar.gz'. Note
+	that releases of DistMaker aVersion 0.50 or later (2018May01+) will no longer
 	include static JREs."""
 	# Retrieve the install path
 	installPath = getInstallRoot()
 	installPath = os.path.dirname(installPath)
 
 	# Determine the workPath
-	workPath = os.path.join(installPath, 'release', 'DistMaker-' + version)
-	destFileGZ = os.path.join(installPath, 'release', 'DistMaker-' + version + '.tar.gz')
+	workPath = os.path.join(installPath, 'release', 'DistMaker-' + aVersion)
+	destFileGZ = os.path.join(installPath, 'release', 'DistMaker-' + aVersion + '.tar.gz')
 
 	# Bail if the work folder for which we compose the release already exists
 	if os.path.exists(workPath) == True:
-		errPrintln('Aborting DistMaker release build. Release folder already exists: ' + workPath, indent=1)
+		errPrintln('\tAborting DistMaker release build. Release folder already exists: ' + workPath)
 		exit(-1)
 
 	# Bail if the release already exists
 	if os.path.exists(destFileGZ) == True:
-		errPrintln('Aborting DistMaker release build. Release already exists. File: ' + destFileGZ, indent=1)
+		errPrintln('\tAborting DistMaker release build. Release already exists. File: ' + destFileGZ)
 		exit(-1)
 
 	# Laydown the structure, and let the user know of the version we are building
-	print('Building DistMaker release ' + version + '...')
+	print('Building DistMaker release ' + aVersion + '...')
 	os.mkdir(workPath)
 
 	# Copy the libraries
 	dstPath = os.path.join(workPath, 'lib')
 	os.mkdir(dstPath)
-	for aLib in ['glum.jar', 'guava-18.0.jar', 'distMaker.jar']:
+	for aLib in ['glum-1.3.jar', 'guava-18.0.jar', 'distMaker.jar']:
 		srcPath = os.path.join(installPath, 'lib', aLib)
 		shutil.copy2(srcPath, dstPath)
 
@@ -54,7 +54,7 @@ def buildRelease(version, doNotClean=False):
 	os.makedirs(dstPath + '/apple')
 	os.makedirs(dstPath + '/background')
 	os.makedirs(dstPath + '/launch4j')
-	for aFile in ['appLauncher.jar', '.DS_Store.template', 'apple/JavaAppLauncher', 'background/background.png', 'launch4j/launch4j-3.12-linux-x64.tgz', 'launch4j/launch4j-3.12-macosx-x86.tgz']:
+	for aFile in ['appLauncher.jar', 'JreCatalog.txt', 'apple/.DS_Store.template', 'apple/JavaAppLauncher', 'background/background.png', 'launch4j/launch4j-3.12-linux-x64.tgz', 'launch4j/launch4j-3.12-linux.tgz', 'launch4j/launch4j-3.12-macosx-x86.tgz']:
 		srcPath = os.path.join(installPath, 'template', aFile)
 		shutil.copy2(srcPath, dstPath + '/' + aFile)
 
@@ -66,18 +66,17 @@ def buildRelease(version, doNotClean=False):
 		exit(-1)
 
 	# Remove the workPath
-	if doNotClean == False:
+	if aDoNotClean == False:
 		shutil.rmtree(workPath)
 
-	print('DistMaker release ' + version + ' built.')
+	print('DistMaker release ' + aVersion + ' built.')
 
 
-def errPrintln(message="", indent=0):
-	"""Print the specified string with a trailing newline to stderr."""
-	while indent > 0:
-		indent -= 1
-		message = '   ' + message
-	sys.stderr.write(message + '\n')
+def errPrintln(aMessage=''):
+	"""Print the specified string with a trailing newline to stderr. Each tab
+	character will be replaced with: 3 spaces"""
+	aMessage = aMessage.replace('\t', '   ')
+	sys.stderr.write(aMessage + '\n')
 
 
 def getDistMakerVersion():
@@ -92,8 +91,8 @@ def getDistMakerVersion():
 	# Check for distMaker.jar library prerequisite
 	testPath = os.path.join(installPath, 'lib', 'distMaker.jar')
 	if os.path.exists(testPath) == False:
-		errPrintln('Aborting DistMaker release build. The file  ' + testPath + ' does not exist.', indent=1)
-		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		errPrintln('\tAborting DistMaker release build. The file  ' + testPath + ' does not exist.')
+		errPrintln('\tPlease run the buildDistMakerBin.jardesc from your workspace.')
 		exit(-1)
 
 	try:
@@ -102,7 +101,7 @@ def getDistMakerVersion():
 		version = output.split()[1]
 		return version
 	except:
-		errPrintln('Please run the buildDistMakerBin.jardesc from your workspace.', indent=1)
+		errPrintln('\tPlease run the buildDistMakerBin.jardesc from your workspace.')
 		exit(-1)
 
 
@@ -124,7 +123,7 @@ if __name__ == "__main__":
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, handleSignal)
 
-	# Ensure we are running version 2.7 or greater
+	# Require python version 2.7 or later
 	targVer = (2, 7)
 	if sys.version_info < targVer:
 		print('The installed version of python is too old. Please upgrade.')

@@ -15,68 +15,72 @@ import miscUtils
 import deployJreDist
 
 
-def buildRelease(args, buildPath):
+def buildRelease(aArgs, aBuildPath, aJreNodeL):
 	# We mutate args - thus make a custom copy
-	args = copy.copy(args)
+	args = copy.copy(aArgs)
 
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
 	jreVerSpec = args.jreVerSpec
-	platformStr = 'apple'
+	archStr = 'x64'
+	platStr = 'macosx'
 
 	# Determine the types of builds we should do
-	platformType = miscUtils.getPlatformTypes(args.platform, platformStr)
+	platformType = miscUtils.getPlatformTypes(args.platform, platStr)
 	if platformType.nonJre == False and platformType.withJre == False:
 		return;
-	# Warn if a request for a non-JRE build. We do not support that for the Apple platform.
-	if 'apple-' in args.platform:
-		print('Building an Apple release without a JRE is currently not supported. This release will not be made.')
+	# Warn if a request for a non-JRE build. We do not support that for the Macosx platform.
+	if 'macosx-' in args.platform:
+		print('Building a Macosx release without a JRE is currently not supported. This release will not be made.')
 
 	# Check our system environment before proceeding
 	if checkSystemEnvironment() == False:
 		return
 
 	# Form the list of distributions to build (dynamic and static JREs)
-	distList = []
+	distL = []
 # Note as of 2016May01 there is no longer support for a dynamic Apple release
 #	if platformType.nonJre == True:
-#		distList = [(appName + '-' + version, None)]
+#		distL = [(appName + '-' + version, None)]
 	if platformType.withJre == True:
-		# Select the jreTarGzFile to utilize for static releases
-		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
-		if jreTarGzFile == None:
+		# Select the JreNode to utilize for static releases
+		tmpJreNode = jreUtils.getJreNode(aJreNodeL, archStr, platStr, jreVerSpec)
+		if tmpJreNode == None:
 			# Let the user know that a compatible JRE was not found - thus no static release will be made.
-			print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
+			print('[Warning] No compatible JRE ({}) is available for the ({}) {} platform. A static release will not be provided for the platform.'.format(jreVerSpec, archStr, platStr.capitalize()))
 #			# Let the user know that a compatible JRE was not found - and thus no Apple builds will be made
-			print('Only static Apple distributions are supported - thus there will be no Apple distribution of the application: ' + appName + '\n')
+			print('Only static Macosx distributions are supported - thus there will be no Apple distribution of the application: ' + appName + '\n')
 			return
 		else:
-			distList.append((appName + '-' + version + '-jre', jreTarGzFile))
+			distL.append((appName + '-' + version + '-jre', tmpJreNode))
 
 	# Create the various distributions
-	for (aDistName, aJreTarGzFile) in distList:
-		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
+	for (aDistName, aJreNode) in distL:
+		print('Building {} distribution: {}'.format(platStr.capitalize(), aDistName))
 		# Let the user know of the JRE release we are going to build with
-		if aJreTarGzFile != None:
-			print('\tUtilizing JRE: ' + aJreTarGzFile)
+		if aJreNode != None:
+			print('\tUtilizing JRE: ' + aJreNode.getFile())
 
 		# Create a tmp folder and build the static release to the tmp folder
-		tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
+		tmpPath = tempfile.mkdtemp(prefix=platStr, dir=aBuildPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(buildPath, tmpPath, args, aJreTarGzFile)
+		buildDistTree(aBuildPath, tmpPath, args, aJreNode)
 
 		# Create the DMG image via genisoimage or hdiutil
-		dmgFile = os.path.join(buildPath, aDistName + '.dmg')
+		dmgFile = os.path.join(aBuildPath, aDistName + '.dmg')
 		if platform.system() == 'Darwin':
 #			cmd = ['hdiutil', 'create', '-fs', 'HFS+'  '-o', dmgFile, '-quiet', '-volname', appName, '-srcfolder', tmpPath]
 			cmd = ['hdiutil', 'makehybrid', '-hfs', '-o', dmgFile, '-default-volume-name', appName, tmpPath]
+			indentStr = 'hdiutil'
 		else:
 #			cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-uid', '501', '-gid', '80', '-r', '-D', '-apple', tmpPath]
 			cmd = ['genisoimage', '-o', dmgFile, '-quiet', '-V', appName, '-max-iso9660-filenames', '-hfs-unlock', '-D', '-r', '-apple', tmpPath]
+			indentStr = 'genisoimage'
 		print('\tForming DMG image. File: ' + dmgFile)
-		proc = miscUtils.executeAndLog(cmd, "\t\tgenisoimage: ")
+		indentStr = '\t\t' + indentStr + ': '
+		proc = miscUtils.executeAndLog(cmd, indentStr)
 		if proc.returncode != 0:
 			print('\tError: Failed to form DMG image. Return code: ' + str(proc.returncode) + '\n')
 		else:
@@ -144,15 +148,15 @@ def buildRelease(args, buildPath):
 #	os.rmdir(tmpPath)
 
 
-def normGuid(mountPt):
+def normGuid(aMountPt):
 	# Ensure we are running as root
 	miscUtils.checkRoot()
 
-	# Ensure mountPt is a loopback mountPt
+	# Ensure aMountPt is a loopback mountPt
 	# TODO
 
 	# The standard Apple group/user id is 501:80
-	cmd = ['chown', '-R', '501:80', mountPt]
+	cmd = ['chown', '-R', '501:80', aMountPt]
 	subprocess.check_call(cmd, stderr=None, stdout=None)
 #	# The more pythonic way below is disabled because the command does not handle paths with spaces
 #	for path, dirs, files in os.walk(rootPath):
@@ -165,76 +169,76 @@ def normGuid(mountPt):
 
 
 
-def mount(dmgFile, mountPt):
+def mount(dmgFile, aMountPt):
 	# Ensure we are running as root
 	miscUtils.checkRoot()
 
 	# Mount the dmgFile (silently ???)
 #	mount -o loop,ro -t hfsplus imagefile.dmg /mnt/mountpoint
-	cmd = ['mount', '-n', '-o', 'loop,rw', '-t', 'hfsplus', dmgFile, mountPt]
+	cmd = ['mount', '-n', '-o', 'loop,rw', '-t', 'hfsplus', dmgFile, aMountPt]
 	subprocess.call(cmd, stderr=subprocess.STDOUT)
 
 
-def umount(mountPt):
+def umount(aMountPt):
 	# Ensure we are running as root
 	miscUtils.checkRoot()
 
 	# Release the mount
-	cmd = ['umount', mountPt]
+	cmd = ['umount', aMountPt]
 	subprocess.call(cmd, stderr=subprocess.STDOUT)
 
 
 
 
 
-def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
+def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	appTemplatePath = os.path.join(appInstallRoot, 'template')
-	appName = args.name
-	bgFile = args.bgFile
-	icnsFile = args.icnsFile
+	appName = aArgs.name
+	bgFile = aArgs.bgFile
+	icnsFile = aArgs.icnsFile
 
 	# Form the symbolic link which points to /Applications
 	srcPath = '/Applications'
-	dstPath = os.path.join(rootPath, 'Applications');
+	dstPath = os.path.join(aRootPath, 'Applications');
 	os.symlink(srcPath, dstPath)
 
 	# Construct the app folder
 	appNodes = ['MacOS', 'Resources']
 	for aPath in appNodes:
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', aPath)
+		dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', aPath)
 		os.makedirs(dstPath)
 
 	# Copy over the executable launcher
 	srcPath = os.path.join(appTemplatePath, 'apple', 'JavaAppLauncher')
-	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
+	dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', 'MacOS')
 	shutil.copy(srcPath, dstPath)
 
 	# Unpack the JRE and set up the JRE tree
-	if jreTarGzFile != None:
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'PlugIns')
+	if aJreNode != None:
+		dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', 'PlugIns')
 		os.makedirs(dstPath)
-		jreUtils.unpackAndRenameToStandard(jreTarGzFile, dstPath)
+		jreUtils.unpackAndRenameToStandard(aJreNode, dstPath)
 
 	# Write out the PkgInfo file
-	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', "PkgInfo")
+	dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', "PkgInfo")
 	f = open(dstPath, 'wb')
 	f.write('APPL????')
 	f.close()
 
 	# Define the payloadPath for where to store the appLauncher
-	payloadPath = os.path.join(rootPath, appName + '.app', 'Contents')
+	payloadPath = os.path.join(aRootPath, appName + '.app', 'Contents')
 
 	# Form the app contents folder
-	srcPath = os.path.join(buildPath, "delta")
+	srcPath = os.path.join(aBuildPath, "delta")
 	dstPath = os.path.join(payloadPath, 'app')
 	shutil.copytree(srcPath, dstPath, symlinks=True)
 
 	# Link dlls to the MacOS directory so they can be found at launch
-	jarDir = os.path.join(rootPath, appName + '.app', 'Contents', 'app', 'code', 'osx')
-	dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'MacOS')
+	jarDir = os.path.join(aRootPath, appName + '.app', 'Contents', 'app', 'code', 'osx')
+	dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', 'MacOS')
 	for jniPath in glob.iglob(os.path.join(jarDir, "*.jnilib")):
 		jniFileName = os.path.basename(jniPath)
 		srcPath = os.path.join('..', 'app', 'code', 'osx', jniFileName)
@@ -253,98 +257,98 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 	shutil.copy(srcPath, dstPath);
 
 	# Build the java component of the distribution
-	if args.javaCode != None:
+	if aArgs.javaCode != None:
 		# Form the Info.plist file
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Info.plist')
-		buildPListInfo(dstPath, args, jreTarGzFile)
+		dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', 'Info.plist')
+		buildPListInfo(dstPath, aArgs, aJreNode)
 
 	# Copy over the icon file *.icns
 	if icnsFile != None and os.path.exists(icnsFile) == True:
 		srcPath = icnsFile
-		dstPath = os.path.join(rootPath, appName + '.app', 'Contents', 'Resources')
+		dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', 'Resources')
 		shutil.copy(srcPath, dstPath)
 
 	# Copy over the background file
 	srcPath = bgFile
 	if srcPath == None:
 		srcPath = os.path.join(appTemplatePath, 'background', 'background.png');
-	dstPath = os.path.join(rootPath, '.background')
+	dstPath = os.path.join(aRootPath, '.background')
 	os.mkdir(dstPath)
-	dstPath = os.path.join(rootPath, '.background', 'background.png')
+	dstPath = os.path.join(aRootPath, '.background', 'background.png')
 	shutil.copy(srcPath, dstPath)
 
 	# Copy over the .DS_Store
-	srcPath = os.path.join(appTemplatePath, '.DS_Store.template')
-	dstPath = os.path.join(rootPath, '.DS_Store')
+	srcPath = os.path.join(appTemplatePath, 'apple', '.DS_Store.template')
+	dstPath = os.path.join(aRootPath, '.DS_Store')
 	shutil.copy(srcPath, dstPath)
 
 	# Update the .DS_Store file to reflect the new volume name
-	srcPath = os.path.join(rootPath, '.DS_Store')
-	classPath = appInstallRoot + '/lib/glum.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
+	srcPath = os.path.join(aRootPath, '.DS_Store')
+	classPath = appInstallRoot + '/lib/glum-1.3.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
 	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
 	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
 	if proc.returncode != 0:
 		print('\tError: Failed to update .DS_Store. Return code: ' + str(proc.returncode))
 
 
-def buildPListInfo(destFile, args, jreTarGzFile):
+def buildPListInfo(aDestFile, aArgs, aJreNode):
 	"""Method that will construct and populate the Info.plist file. This file
 	defines the attributes associated with the (Apple) app."""
 	# Retrieve vars of interest
 	icnsStr = None
-	if args.icnsFile != None:
-		icnsStr = os.path.basename(args.icnsFile)
+	if aArgs.icnsFile != None:
+		icnsStr = os.path.basename(aArgs.icnsFile)
 
-	f = open(destFile, 'wb')
+	f = open(aDestFile, 'wb')
 #	writeln(f, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
 	writeln(f, 0, '<?xml version="1.0" ?>')
 	writeln(f, 0, '<plist version="1.0">')
 	writeln(f, 1, '<dict>')
 
-	tupList = []
-	tupList.append(('CFBundleDevelopmentRegion', 'English'))
-	tupList.append(('CFBundleExecutable', 'JavaAppLauncher'))
-	tupList.append(('CFBundleGetInfoString', args.company))
-	tupList.append(('CFBundleInfoDictionaryVersion', 6.0))
-	tupList.append(('CFBundleIconFile', icnsStr))
-	tupList.append(('CFBundleIdentifier', args.name.lower()))
-	tupList.append(('CFBundleDisplayName', args.name))
-	tupList.append(('CFBundleName', args.name))
-	tupList.append(('CFBundlePackageType', 'APPL'))
-	tupList.append(('CFBundleSignature', '????'))
-	tupList.append(('CFBundleVersion', args.version))
-	tupList.append(('NSHighResolutionCapable', 'true'))
-	tupList.append(('NSHumanReadableCopyright', ''))
+	tupL = []
+	tupL.append(('CFBundleDevelopmentRegion', 'English'))
+	tupL.append(('CFBundleExecutable', 'JavaAppLauncher'))
+	tupL.append(('CFBundleGetInfoString', aArgs.company))
+	tupL.append(('CFBundleInfoDictionaryVersion', 6.0))
+	tupL.append(('CFBundleIconFile', icnsStr))
+	tupL.append(('CFBundleIdentifier', aArgs.name.lower()))
+	tupL.append(('CFBundleDisplayName', aArgs.name))
+	tupL.append(('CFBundleName', aArgs.name))
+	tupL.append(('CFBundlePackageType', 'APPL'))
+	tupL.append(('CFBundleSignature', '????'))
+	tupL.append(('CFBundleVersion', aArgs.version))
+	tupL.append(('NSHighResolutionCapable', 'true'))
+	tupL.append(('NSHumanReadableCopyright', ''))
 
 	# Define the JVM that is to be uesd
-	if jreTarGzFile != None:
-		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
-		tupList.append(('JVMRuntime', jrePath))
+	if aJreNode != None:
+		jrePath = jreUtils.getBasePathFor(aJreNode)
+		tupL.append(('JVMRuntime', jrePath))
 	else:
-#		tupList.append(('JVMVersion', '1.7+'))
+#		tupL.append(('JVMVersion', '1.7+'))
 		raise Exception('Support for utilizing the system JRE has not been added yet.')
 
 	# Define the main entry point (AppLauncher) and the working directory
-	tupList.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
+	tupL.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
 
 	cwdPath = os.path.join('$APP_ROOT', 'Contents', 'app')
-	tupList.append(('WorkingDirectory', cwdPath))
+	tupL.append(('WorkingDirectory', cwdPath))
 
 	# Application configuration
-	for (key, val) in tupList:
+	for (key, val) in tupL:
 		writeln(f, 2, '<key>' + key + '</key>')
 		writeln(f, 2, '<string>' + str(val) + '</string>')
 
 	# JVM options
-	jvmArgs = list(args.jvmArgs)
+	jvmArgs = list(aArgs.jvmArgs)
 	if any(aStr.startswith('-Dapple.laf.useScreenMenuBar') == False for aStr in jvmArgs) == True:
 		jvmArgs.append('-Dapple.laf.useScreenMenuBar=true')
 	if any(aStr.startswith('-Dcom.apple.macos.useScreenMenuBar') == False for aStr in jvmArgs) == True:
 		jvmArgs.append('-Dcom.apple.macos.useScreenMenuBar=true')
 	if any(aStr.startswith('-Dcom.apple.macos.use-file-dialog-packages') == False for aStr in jvmArgs) == True:
 		jvmArgs.append('-Dcom.apple.macos.use-file-dialog-packages=true')
-	jvmArgs.append('-Dcom.apple.mrj.application.apple.menu.about.name=' + args.name)
-	jvmArgs.append('-Dapple.awt.application.name=' + args.name)
+	jvmArgs.append('-Dcom.apple.mrj.application.apple.menu.about.name=' + aArgs.name)
+	jvmArgs.append('-Dapple.awt.application.name=' + aArgs.name)
 	jvmArgs.append('-Djava.system.class.loader=appLauncher.RootClassLoader')
 #	if icnsStr != None:
 #		jvmArgs.append('-Xdock:icon=Contents/Resources/' + icnsStr)
@@ -361,10 +365,10 @@ def buildPListInfo(destFile, args, jreTarGzFile):
 #
 #	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
 #
-#	tupList = []
-#	tupList.append(('ClassPath', classPathStr))
+#	tupL = []
+#	tupL.append(('ClassPath', classPathStr))
 #
-#	for (key, val) in tupList:
+#	for (key, val) in tupL:
 #		writeln(f, 3, '<key>' + key + '</key>')
 #		writeln(f, 3, '<string>' + str(val) + '</string>')
 #
@@ -377,7 +381,7 @@ def buildPListInfo(destFile, args, jreTarGzFile):
 
 def checkSystemEnvironment():
 	"""Checks to ensure that all system application / environment variables
-	needed to build a Apple distribution are installed	and properly configured.
+	needed to build a Macosx distribution are installed and properly configured.
 	Returns False if the system environment is insufficient"""
 	return True
 

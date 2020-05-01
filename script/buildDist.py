@@ -4,6 +4,7 @@ from __future__ import print_function
 import argparse
 import os
 import platform
+import re
 import shutil
 import signal
 import subprocess
@@ -20,25 +21,23 @@ from miscUtils import ErrorDM
 from miscUtils import FancyArgumentParser
 
 
-def buildCatalogFile(args, deltaPath):
+def buildCatalogFile(aArgs, aDeltaPath):
 	# Build the delta catalog
 	records = []
 
 	# Record the digest used
-	digestType = args.digest
+	digestType = aArgs.digest
 	record = ('digest', digestType)
 	records.append(record)
 
-	# Record the JRE required
-	jreVerSpec = args.jreVerSpec
-	if jreVerSpec == None:
-		jreVerSpec = [jreUtils.getDefaultJreVerStr()]
+	# Record the required JRE version
+	jreVerSpec = aArgs.jreVerSpec
 	record = ('jre', ",".join(jreVerSpec))
 	records.append(record)
 
-	snipLen = len(deltaPath) + 1
-#	for root, dirNames, fileNames in os.walk(deltaPath, onerror=failTracker.recordError):
-	for root, dirNames, fileNames in os.walk(deltaPath):
+	snipLen = len(aDeltaPath) + 1
+#	for root, dirNames, fileNames in os.walk(aDeltaPath, onerror=failTracker.recordError):
+	for root, dirNames, fileNames in os.walk(aDeltaPath):
 
 		# Presort the results alphabetically
 		dirNames.sort()
@@ -73,7 +72,7 @@ def buildCatalogFile(args, deltaPath):
 				print("Undefined node. Full path: " + fullPath + "\n")
 
 	# Save the records to the catalog file
-	dstPath = os.path.join(deltaPath, "catalog.txt")
+	dstPath = os.path.join(aDeltaPath, "catalog.txt")
 	f = open(dstPath, 'wb')
 	for aRecord in records:
 		f.write(','.join(aRecord) + '\n')
@@ -87,36 +86,47 @@ def checkForRequiredApplicationsAndExit():
 	If there are mandatory applications that are missing then this will be printed to stderr and the program will exit.
 	The current set of required applications are:
 	java, jar, (genisoimage or hdiutil)"""
+	# Check for java (version 1.8 or later)
 	evalPath = distutils.spawn.find_executable('java')
-	errList = []
+	errL = []
 	if evalPath == None:
-		errList.append('Failed while trying to locate java. Please install Java')
+		errL.append('Failed while trying to locate java. Please install Java')
+	else:
+		tmpStr = subprocess.check_output(['java', '-version'], stderr=subprocess.STDOUT)
+		pattern = '\"(\d+\.\d+).*\"'
+		verStr = re.search(pattern, tmpStr).groups()[0]
+		verVal = float(verStr)
+		if verVal < 1.8:
+			errL.append('Installed version of Java is too old. Require Java 1.8. Installed version: {}'.format(verVal))
+
+	# Check for jar
 	evalPath = distutils.spawn.find_executable('jar')
 	if evalPath == None:
-		errList.append('Failed while trying to locate jar. Please install jar (typically included with Java)')
+		errL.append('Failed while trying to locate jar. Please install jar (typically included with Java)')
 
+	# Check for genisoimage or hdiutil
 	genisoimagePath = distutils.spawn.find_executable('genisoimage')
 	hdiutilPath = distutils.spawn.find_executable('hdiutil')
 	if genisoimagePath == None and hdiutilPath == None:
 		if platform.system() == 'Darwin':
-			errList.append('Failed while trying to locate executable hdiutil. Please install hdiutil')
+			errL.append('Failed while trying to locate executable hdiutil. Please install hdiutil')
 		else:
-			errList.append('Failed while trying to locate executable genisoimage. Please install genisoimage')
+			errL.append('Failed while trying to locate executable genisoimage. Please install genisoimage')
 
 	# Bail if there are no issues
-	if len(errList) == 0:
+	if len(errL) == 0:
 		return
 
 	# Log the issues and exit
 	print('There are configuration errors with the environment or system.')
 #	print('System Path:' + str(sys.path))
 	print('Please correct the following:')
-	for aError in errList:
+	for aError in errL:
 		print('\t' + aError)
-	warnList = checkForSuggestedApplications()
-	if len(warnList) > 0:
+	warnL = checkForSuggestedApplications()
+	if len(warnL) > 0:
 		print('In addition please fix the following for full program functionality:')
-		for aWarn in warnList:
+		for aWarn in warnL:
 			print('\t' + aWarn)
 	sys.exit(0)
 
@@ -126,12 +136,12 @@ def checkForSuggestedApplications():
 	otherwise it will return a list of messages which describe the missing applications and the corresponding missing functionality.
 	The current set of suggested applications are:
 	ImageMagick:convert"""
-	warnList = []
+	retL = []
 	evalPath = distutils.spawn.find_executable('convert')
 	if evalPath == None:
-		warnList.append('Application \'convert\' was not found. Please install (ImageMagick) convert')
-		warnList.append('\tWindows icons will not be supported when using argument: -iconFile.')
-	return warnList
+		retL.append('Application \'convert\' was not found. Please install (ImageMagick) convert')
+		retL.append('\tWindows icons will not be supported when using argument: -iconFile.')
+	return retL
 
 
 def checkReadable(src, names):
@@ -152,115 +162,117 @@ def checkReadable(src, names):
 	return []
 
 
-def getClassPath(javaCodePath):
-	retList = []
+def getClassPath(aJavaCodePath):
+	retL = []
 
-	# Ensure the javaCodePath has a trailing slash
+	# Ensure the aJavaCodePath has a trailing slash
 	# to allow for proper computation of clipLen
-	if javaCodePath.endswith('/') == False:
-		javaCodePath += '/'
-	clipLen = len(javaCodePath)
+	if aJavaCodePath.endswith('/') == False:
+		aJavaCodePath += '/'
+	clipLen = len(aJavaCodePath)
 
 	# Form the default list of all jar files
-	for path, dirs, files in os.walk(javaCodePath):
+	for path, dirs, files in os.walk(aJavaCodePath):
 		files.sort()
 		for file in files:
 			if len(file) > 4 and file[-4:] == '.jar':
 				filePath = os.path.join(path, file)
 				filePath = filePath[clipLen:]
-				retList.append(filePath)
+				retL.append(filePath)
 #				print('Found jar file at: ' + filePath)
 
-	return retList
+	return retL
 
 
 if __name__ == "__main__":
+	# Require Python version 2.7 or later
+	targVer = (2, 7)
+	miscUtils.requirePythonVersion(targVer)
+
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, miscUtils.handleSignal)
 
 	# Set up the argument parser
 	parser = FancyArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@')
-	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
-	parser.add_argument('-name', help='The name of the application.')
-	parser.add_argument('-version', default='0.0.1', help='The version of the application.')
-	parser.add_argument('-mainClass', help='Application main entry point.')
-	parser.add_argument('-appArgs', help='Application arguments. Note that this argument must ALWAYS be the last specified!', nargs=argparse.REMAINDER, default=[])
-	parser.add_argument('-dataCode', '-dc', help='A list of supporting files or folders for the application. All items will be copied to the data folder. Symbolic links will not be presereved.', nargs='+', default=[])
-	parser.add_argument('-javaCode', '-jc', help='A folder which contains the Java build.')
-	parser.add_argument('-jreVersion', dest='jreVerSpec', help='JRE version to utilize. This should be either 1 or 2 values where each value should be something like 1.7 or 1.8 or 1.8.0_34. '
-							+ 'If 2 values are specified than the second value must be later than the first value. Any static build will be built with the latest allowable JRE.'
-							+ ' Note there should be corresponding tar.gz JREs for each platform in the folder ~/jre/', nargs='+', default=None)
-	parser.add_argument('-jvmArgs', help='JVM arguments.', nargs='+', default=[])
-	parser.add_argument('-classPath', help='Class path listing of jar files relative to javaCode. Leave blank for auto determination.', nargs='+', default=[])
-	parser.add_argument('-debug', help='Turn on debug options for built applications.', action='store_true', default=False)
-	parser.add_argument('-company', help='Company / Provider info.')
-	parser.add_argument('-bgFile', help='Background file used for apple dmg file.')
-	parser.add_argument('-iconFile', help='PNG file used for linux/windows icon.')
-	parser.add_argument('-icnsFile', help='Icon file used for apple build.')
-	parser.add_argument('-forceSingleInstance', help='Force the application to have only one instance.', default=False)
-	parser.add_argument('-digest', help='Digest used to ensure integrity of application upgrades. Default: sha256', choices=['md5', 'sha256', 'sha512'], default='sha256')
-	parser.add_argument('-enableJmx', help='Enables JMX technology on the target client. Allows one to attach jconsole, jvisualvm, or other JMX tools.', action='store_true', default=False)
-	parser.add_argument('-platform', help='Target platforms to build. Choices are: [apple, linux, windows]. Note the following (append) modifiers.'
-		+ ' Modifier \'-\' results in only the non-JRE build. Modifier \'+\' results in only the JRE build. Default: apple+, linux, windows', nargs='+', default=['apple+', 'linux', 'windows'],
-		choices=['apple', 'apple-', 'apple+', 'linux', 'linux-', 'linux+', 'windows', 'windows-', 'windows+'], metavar='PLATFORM')
+	parser.add_argument('--help', '-h', help='Show this help message and exit.', action='help')
+	parser.add_argument('--name', help='The name of the application.')
+	parser.add_argument('--version', default='0.0.1', help='The version of the application.')
+	parser.add_argument('--mainClass', help='Application main entry point.')
+	parser.add_argument('--appArgs', help='Application arguments. Note that this argument must ALWAYS be the last specified!', nargs=argparse.REMAINDER, default=[])
+	parser.add_argument('--dataCode', help='A list of supporting files or folders for the application. All items will be copied to the data folder. Symbolic links will not be presereved.', nargs='+', default=[])
+	parser.add_argument('--javaCode', help='A folder which contains the Java build.')
+	parser.add_argument('--jreCatalog', help='A JRE catalog file. This file provides the listing of available JREs for DistMaker to utilize.')
+	parser.add_argument('--jreVersion', dest='jreVerSpec', help='JRE version to utilize. This should be either 1 or 2 values where each value should be something like 1.7 or 1.8 or 1.8.0_34.'
+							+ ' If 2 values are specified than the second value must be later than the first value. Any static build will be built with the latest allowable JRE.'
+							+ ' Note there should be corresponding JREs for each relevant platform specified via arg: --jreCatalog', nargs='+', default=None)
+	parser.add_argument('--jvmArgs', help='JVM arguments.', nargs='+', default=[])
+	parser.add_argument('--classPath', help='Class path listing of jar files relative to javaCode. Leave blank for auto determination.', nargs='+', default=[])
+	parser.add_argument('--debug', help='Turn on debug options for built applications.', action='store_true', default=False)
+	parser.add_argument('--company', help='Company / Provider info.')
+	parser.add_argument('--bgFile', help='Background file used for apple dmg file.')
+	parser.add_argument('--iconFile', help='PNG file used for linux/windows icon.')
+	parser.add_argument('--icnsFile', help='Icon file used for apple build.')
+	parser.add_argument('--forceSingleInstance', help='Force the application to have only one instance.', default=False)
+	parser.add_argument('--digest', help='Digest used to ensure integrity of application upgrades. Default: sha256', choices=['md5', 'sha256', 'sha512'], default='sha256')
+	parser.add_argument('--enableJmx', help='Enables JMX technology on the target client. Allows one to attach jconsole, jvisualvm, or other JMX tools.', action='store_true', default=False)
+	parser.add_argument('--platform', help='Target platforms to build. Choices are: [linux, macosx, windows]. Note the following (append) modifiers.'
+		+ ' Modifier \'-\' results in only the non-JRE build. Modifier \'+\' results in only the JRE build. Default: linux, macosx+, windows', nargs='+', default=['linux', 'macosx+', 'windows'],
+		choices=['linux', 'linux-', 'linux+', 'macosx', 'macosx-', 'macosx+', 'windows', 'windows-', 'windows+'], metavar='PLATFORM')
 #	parser.add_argument('-bundleId', help='Apple specific id descriptor.')
 
 	# Intercept any request for a  help message and bail
 	argv = sys.argv;
-	if '-h' in argv or '-help' in argv:
+	if '-h' in argv or '-help' in argv or '--help' in argv:
 		parser.print_help()
 		exit()
 
 	# Check to ensure all of the required applications are installed before proceeding
 	checkForRequiredApplicationsAndExit()
 
-	# Check to ensure that the JRE path is a folder (or symbolic link to a folder)
-	installRoot = miscUtils.getInstallRoot()
-	installRoot = os.path.dirname(installRoot)
-	jrePath = os.path.join(installRoot, 'jre')
-	if os.path.islink(jrePath) == True and os.path.exists(jrePath) == False:
-		print('The specified JRE path refers to a broken symbol link. Please fix the JRE path to reflect a proper location.')
-		print('   The broken JRE symbolic link is at: {}'.format(jrePath))
-		print()
-		exit()
-	if os.path.exists(jrePath) == False:
-		print('The JRE folder does not exist. Please create a JRE folder (or a symolic link to a proper JRE folder).')
-		print('   The JRE path should be at: {}'.format(jrePath))
-		print('   Populate the folder with the JRE tar.gz release files for each platform of interest.')
-		print('   JRE tar.gz files may be acquired from: {}'.format('http://www.oracle.com/technetwork/java/javase/downloads'))
-		print()
-		exit()
-	if os.path.isdir(jrePath) == False:
-		print('The specified JRE path does not refer to a folder.')
-		print('   The JRE path should be a folder which contains the proper JRE tar.gz files.')
-		print('   The JRE folder should be located at: {}'.format(jrePath))
-		print()
-		exit()
-
 	# Parse the args
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
 
-	# Warn if there are not any valid targets
-	if args.platform == ['apple-']:
-		print('The only release specified is Apple without JRE. This is currently unsupported.\nExiting...')
-		exit()
-
-	# Ensure we are getting the bare minimum options
-	errList = [];
+	# Ensure the bare minimum options were specified
+	errL = [];
 	if args.name == None:
-		errList.append('-name')
+		errL.append('--name')
 	if args.javaCode == None:
-		errList.append('-javaCode')
+		errL.append('--javaCode')
+	if args.jreCatalog == None:
+		errL.append('--jreCatalog')
+	if args.jreVerSpec == None:
+		errL.append('--jreVersion')
 	if args.mainClass == None:
-		errList.append('-mainClass')
-	if len(errList) != 0:
-		print('At a minimum the following must be specified: ' + str(errList) +  '.\nExiting...')
+		errL.append('--mainClass')
+	if len(errL) != 0:
+		print('At a minimum the following must be specified: ' + str(errL) + '.\nExiting...')
 		exit()
 
 	# Ensure the name is not reserved: ['jre', 'launcher']
 	if args.name.lower() == 'jre' or args.name == 'launcher':
 		print('The application can not be named: {}. That name is reserved.\n'.format(args.name))
+		exit()
+
+	# Load the JRE catalog
+	errMsg = None
+#	if args.jreCatalog == None:
+#		errMsg = 'A JRE catalog must be specified! Please specify --jreCatalog'
+	if os.path.exists(args.jreCatalog) == False:
+		errMsg = 'The specified JRE catalog does not exist! File: ' + args.jreCatalog
+	elif os.path.isfile(args.jreCatalog) == False:
+		errMsg = 'The specified JRE catalog is not a valid file! File: ' + args.jreCatalog
+	if errMsg != None:
+		print(errMsg + '\n')
+		exit()
+
+	jreNodeL = jreUtils.loadJreCatalog(args.jreCatalog)
+	if len(jreNodeL) == 0:
+		print('Warning: Failed to load any JREs from the JRE catalog. Only non bundled JRE applications can be built!\n')
+
+	# Warn if there are not any valid targets
+	if args.platform == ['macosx-']:
+		print('The only release specified is Macosx without JRE. This is currently unsupported.\nExiting...')
 		exit()
 
 #
@@ -309,10 +321,10 @@ if __name__ == "__main__":
 		exit(-1)
 
 	# Let the user know of any missing functionality
-	warnList = checkForSuggestedApplications()
-	if len(warnList) > 0:
+	warnL = checkForSuggestedApplications()
+	if len(warnL) > 0:
 		print('All suggested applications are not installed. There will be reduced functionality:')
-		for aWarn in warnList:
+		for aWarn in warnL:
 			print('\t' + aWarn)
 		print()
 
@@ -329,9 +341,9 @@ if __name__ == "__main__":
 		srcPath = args.dataCode[0].rstrip('/')
 		print('   [ERROR] The specified dataCode path will result in a data folder inside another data folder. Refusing action. Please specify the individual data files/folders.')
 		print('           Consider using:')
-		print('               -dataCode ' + srcPath + '/*')
+		print('               --dataCode ' + srcPath + '/*')
 		print('            instead of:')
-		print('               -dataCode ' + args.dataCode[0] + '\n')
+		print('               --dataCode ' + args.dataCode[0] + '\n')
 		shutil.rmtree(buildPath)
 		exit(-1)
 
@@ -380,13 +392,13 @@ if __name__ == "__main__":
 	buildCatalogFile(args, deltaPath)
 
 	# Build the Apple release
-	appleUtils.buildRelease(args, buildPath)
+	appleUtils.buildRelease(args, buildPath, jreNodeL)
 
 	# Build the Linux release
-	linuxUtils.buildRelease(args, buildPath)
+	linuxUtils.buildRelease(args, buildPath, jreNodeL)
 
 	# Build the Windows release
-	windowsUtils.buildRelease(args, buildPath)
+	windowsUtils.buildRelease(args, buildPath, jreNodeL)
 
 	# Copy over the deploy script
 	srcPath = os.path.join(miscUtils.getInstallRoot(), "deployAppDist.py")

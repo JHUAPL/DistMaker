@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import argparse
+import collections
 import getpass
 import glob
 import math
@@ -10,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+from collections import OrderedDict
 
 import jreUtils
 import logUtils
@@ -40,8 +42,8 @@ def getAppLauncherVersion():
 	# Check for appLauncher.jar prerequisite
 	jarFile = getAppLauncherSourceFile()
 	if os.path.exists(jarFile) == False:
-		errPrintln('This installation of DistMaker appears to be broken. Please ensure there is an appLauncher.jar file in the template folder.', indent=1)
-		errPrintln('File does not exist: ' + jarFile, indent=1)
+		errPrintln('\tThis installation of DistMaker appears to be broken. Please ensure there is an appLauncher.jar file in the template folder.')
+		errPrintln('\tFile does not exist: ' + jarFile)
 		exit(-1)
 
 	try:
@@ -50,12 +52,12 @@ def getAppLauncherVersion():
 		version = output.split()[1]
 		return version
 	except Exception as aExp:
-		errPrintln('This installation of DistMaker appears to be broken. Failed to determine the AppLauncher version.', indent=1)
+		errPrintln('\tThis installation of DistMaker appears to be broken. Failed to determine the AppLauncher version.')
 		errPrintln(str(aExp))
 		exit(-1)
 
 
-def addAppLauncherRelease():
+def addAppLauncherRelease(aRootPath):
 	""" Adds the appLauncher.jar file to a well defined location under the deploy tree.
 	The appLauncher.jar file will be stored under ~/deploy/launcher/. The appLauncher.jar is
 	responsible for launching a DistMaker enabled application. This jar file will typically
@@ -65,7 +67,7 @@ def addAppLauncherRelease():
 	srcFile = getAppLauncherSourceFile()
 
 	# Ensure that the AppLauncher deployed location exists
-	deployPath = os.path.join(rootPath, 'launcher')
+	deployPath = os.path.join(aRootPath, 'launcher')
 	if os.path.isdir(deployPath) == False:
 		os.makedirs(deployPath, 0o755)
 
@@ -101,49 +103,53 @@ def addAppLauncherRelease():
 	os.chmod(dstFile, 0o644)
 
 
-def addRelease(version):
+def addRelease(aRootPath, aJreNodeL, aVerStr):
 	# Normalize the JVM version for consistency
-	version = jreUtils.normalizeJvmVerStr(version)
+	aVerStr = jreUtils.normalizeJvmVerStr(aVerStr)
 
 	# Check to see if the deployed location already exists
-	installPath = os.path.join(rootPath, 'jre')
+	installPath = os.path.join(aRootPath, 'jre')
 	if os.path.isdir(installPath) == False:
-		print('A JRE has never been deployed to the root location: ' + args.deployRoot)
-		print('Create a new release of the JRE at the specified location?')
+		regPrintln('A JRE has never been deployed to the root location: ' + aRootPath)
+		regPrintln('Create a new release of the JRE at the specified location?')
 		input = raw_input('--> ').upper()
 		if input != 'Y' and input != 'YES':
-			print('Release will not be made for JRE version: ' + version)
+			regPrintln('Release will not be made for JRE version: ' + aVerStr)
 			exit()
 
 		# Build the deployed location
 		os.makedirs(installPath, 0o755)
 
 	# Check to see if the deploy version already exists
-	versionPath = os.path.join(installPath, version)
+	versionPath = os.path.join(installPath, aVerStr)
 	if os.path.isdir(versionPath) == True:
-		print('JREs with version, ' + version + ', has already been deployed.')
-		print('  The JREs have already been deployed.')
+		regPrintln('JREs with version, ' + aVerStr + ', has already been deployed.')
+		regPrintln('\tThe JREs have already been deployed.')
 		exit()
 
 	# Update the version info
-	addReleaseInfo(installPath, version)
-	addAppLauncherRelease()
-	print('JRE ({}) has been deployed to location: {}'.format(version, args.deployRoot))
+	addReleaseInfo(installPath, aJreNodeL, aVerStr)
+	addAppLauncherRelease(aRootPath)
+	regPrintln('JRE ({}) has been deployed to location: {}'.format(aVerStr, aRootPath))
 
 
-def addReleaseInfo(installPath, verStr):
+def addReleaseInfo(aInstallPath, aJreNodeL, aVerStr):
 	# Var that holds the last recorded exit (distmaker) command
 	# By default assume the command has not been set
 	exitVerDM = None
 
 	# Create the jreCatalogfile
-	catFile = os.path.join(installPath, 'jreCatalog.txt')
+	catFile = os.path.join(aInstallPath, 'jreCatalog.txt')
 	if os.path.isfile(catFile) == False:
 		f = open(catFile, 'w')
 		f.write('name' + ',' + 'JRE' + '\n')
 		f.write('digest' + ',' + 'sha256' + '\n\n')
+		# Note new JRE catalogs require DistMaker versions 0.55 or later
+		f.write('exit,DistMaker,0.55' + '\n\n')
 		f.close()
 		os.chmod(catFile, 0o644)
+
+		exitVerDM = [0, 55]
 	# Determine the last exit,DistMaker instruction specified
 	else:
 		f = open(catFile, 'r')
@@ -151,38 +157,23 @@ def addReleaseInfo(installPath, verStr):
 			tokens = line[:-1].split(',');
 			# Record the (exit) version of interest
 			if len(tokens) == 3 and tokens[0] == 'exit' and tokens[1] == 'DistMaker':
-				exitVerDM = tokens[2]
+				try:
+					exitVerDM = jreUtils.verStrToVerArr(tokens[2])
+				except:
+					exitVerDM = None
 		f.close()
 
-	# Locate the list of JRE files with a matching verStr
-	jreFiles = jreUtils.getJreTarGzFilesForVerStr(verStr)
-	if len(jreFiles) == 0:
-		raise ErrorDM('No JREs were located for the version: ' + verStr)
-
-	# Determine if the user is deploying a legacy JREs. Legacy JRE versions match the pattern 1.*
-	isLegacyJre = verStr.startswith('1.') == True
-
-	# Let the user know that legacy JREs can NOT be deployed once an exit,DistMaker instruction
-	# has been found. Basically once non-legacy JREs have been deployed then legacy JREs are no
-	# longer allowed.
-	if isLegacyJre == True and exitVerDM != None:
-		logUtils.errPrintln('Legacy JREs can not be deployed once any non legacy JRE has been deployed.')
-		logUtils.errPrintln('The specified JRE ({}) is considered legacy.'.format(verStr), indent=1)
-		exit()
+	# Locate the list of JREs with a matching version
+	matchJreNodeL = jreUtils.getJreNodesForVerStr(aJreNodeL, aVerStr)
+	if len(matchJreNodeL) == 0:
+		raise ErrorDM('No JREs were located for the version: ' + aVerStr)
 
 	# Determine if we need to record an exit instruction. An exit instruction is needed if the
-	# deployed JRE is non-legacy. Legacy DistMaker apps will not be able to handle non-legacy JREs.
+	# the catalog was built with an old version of DistMaker. Old versions of DistMaker do
+	# not specify exit instructions. If none is specified - ensure one is added.
 	needExitInstr = False
-	if isLegacyJre == False:
-		try:
-			tokenArr = exitVerDM.split('.')
-			majorVerAL = int(tokenArr[0])
-			minorVerAL = int(tokenArr[1])
-			if majorVerAL == 0 and minorVerAL < 1:
-				needExitInstr = True
-		except:
-			needExitInstr = True
-			pass
+	if exitVerDM == None:
+		needExitInstr = True
 
 	# Updated the jreCatalogfile
 	f = open(catFile, 'a')
@@ -190,62 +181,68 @@ def addReleaseInfo(installPath, verStr):
 	if needExitInstr == True:
 		f.write('exit,DistMaker,0.48\n\n')
 	# Write out the JRE release info
-	f.write("jre,{}\n".format(verStr))
+	f.write("jre,{}\n".format(aVerStr))
 	if needExitInstr == True:
 		f.write("require,AppLauncher,0.1,0.2\n")
-	for aFile in jreFiles:
-		stat = os.stat(aFile)
-		digestStr = miscUtils.computeDigestForFile(aFile, 'sha256')
+	for aJreNode in matchJreNodeL:
+		tmpFile = aJreNode.getFile()
+		stat = os.stat(tmpFile)
+		digestStr = miscUtils.computeDigestForFile(tmpFile, 'sha256')
 		fileLen = stat.st_size
-		platformStr = jreUtils.getPlatformForJreTarGzFile(aFile)
-		if isLegacyJre == False:
-			f.write("F,{},{},{},{}\n".format(digestStr, fileLen, platformStr, os.path.basename(aFile)))
+		archStr = aJreNode.getArchitecture();
+		platStr = aJreNode.getPlatform()
+		if exitVerDM != None and exitVerDM > [0, 54]:
+			f.write("F,{},{},{},{},{}\n".format(archStr, platStr, os.path.basename(tmpFile), digestStr, fileLen))
+		elif exitVerDM != None:
+			f.write("F,{},{},{},{}\n".format(digestStr, fileLen, platStr, os.path.basename(tmpFile)))
 		else:
-			f.write("F,{},{},{}\n".format(digestStr, fileLen, os.path.basename(aFile)))
+			f.write("F,{},{},{}\n".format(digestStr, fileLen, os.path.basename(tmpFile)))
 	f.write('\n')
 	f.close()
 
-	destPath = os.path.join(installPath, verStr)
+	destPath = os.path.join(aInstallPath, aVerStr)
 	os.makedirs(destPath, 0o755)
 
 	# Copy over the JRE files to the proper path
-	for aFile in jreFiles:
-		shutil.copy2(aFile, destPath)
-		destFile = os.path.join(destPath, aFile)
+	for aJreNode in matchJreNodeL:
+		tmpFile = aJreNode.getFile()
+		shutil.copy2(tmpFile, destPath)
+		destFile = os.path.join(destPath, os.path.basename(tmpFile))
 		os.chmod(destFile, 0o644)
 
 
-def delRelease(verStr):
+def delRelease(aRootPath, aVerStr):
 	# Normalize the JVM version for consistency
-	verStr = jreUtils.normalizeJvmVerStr(verStr)
+	aVerStr = jreUtils.normalizeJvmVerStr(aVerStr)
 
 	# Check to see if the deployed location already exists
-	installPath = os.path.join(rootPath, 'jre')
+	installPath = os.path.join(aRootPath, 'jre')
 	if os.path.isdir(installPath) == False:
-		print('A JRE has never been deployed to the root location: ' + args.deployRoot)
-		print('There are no JRE releases to remove. ')
+		regPrintln('A JRE has never been deployed to the root location: ' + aRootPath)
+		regPrintln('There are no JRE releases to remove. ')
 		exit()
 
 	# Check to see if the deploy version already exists
-	versionPath = os.path.join(installPath, verStr)
+	versionPath = os.path.join(installPath, aVerStr)
 	if os.path.isdir(versionPath) == False:
-		print('JREs with version, ' + verStr + ', has not been deployed.')
-		print('  There is nothing to remove.')
+		regPrintln('JREs with version, ' + aVerStr + ', has not been deployed.')
+		regPrintln('There is nothing to remove.')
 		exit()
 
 	# Update the version info
-	delReleaseInfo(installPath, verStr)
+	delReleaseInfo(installPath, aVerStr)
 
 	# Remove the release from the deployed location
 	shutil.rmtree(versionPath)
+	regPrintln('JRE ({}) has been removed from location: {}'.format(aVerStr, aRootPath))
 
 
-def delReleaseInfo(installPath, version):
+def delReleaseInfo(aInstallPath, aVerStr):
 	# Bail if the jreCatalogfile does not exist
-	catFile = os.path.join(installPath, 'jreCatalog.txt')
+	catFile = os.path.join(aInstallPath, 'jreCatalog.txt')
 	if os.path.isfile(catFile) == False:
-		print('Failed to locate deployment catalog file: ' + catFile)
-		print('Aborting removal action for version: ' + version)
+		errPrintln('Failed to locate deployment catalog file: ' + catFile)
+		errPrintln('Aborting removal action for version: ' + aVerStr)
 		exit()
 
 	# Read the file
@@ -255,11 +252,11 @@ def delReleaseInfo(installPath, version):
 	for line in f:
 		tokens = line[:-1].split(',', 1);
 		# Switch to deleteMode when we find a matching JRE release
-		if len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] == version:
+		if len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] == aVerStr:
 			isDeleteMode = True
 			continue
 		# Switch out of deleteMode when we find a different JRE release
-		elif len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] != version:
+		elif len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] != aVerStr:
 			isDeleteMode = False
 		# Skip over the input line if we are in deleteMode
 		elif isDeleteMode == True:
@@ -276,48 +273,45 @@ def delReleaseInfo(installPath, version):
 	f.close()
 
 
-def showReleaseInfo():
+def showReleaseInfo(aRootPath, aJreNodeL):
 	"""This action will display information on the deployed / undeployed JREs to stdout."""
 	# Header section
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
+	regPrintln('Install Path: ' + os.path.abspath(appInstallRoot))
+	regPrintln(' Deploy Root: ' + aRootPath + '\n')
 
-	logUtils.regPrintln('Install Path: ' + os.path.abspath(appInstallRoot))
-	logUtils.regPrintln(' Deploy Root: ' + rootPath + '\n')
-
-	# Validate that the deployRoot location
-	if os.path.exists(rootPath) == False:
-		logUtils.errPrintln('The specified deployRoot does not exits.')
+	# Validate the (deploy) root location
+	if os.path.exists(aRootPath) == False:
+		errPrintln('The specified deployRoot does not exits.')
 		exit()
-	if os.path.isdir(rootPath) == False:
-		logUtils.errPrintln('The specified deployRoot does not appear to be a valid folder.')
+	if os.path.isdir(aRootPath) == False:
+		errPrintln('The specified deployRoot does not appear to be a valid folder.')
 		exit()
 
 	# Check to see if the jre folder exists in the deployRoot
-	installPath = os.path.join(rootPath, 'jre')
+	installPath = os.path.join(aRootPath, 'jre')
 	if os.path.isdir(installPath) == False:
-		logUtils.errPrintln('The specified deployRoot does not have any deployed JREs...')
+		errPrintln('The specified deployRoot does not have any deployed JREs...')
 		exit();
 
-	# Form a dictionary of all the JRE version to corresponding (JRE) tar.gz files
-	# This dictionary will include all the JREs that are known by this release of DistMaker
-	searchName = "jre-*.tar.gz";
-	searchPath = os.path.join(os.path.abspath(appInstallRoot), 'jre', searchName)
-	fullD = dict()
-	for aFile in glob.glob(searchPath):
-		# Skip to next if aFile is not a valid JRE tar.gz file
-		aFile = os.path.basename(aFile)
-		tmpVerArr = jreUtils.getJreTarGzVerArr(aFile)
-		if tmpVerArr == None:
-			continue
+	# Form 2 dictionaries:
+	# [1] File name (excluding path) to corresponding JreNode
+	# [2] JRE version to corresponding JreNodes
+	nameD = OrderedDict()
+	verD = OrderedDict()
+	for aJreNode in aJreNodeL:
+		tmpFileName = os.path.basename(aJreNode.getFile())
+		nameD[tmpFileName] = aJreNode
 
-		tmpVerStr =  jreUtils.verArrToVerStr(tmpVerArr)
-		fullD.setdefault(tmpVerStr, [])
-		fullD[tmpVerStr].append(aFile)
+		tmpVerArr = aJreNode.getVersion()
+		tmpVerStr = jreUtils.verArrToVerStr(tmpVerArr)
+		verD.setdefault(tmpVerStr, [])
+		verD[tmpVerStr].append(aJreNode)
 
 	# Get the list of available (installable) JREs
 	availablePathL = []
-	for aVer in sorted(fullD.keys()):
+	for aVer in sorted(verD.keys()):
 		# Skip to next if this version has already been installed
 		versionPath = os.path.join(installPath, aVer)
 		if os.path.isdir(versionPath) == True:
@@ -325,14 +319,17 @@ def showReleaseInfo():
 		availablePathL.append(aVer)
 
 	# Show the list of available (installable) JREs
-	print('Available JREs:')
+	regPrintln('Available JREs:')
 	if len(availablePathL) == 0:
-		logUtils.regPrintln('There are no installable JREs.', indent=2)
+		regPrintln('\t\tThere are no installable JREs.\n')
 	for aVer in availablePathL:
-		logUtils.regPrintln('Version: {}'.format(aVer), indent=1)
-		for aFile in sorted(fullD[aVer]):
-			logUtils.regPrintln('{}'.format(aFile), indent=2)
-	logUtils.regPrintln('')
+		regPrintln('\tVersion: {}'.format(aVer))
+		for aJreNode in verD[aVer]:
+			archStr = aJreNode.getArchitecture();
+			platStr = aJreNode.getPlatform()
+			pathStr = aJreNode.getFile()
+			regPrintln('\t\t{}  {:<7}  {}'.format(archStr, platStr, pathStr))
+		regPrintln('')
 
 	# Get the list of all installed (version) folders
 	installedPathL = []
@@ -347,22 +344,35 @@ def showReleaseInfo():
 		installedPathL.append(verStr)
 
 	# Show the list of installed JREs
-	print('Installed JREs:')
+	regPrintln('Installed JREs:')
 	if len(installedPathL) == 0:
-		logUtils.regPrintln('There are no installed JREs.', indent=2)
+		regPrintln('\t\tThere are no installed JREs.')
 	for aVer in sorted(installedPathL):
-		logUtils.regPrintln('Version: {}'.format(aVer), indent=1)
+		regPrintln('\tVersion: {}'.format(aVer))
+
+		# Show all of the JREs in the specified (version) folder
 		for aFile in sorted(glob.glob(os.path.join(installPath, aVer) + '/*')):
-			tmpVerArr = jreUtils.getJreTarGzVerArr(aFile)
-			if tmpVerArr == None:
-				continue;
-			aFile = os.path.basename(aFile)
-			logUtils.regPrintln('{}'.format(aFile), indent=2)
-	logUtils.regPrintln('')
+			tmpFileName = os.path.basename(aFile)
+
+			# Bail if the file name does not correspond to a JRE
+			tmpJreNode = nameD.get(tmpFileName, None)
+			if tmpJreNode == None:
+				errPrintln('\t\tJRE file is not in the JRE catalog. File: ' + aFile)
+				continue
+
+			archStr = tmpJreNode.getArchitecture();
+			platStr = tmpJreNode.getPlatform()
+			pathStr = tmpJreNode.getFile()
+			regPrintln('\t\t{}  {:<7}  {}'.format(archStr, platStr, pathStr))
+		regPrintln('')
 
 
 
 if __name__ == "__main__":
+	# Require python version 2.7 or later
+	targVer = (2, 7)
+	miscUtils.requirePythonVersion(targVer)
+
 	# Logic to capture Ctrl-C and bail
 	signal.signal(signal.SIGINT, miscUtils.handleSignal)
 
@@ -375,15 +385,16 @@ if __name__ == "__main__":
 	tmpDescr += 'top level deployment location. This location is typically made available via a public web server. The ';
 	tmpDescr +=  'deployRoot should NOT refer to the child jre folder but rather the top level folder!'
 	parser = argparse.ArgumentParser(prefix_chars='-', add_help=False, fromfile_prefix_chars='@', description=tmpDescr)
-	parser.add_argument('-help', '-h', help='Show this help message and exit.', action='help')
-	parser.add_argument('-deploy', metavar='version', help='Deploy the specified JRE distribution to the deployRoot.', action='store', default=None)
-	parser.add_argument('-remove', metavar='version', help='Remove the specified JRE distribution from the deployRoot.', action='store', default=None)
-	parser.add_argument('-status', help='Display stats of all deployed/undeployed JREs relative to the deployRoot.', action='store_true', default=False)
+	parser.add_argument('--help', '-h', help='Show this help message and exit.', action='help')
+	parser.add_argument('--jreCatalog', help='A JRE catalog file. This file provides the listing of available JREs for DistMaker to utilize.')
+	parser.add_argument('--deploy', metavar='version', help='Deploy the specified JRE distribution to the deployRoot.', action='store', default=None)
+	parser.add_argument('--remove', metavar='version', help='Remove the specified JRE distribution from the deployRoot.', action='store', default=None)
+	parser.add_argument('--status', help='Display stats of all deployed/undeployed JREs relative to the deployRoot.', action='store_true', default=False)
 	parser.add_argument('deployRoot', help='Top level folder to the deployment root.')
 
 	# Intercept any request for a  help message and bail
 	argv = sys.argv;
-	if '-h' in argv or '-help' in argv:
+	if '-h' in argv or '-help' in argv or '--help' in argv:
 		parser.print_help()
 		exit()
 
@@ -391,28 +402,49 @@ if __name__ == "__main__":
 	parser.formatter_class.max_help_position = 50
 	args = parser.parse_args()
 
-	# Process the args
+	# Load the JRE catalog
+	jreCatalog = args.jreCatalog
+
+	errMsg = None
+	if jreCatalog == None:
+		errMsg = 'A JRE catalog must be specified! Please specify -jreCatalog'
+	elif os.path.exists(jreCatalog) == False:
+		errMsg = 'The specified JRE catalog does not exist! File: ' + jreCatalog
+	elif os.path.isfile(jreCatalog) == False:
+		errMsg = 'The specified JRE catalog is not a valid file! File: ' + jreCatalog
+	if errMsg != None:
+		errPrintln(errMsg + '\n')
+		exit()
+
+	jreNodeL = jreUtils.loadJreCatalog(jreCatalog)
+	if len(jreNodeL) == 0:
+		errPrintln('Failed to load any JREs from the JRE catalog.')
+		errPrintln('\tA valid populated JRE catalog must be specified!')
+		errPrintln('\tJRE Catalog specified: {}\n'.format(jreCatalog))
+		exit()
+
+	# Execute the approriate action
 	rootPath = args.deployRoot
 
 	if args.status == True:
-		showReleaseInfo()
+		showReleaseInfo(rootPath, jreNodeL)
 		exit()
 	elif args.deploy != None:
 		# Deploy the specified JRE
 		version = args.deploy
 		try:
-			addRelease(version)
+			addRelease(rootPath, jreNodeL, version)
 		except ErrorDM as aExp:
-			print('Failed to deploy JREs with version: ' + version)
-			print('  ' + aExp.message, file=sys.stderr)
+			errPrintln('Failed to deploy JREs with version: ' + version)
+			errPrintln('\t' + aExp.message)
 	elif args.remove != None:
 		# Remove the specified JRE
 		version = args.remove
 		try:
-			delRelease(version)
+			delRelease(rootPath, version)
 		except ErrorDM as aExp:
-			print('Failed to deploy JREs with version: ' + version)
-			print('  ' + aExp.message, file=sys.stderr)
+			errPrintln('Failed to deploy JREs with version: ' + version)
+			errPrintln('\t' + aExp.message)
 	else:
-		print('Please specify one of the valid actions: [-deploy, -remove, -status]')
+		regPrintln('Please specify one of the valid actions: [--deploy, --remove, --status]')
 

@@ -66,10 +66,10 @@ def computeDigestForFile(evalFile, digestType, block_size=2**20):
 	return hash.hexdigest()
 
 
-def getPlatformTypes(platformArr, platformStr):
+def getPlatformTypes(aPlatformArr, aPlatformStr):
 	"""Returns an object that defines the release types that should be built for the given platform. The object will
 	have 2 field members: [nonJre, withJre]. If the field is set to True then the corresonding platform should be
-	built. This is determined by examaning the platformStr and determine it's occurance in the platformArr. For
+	built. This is determined by examaning aPlatformStr and determine it occurs in aPlatformArr. For
 	example to determine the build platforms for Linux one might call getPlatformArr(someArr, 'linux'). Following are
 	the results of contents in someArr:
 	   ['']       ---> nonJre = False, withJre = False
@@ -81,12 +81,12 @@ def getPlatformTypes(platformArr, platformStr):
 		withJre = False
 
 	retObj = PlatformType()
-	if platformStr in platformArr:
+	if aPlatformStr in aPlatformArr:
 		retObj.nonJre = True
 		retObj.withJre = True
-	if platformStr + '-' in platformArr:
+	if aPlatformStr + '-' in aPlatformArr:
 		retObj.nonJre = True
-	if platformStr + '+' in platformArr:
+	if aPlatformStr + '+' in aPlatformArr:
 		retObj.withJre = True
 	return retObj
 
@@ -98,17 +98,17 @@ def getInstallRoot():
 	return installRoot
 
 
-def executeAndLog(command, indentStr=""):
+def executeAndLog(aCommand, indentStr=""):
 	"""Executes the specified command via subprocess and logs all (stderr,stdout) output to the console"""
 	try:
-		proc = subprocess.Popen(command, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+		proc = subprocess.Popen(aCommand, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
 		proc.wait()
 		outStr = proc.stdout.read()
 		if outStr != "":
 			outStr = logUtils.appendLogOutputWithText(outStr, indentStr)
 			print(outStr)
 	except Exception as aExp:
-		print(indentStr + 'Failed to execute command: ' + str(command))
+		print(indentStr + 'Failed to execute command: ' + str(aCommand))
 		outStr = logUtils.appendLogOutputWithText(str(aExp), indentStr)
 		print(outStr)
 		print(indentStr + 'Stack Trace:')
@@ -152,33 +152,45 @@ def handleSignal(signal, frame):
 	sys.exit(0)
 
 
-def buildAppLauncherConfig(destFile, args):
+def requirePythonVersion(aVer):
+	"""Checks the version of python running and if not correct will exit with
+	an error message."""
+	if aVer <= sys.version_info:
+		return
+
+	print('The installed version of python is too old. Please upgrade.')
+	print('   Current version: ' + '.'.join(str(i) for i in sys.version_info))
+	print('   Require version: ' + '.'.join(str(i) for i in aVer))
+	exit(-1)
+
+
+def buildAppLauncherConfig(aDestFile, aArgs):
 	classPathStr = ''
-	for aStr in args.classPath:
+	for aStr in aArgs.classPath:
 		classPathStr += 'java/' + aStr + ':'
 	if len(classPathStr) > 0:
 		classPathStr = classPathStr[0:-1]
 
 	jvmArgsStr = ''
-	for aStr in args.jvmArgs:
+	for aStr in aArgs.jvmArgs:
 		if len(aStr) > 2 and aStr[0:1] == '\\':
 			aStr = aStr[1:]
 		jvmArgsStr += aStr + ' '
 
 	appArgsStr = ''
-	for aStr in args.appArgs:
+	for aStr in aArgs.appArgs:
 		appArgsStr += ' ' + aStr
 
-	f = open(destFile, 'wb')
+	f = open(aDestFile, 'wb')
 
 	# App name section
 	f.write('-name\n')
-	f.write(args.name + '\n')
+	f.write(aArgs.name + '\n')
 	f.write('\n')
 
 	# Version section
 	f.write('-version\n')
-	f.write(args.version + '\n')
+	f.write(aArgs.version + '\n')
 	f.write('\n')
 
 	# Build date section
@@ -190,18 +202,18 @@ def buildAppLauncherConfig(destFile, args):
 
 	# MainClass section
 	f.write('-mainClass\n')
-	f.write(args.mainClass + '\n')
+	f.write(aArgs.mainClass + '\n')
 	f.write('\n')
 
 	# ClassPath section
 	f.write('-classPath\n')
-	for aStr in args.classPath:
+	for aStr in aArgs.classPath:
 		f.write(aStr + '\n')
 	f.write('\n')
 
 	# Application args section
 	f.write('-appArgs\n')
-	for aStr in args.appArgs:
+	for aStr in aArgs.appArgs:
 		f.write(aStr + '\n')
 	f.write('\n')
 

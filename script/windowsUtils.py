@@ -1,29 +1,31 @@
 #! /usr/bin/env python
 
 import copy
+import glob
 import os
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
-import glob
 
 import jreUtils
 import miscUtils
 import deployJreDist
 
-def buildRelease(args, buildPath):
+def buildRelease(aArgs, aBuildPath, aJreNodeL):
 	# We mutate args - thus make a custom copy
-	args = copy.copy(args)
+	args = copy.copy(aArgs)
 
 	# Retrieve vars of interest
 	appName = args.name
 	version = args.version
 	jreVerSpec = args.jreVerSpec
-	platformStr = 'windows'
+	archStr = 'x64'
+	platStr = 'windows'
 
 	# Determine the types of builds we should do
-	platformType = miscUtils.getPlatformTypes(args.platform, platformStr)
+	platformType = miscUtils.getPlatformTypes(args.platform, platStr)
 	if platformType.nonJre == False and platformType.withJre == False:
 		return;
 
@@ -32,20 +34,20 @@ def buildRelease(args, buildPath):
 		return
 
 	# Form the list of distributions to build (dynamic and static JREs)
-	distList = []
+	distL = []
 	if platformType.nonJre == True:
-		distList = [(appName + '-' + version, None)]
+		distL = [(appName + '-' + version, None)]
 	if platformType.withJre == True:
-		# Select the jreTarGzFile to utilize for static releases
-		jreTarGzFile = jreUtils.getJreTarGzFile(platformStr, jreVerSpec)
-		if jreTarGzFile == None:
+		# Select the JreNode to utilize for static releases
+		tmpJreNode = jreUtils.getJreNode(aJreNodeL, archStr, platStr, jreVerSpec)
+		if tmpJreNode == None:
 			# Let the user know that a compatible JRE was not found - thus no static release will be made.
-			print('[Warning] No compatible JRE ({0}) is available for the {1} platform. A static release will not be provided for the platform.'.format(jreVerSpec, platformStr.capitalize()))
+			print('[Warning] No compatible JRE ({}) is available for the ({}) {} platform. A static release will not be provided for the platform.'.format(jreVerSpec, archStr, platStr.capitalize()))
 		else:
-			distList.append((appName + '-' + version + '-jre', jreTarGzFile))
+			distL.append((appName + '-' + version + '-jre', tmpJreNode))
 
 	# Create a tmp (working) folder
-	tmpPath = tempfile.mkdtemp(prefix=platformStr, dir=buildPath)
+	tmpPath = tempfile.mkdtemp(prefix=platStr, dir=aBuildPath)
 
 	# Unpack the proper launch4j release (for the platform we are
 	# running on) into the tmp (working) folder
@@ -55,7 +57,11 @@ def buildRelease(args, buildPath):
 	if platform.system() == 'Darwin':
 		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-macosx-x86.tgz']
 	else:
-		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-linux-x64.tgz']
+		is64Bit = sys.maxsize > 2**32
+		if is64Bit == True:
+			exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-linux-x64.tgz']
+		else:
+			exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-linux.tgz']
 	retCode = subprocess.call(exeCmd)
 	if retCode != 0:
 		print('Failed to extract launch4j package...')
@@ -63,21 +69,21 @@ def buildRelease(args, buildPath):
 		return
 
 	# Create the various distributions
-	for (aDistName, aJreTarGzFile) in distList:
-		print('Building {0} distribution: {1}'.format(platformStr.capitalize(), aDistName))
+	for (aDistName, aJreNode) in distL:
+		print('Building {} distribution: {}'.format(platStr.capitalize(), aDistName))
 		# Let the user know of the JRE release we are going to build with
-		if aJreTarGzFile != None:
-			print('\tUtilizing JRE: ' + aJreTarGzFile)
+		if aJreNode != None:
+			print('\tUtilizing JRE: ' + aJreNode.getFile())
 
 		# Create the (top level) distribution folder
 		dstPath = os.path.join(tmpPath, aDistName)
 		os.mkdir(dstPath)
 
 		# Build the contents of the distribution folder
-		buildDistTree(buildPath, dstPath, args, aJreTarGzFile)
+		buildDistTree(aBuildPath, dstPath, args, aJreNode)
 
 		# Create the zip file
-		zipFile = os.path.join(buildPath, aDistName + ".zip")
+		zipFile = os.path.join(aBuildPath, aDistName + ".zip")
 		cmd = ["jar", "-cMf", zipFile, "-C", dstPath, '.']
 		print('\tForming zip file: ' + zipFile)
 		proc = miscUtils.executeAndLog(cmd, "\t\tjar: ")
@@ -91,19 +97,19 @@ def buildRelease(args, buildPath):
 	shutil.rmtree(tmpPath)
 
 
-def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
+def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 	# Retrieve vars of interest
 	appInstallRoot = miscUtils.getInstallRoot()
 	appInstallRoot = os.path.dirname(appInstallRoot)
-	appName = args.name
+	appName = aArgs.name
 
 	# Form the app contents folder
-	srcPath = os.path.join(buildPath, "delta")
-	dstPath = os.path.join(rootPath, "app")
+	srcPath = os.path.join(aBuildPath, "delta")
+	dstPath = os.path.join(aRootPath, "app")
 	shutil.copytree(srcPath, dstPath, symlinks=True)
 
 	# Copy dlls to the app directory so they can be found at launch
-	dllDir = os.path.join(rootPath, 'app', 'code', 'win')
+	dllDir = os.path.join(aRootPath, 'app', 'code', 'win')
 	for libPath in glob.iglob(os.path.join(dllDir, "*.lib")):
 		libFileName = os.path.basename(libPath)
 		srcPath = os.path.join(dllDir, libFileName)
@@ -116,18 +122,18 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 		shutil.copy(srcPath, linkPath)
 
 	# Setup the launcher contents
-	dstPath = os.path.join(rootPath, "launcher/" + deployJreDist.getAppLauncherFileName())
+	dstPath = os.path.join(aRootPath, "launcher/" + deployJreDist.getAppLauncherFileName())
 	srcPath = os.path.join(appInstallRoot, "template/appLauncher.jar")
 	os.makedirs(os.path.dirname(dstPath))
 	shutil.copy(srcPath, dstPath);
 
 	# Build the java component of the distribution
-	if args.javaCode != None:
+	if aArgs.javaCode != None:
 		# Generate the iconFile
 		winIconFile = None
-		origIconFile = args.iconFile
+		origIconFile = aArgs.iconFile
 		if origIconFile != None:
-			winIconFile = os.path.join(rootPath, os.path.basename(origIconFile) + ".ico")
+			winIconFile = os.path.join(aRootPath, os.path.basename(origIconFile) + ".ico")
 			cmd = ['convert', origIconFile, winIconFile]
 			proc = miscUtils.executeAndLog(cmd, "\t\t(ImageMagick) convert: ")
 			if proc.returncode != 0:
@@ -139,11 +145,11 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 				winIconFile = None
 
 		# Form the launch4j config file
-		configFile = os.path.join(rootPath, appName + ".xml")
-		buildLaunch4JConfig(configFile, args, jreTarGzFile, winIconFile)
+		configFile = os.path.join(aRootPath, appName + ".xml")
+		buildLaunch4JConfig(configFile, aArgs, aJreNode, winIconFile)
 
 		# Build the Windows executable
-		tmpPath = os.path.dirname(rootPath)
+		tmpPath = os.path.dirname(aRootPath)
 		launch4jExe = os.path.join(tmpPath, "launch4j", "launch4j")
 		cmd = [launch4jExe, configFile]
 		print('\tBuilding windows executable via launch4j')
@@ -152,25 +158,25 @@ def buildDistTree(buildPath, rootPath, args, jreTarGzFile):
 			print('\tError: Failed to build executable. Return code: ' + str(proc.returncode))
 
 	# Unpack the JRE and set up the JRE tree
-	if jreTarGzFile != None:
-		jreUtils.unpackAndRenameToStandard(jreTarGzFile, rootPath)
+	if aJreNode != None:
+		jreUtils.unpackAndRenameToStandard(aJreNode, aRootPath)
 
 		# Perform cleanup
 		os.remove(configFile)
 		if winIconFile != None:
 			os.remove(winIconFile)
 
-def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
-	f = open(destFile, 'wb')
+def buildLaunch4JConfig(aDestFile, aArgs, aJreNode, aIconFile):
+	f = open(aDestFile, 'wb')
 
 	writeln(f, 0, "<launch4jConfig>")
-	if args.debug == True:
+	if aArgs.debug == True:
 		writeln(f, 1, "<headerType>console</headerType>");
 	else:
 		writeln(f, 1, "<headerType>gui</headerType>");
-	writeln(f, 1, "<outfile>" + args.name + ".exe</outfile>");
+	writeln(f, 1, "<outfile>" + aArgs.name + ".exe</outfile>");
 	writeln(f, 1, "<dontWrapJar>true</dontWrapJar>");
-	writeln(f, 1, "<errTitle>" + args.name + "</errTitle>");
+	writeln(f, 1, "<errTitle>" + aArgs.name + "</errTitle>");
 	writeln(f, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
 # 	writeln(f, 1, "<supportUrl>url</supportUrl>");
 
@@ -179,41 +185,41 @@ def buildLaunch4JConfig(destFile, args, jreTarGzFile, iconFile):
 	writeln(f, 1, "<priority>normal</priority>");
 	writeln(f, 1, "<customProcName>true</customProcName>");
 	writeln(f, 1, "<stayAlive>false</stayAlive>");
-	if iconFile != None:
-		writeln(f, 1, "<icon>" + iconFile + "</icon>");
+	if aIconFile != None:
+		writeln(f, 1, "<icon>" + aIconFile + "</icon>");
 
 	writeln(f, 1, "<classPath>");
 	writeln(f, 2, "<mainClass>appLauncher.AppLauncher</mainClass>");
 	writeln(f, 2, "<cp>../launcher/" + deployJreDist.getAppLauncherFileName() + "</cp>");
 	writeln(f, 1, "</classPath>");
 
-	if args.forceSingleInstance != False:
+	if aArgs.forceSingleInstance != False:
 		writeln(f, 0, "");
 		writeln(f, 1, "<singleInstance>");
-		writeln(f, 2, "<mutexName>" + args.name + ".mutex</mutexName>");
-		writeln(f, 2, "<windowTitle>" + args.name + "</windowTitle>");
+		writeln(f, 2, "<mutexName>" + aArgs.name + ".mutex</mutexName>");
+		writeln(f, 2, "<windowTitle>" + aArgs.name + "</windowTitle>");
 		writeln(f, 1, "</singleInstance>");
 
 	writeln(f, 0, "");
 	writeln(f, 1, "<jre>");
-	if jreTarGzFile != None:
-		jrePath = jreUtils.getBasePathForJreTarGzFile(jreTarGzFile)
+	if aJreNode != None:
+		jrePath = jreUtils.getBasePathFor(aJreNode)
 		writeln(f, 2, "<path>" + jrePath + "</path>");
 	else:
-		jreVer = getJreMajorVersion(args.jreVerSpec)
+		jreVer = getJreMajorVersion(aArgs.jreVerSpec)
 		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");  # Valid values: '1.7.0' or '1.8.0' ...
 	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");  # Valid values: jreOnlyjdkOnly|preferJre|preferJdk
-	for aJvmArg in args.jvmArgs:
+	for aJvmArg in aArgs.jvmArgs:
 		writeln(f, 2, "<opt>" + aJvmArg + "</opt>");
 	writeln(f, 2, "<opt>-Djava.system.class.loader=appLauncher.RootClassLoader</opt>");
 	writeln(f, 1, "</jre>");
 
 	writeln(f, 0, "");
 	writeln(f, 1, "<messages>");
-	writeln(f, 2, "<startupErr>" + args.name + " error...</startupErr>");
+	writeln(f, 2, "<startupErr>" + aArgs.name + " error...</startupErr>");
 	writeln(f, 2, "<bundledJreErr>Failed to locate the bundled JRE</bundledJreErr>");
 	writeln(f, 2, "<jreVersionErr>Located JRE is not the proper version.</jreVersionErr>");
-	writeln(f, 2, "<launcherErr>Failed to launch " + args.name + "</launcherErr>");
+	writeln(f, 2, "<launcherErr>Failed to launch " + aArgs.name + "</launcherErr>");
 	writeln(f, 1, "</messages>");
 
 	writeln(f, 0, "")
@@ -229,14 +235,8 @@ def checkSystemEnvironment():
 
 
 def getJreMajorVersion(aJreVerSpec):
-	"""Returns the minimum version of the JRE to utilize based on the passed in JreVerSpec. If aJreVerSpec is None then
-	the value specified in jreUtils.getDefaultJreVerStr() will be utilized. If that value is None then the value of
-	1.8.0 will be utilized."""
-	if aJreVerSpec == None:
-		aJreVerSpec = [jreUtils.getDefaultJreVerStr()]
+	"""Returns the minimum version of the JRE to utilize based on the passed in aJreVerSpec."""
 	minJreVerStr = aJreVerSpec[0]
-	if minJreVerStr == None:
-		minJreVerStr = '1.8.0'
 
 	try:
 		verArr = jreUtils.verStrToVerArr(minJreVerStr)
