@@ -1,14 +1,14 @@
 package distMaker.jre;
 
-import distMaker.digest.Digest;
-import distMaker.utils.PlainVersion;
-import distMaker.utils.Version;
-import distMaker.utils.VersionUtils;
+import distMaker.utils.*;
+import glum.digest.Digest;
 
 /**
  * Immutable class that describes an AppLauncher release.
  * <P>
  * The reference fileName should be a jar file.
+ *
+ * @author lopeznr1
  */
 public class AppLauncherRelease implements Comparable<AppLauncherRelease>
 {

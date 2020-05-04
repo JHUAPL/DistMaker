@@ -9,6 +9,11 @@ import java.util.regex.Pattern;
 import distMaker.*;
 import distMaker.jre.*;
 
+/**
+ * Collection of utility methods specific to the Linux platform.
+ *
+ * @author lopeznr1
+ */
 public class LinuxUtils
 {
 	/**
@@ -60,7 +65,7 @@ public class LinuxUtils
 	 */
 	public static void updateAppLauncher(AppLauncherRelease aRelease, File aScriptFile)
 	{
-		List<String> inputList;
+		List<String> inputL;
 		String evalStr, tmpStr;
 		boolean isFound;
 
@@ -73,7 +78,7 @@ public class LinuxUtils
 
 		// Process our input
 		isFound = false;
-		inputList = new ArrayList<>();
+		inputL = new ArrayList<>();
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aScriptFile))
 		{
 			// Read the lines
@@ -96,7 +101,7 @@ public class LinuxUtils
 					isFound = true;
 				}
 
-				inputList.add(evalStr);
+				inputL.add(evalStr);
 			}
 		}
 		catch(IOException aExp)
@@ -109,7 +114,7 @@ public class LinuxUtils
 			throw new ErrorDM("[" + aScriptFile + "] The script does not specify a valid class path.");
 
 		// Write the scriptFile
-		MiscUtils.writeDoc(aScriptFile, inputList);
+		MiscUtils.writeDoc(aScriptFile, inputL);
 	}
 
 	/**
@@ -119,7 +124,7 @@ public class LinuxUtils
 	 */
 	public static void updateJreVersion(JreVersion aJreVersion, File aScriptFile)
 	{
-		List<String> inputList;
+		List<String> inputL;
 		String evalStr, tmpStr;
 		boolean isFound;
 
@@ -129,7 +134,7 @@ public class LinuxUtils
 
 		// Process our input
 		isFound = false;
-		inputList = new ArrayList<>();
+		inputL = new ArrayList<>();
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aScriptFile))
 		{
 			// Read the lines
@@ -147,7 +152,7 @@ public class LinuxUtils
 					evalStr = "javaExe=../" + JreUtils.getExpandJrePath(aJreVersion) + "/bin/java";
 				}
 
-				inputList.add(evalStr);
+				inputL.add(evalStr);
 			}
 		}
 		catch(IOException aExp)
@@ -160,7 +165,7 @@ public class LinuxUtils
 			throw new ErrorDM("[" + aScriptFile + "] The script does not specify a valid JRE path.");
 
 		// Write the scriptFile
-		MiscUtils.writeDoc(aScriptFile, inputList);
+		MiscUtils.writeDoc(aScriptFile, inputL);
 	}
 
 	/**
@@ -174,9 +179,9 @@ public class LinuxUtils
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void updateMaxMem(long numBytes, File aScriptFile)
+	public static void updateMaxMem(long aNumBytes, File aScriptFile)
 	{
-		List<String> inputList;
+		List<String> inputL;
 		String evalStr, memStr, tmpStr;
 		int currLineNum, injectLineNum, targLineNum;
 
@@ -185,7 +190,7 @@ public class LinuxUtils
 			throw new ErrorDM("The script file is not writeable: " + aScriptFile);
 
 		// Process our input
-		inputList = new ArrayList<>();
+		inputL = new ArrayList<>();
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aScriptFile))
 		{
 			// Read the lines
@@ -205,7 +210,7 @@ public class LinuxUtils
 				else if (tmpStr.startsWith("maxMem=") == true)
 					targLineNum = currLineNum;
 
-				inputList.add(evalStr);
+				inputL.add(evalStr);
 				currLineNum++;
 			}
 		}
@@ -215,24 +220,24 @@ public class LinuxUtils
 		}
 
 		// Determine the memStr to use
-		if (numBytes % MemUtils.GB_SIZE == 0)
-			memStr = "" + (numBytes / MemUtils.GB_SIZE) + "g";
+		if (aNumBytes % MemUtils.GB_SIZE == 0)
+			memStr = "" + (aNumBytes / MemUtils.GB_SIZE) + "g";
 		else
-			memStr = "" + (numBytes / MemUtils.MB_SIZE) + "m";
+			memStr = "" + (aNumBytes / MemUtils.MB_SIZE) + "m";
 
 		// Insert our changes into the script
 		if (targLineNum != -1)
-			inputList.set(targLineNum, "maxMem=" + memStr);
+			inputL.set(targLineNum, "maxMem=" + memStr);
 		else if (injectLineNum != -1 && injectLineNum < currLineNum)
-			inputList.add(injectLineNum + 1, "maxMem=" + memStr);
+			inputL.add(injectLineNum + 1, "maxMem=" + memStr);
 		else
 		{
-			inputList.add(0, "# Define the maximum memory to allow the application to utilize");
-			inputList.add(1, "maxMem=" + memStr + "\n");
+			inputL.add(0, "# Define the maximum memory to allow the application to utilize");
+			inputL.add(1, "maxMem=" + memStr + "\n");
 		}
 
 		// Write the scriptFile
-		MiscUtils.writeDoc(aScriptFile, inputList);
+		MiscUtils.writeDoc(aScriptFile, inputL);
 	}
 
 }

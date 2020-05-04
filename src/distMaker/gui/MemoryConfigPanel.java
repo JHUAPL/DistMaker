@@ -1,16 +1,11 @@
 package distMaker.gui;
 
-import glum.gui.FocusUtil;
-import glum.gui.GuiUtil;
-import glum.gui.action.ClickAction;
-import glum.gui.component.GLabel;
-import glum.gui.component.GSlider;
-import glum.gui.panel.GlassPanel;
-import glum.gui.panel.generic.MessagePanel;
-import glum.unit.ByteUnit;
-import glum.util.ThreadUtil;
+import static distMaker.platform.MemUtils.GB_SIZE;
+import static distMaker.platform.MemUtils.KB_SIZE;
+import static distMaker.platform.MemUtils.MB_SIZE;
 
-import java.awt.*;
+import java.awt.Component;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.lang.management.ManagementFactory;
@@ -21,14 +16,29 @@ import javax.swing.border.BevelBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import net.miginfocom.swing.MigLayout;
+import com.google.common.collect.Range;
+
 import distMaker.ErrorDM;
 import distMaker.platform.MemUtils;
 import distMaker.platform.PlatformUtils;
-import static distMaker.platform.MemUtils.KB_SIZE;
-import static distMaker.platform.MemUtils.MB_SIZE;
-import static distMaker.platform.MemUtils.GB_SIZE;
+import glum.gui.FocusUtil;
+import glum.gui.GuiUtil;
+import glum.gui.action.ClickAction;
+import glum.gui.component.GLabel;
+import glum.gui.component.GSlider;
+import glum.gui.panel.GlassPanel;
+import glum.gui.panel.generic.MessagePanel;
+import glum.io.ParseUtil;
+import glum.unit.ByteUnit;
+import glum.util.ThreadUtil;
+import net.miginfocom.swing.MigLayout;
 
+/**
+ * User input component that configures the applications memory usage. Changes will not take effect until the
+ * application is restarted.
+ * 
+ * @author lopeznr1
+ */
 public class MemoryConfigPanel extends GlassPanel implements ActionListener, ListSelectionListener
 {
 	/** Unused - but added to eliminate warning due to poorly designed java.io.Serializable interface. */
@@ -43,30 +53,31 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	private MessagePanel warnPanel;
 
 	// State vars
-	private long minMemSize, maxMemSize;
+	private Range<Double> memSizeRange;
 	private long currMemSize;
 	private long instMemSize;
 	private long targMemSize;
 
 	/**
-	 * Constructor where the developer specifies the max heap memory. Be careful about using this method, as if a value is specified too large, then the program
-	 * may become non operational on the next run.
+	 * Constructor where the developer specifies the max heap memory. Be careful about using this method, as if a value
+	 * is specified too large, then the program may become non operational on the next run.
 	 * <P>
-	 * Should the program become non operational then the end user would have to manually configure the config/script files by hand or a reinstall would be
-	 * required.
+	 * Should the program become non operational then the end user would have to manually configure the config/script
+	 * files by hand or a reinstall would be required.
 	 */
 	public MemoryConfigPanel(Component aParent, long aMaxMemSize)
 	{
 		super(aParent);
 
 		// State vars
-		minMemSize = roundToMB(256 * MB_SIZE);
-		maxMemSize = roundToMB(aMaxMemSize);
+		double minMemSize = roundToMB(256 * MB_SIZE);
+		double maxMemSize = roundToMB(aMaxMemSize);
+		memSizeRange = Range.closed(minMemSize, maxMemSize);
 		initialize();
 
 		// Build the actual GUI
 		buildGuiArea();
-		warnPanel = new MessagePanel(this);
+		warnPanel = new MessagePanel(this, "Memory");
 		warnPanel.setSize(400, 150);
 
 		// Set up some keyboard shortcuts
@@ -75,8 +86,8 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	}
 
 	/**
-	 * Constructor where the DistMaker framework attempts to determine the appropriate maxMexSize. Should, the DistMaker framework fail to determine the
-	 * installed system memory, then 4GB will be assumed as the installed system memory.
+	 * Constructor where the DistMaker framework attempts to determine the appropriate maxMexSize. Should, the DistMaker
+	 * framework fail to determine the installed system memory, then 4GB will be assumed as the installed system memory.
 	 */
 	public MemoryConfigPanel(Component aParent)
 	{
@@ -121,7 +132,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	public void applyChanges()
 	{
 		// Retrieve the targMemSize
-		targMemSize = (long)targMemS.getModelValue();
+		targMemSize = (long) targMemS.getModelValue();
 		targMemSize = roundToMB(targMemSize);
 
 		try
@@ -129,7 +140,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 			// Delegate the updating of the memory
 			PlatformUtils.setMaxHeapMem(targMemSize);
 		}
-		catch(ErrorDM aExp)
+		catch (ErrorDM aExp)
 		{
 			String subjectStr = aExp.getSubject();
 			if (subjectStr == null)
@@ -173,6 +184,8 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 		smallFont = new JTextField().getFont();
 
 		// Stat area
+		double minMemSize = memSizeRange.lowerEndpoint();
+		double maxMemSize = memSizeRange.upperEndpoint();
 		tmpL = new JLabel("System memory: ");
 		maxMemL = new GLabel(byteUnit, smallFont);
 		maxMemL.setValue(maxMemSize);
@@ -189,8 +202,8 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 		tmpComp = GuiUtil.createDivider();
 		add(tmpComp, "gaptop 15,gapbottom 10,growx,h 4!,span,wrap");
 
-		maxSteps = (int)((maxMemSize - minMemSize) / MB_SIZE);
-		targMemS = new GSlider(this, maxSteps, minMemSize, maxMemSize);
+		maxSteps = (int) ((maxMemSize - minMemSize) / MB_SIZE);
+		targMemS = new GSlider(this, memSizeRange, maxSteps);
 		targMemS.setModelValue(currMemSize);
 		add(targMemS, "growx,span,wrap");
 
@@ -218,7 +231,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 		setBorder(new BevelBorder(BevelBorder.RAISED));
 
 		// Configure the slider to be aware of the new memory range
-		targMemS.setModelRange(256 * MB_SIZE, maxMemSize);
+		targMemS.setModelRange(memSizeRange);
 		targMemS.setModelValue(currMemSize);
 	}
 
@@ -227,27 +240,27 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	 */
 	private void initialize()
 	{
-		List<String> argList;
+		List<String> argL;
 		String memStr;
 
 		// Retrieve the default max memory value as specified to the JVM
 		currMemSize = Runtime.getRuntime().maxMemory();
 
 		// Parse the args to see if we could locate the -Xmx JVM argument
-		argList = ManagementFactory.getRuntimeMXBean().getInputArguments();
-		for (String aArg : argList)
+		argL = ManagementFactory.getRuntimeMXBean().getInputArguments();
+		for (String aArg : argL)
 		{
 			if (aArg.startsWith("-Xmx") == true)
 			{
 				memStr = aArg.toUpperCase().substring(4);
 				if (memStr.endsWith("K") == true)
-					currMemSize = GuiUtil.readLong(memStr.substring(0, memStr.length() - 1), currMemSize) * KB_SIZE;
+					currMemSize = ParseUtil.readLong(memStr.substring(0, memStr.length() - 1), currMemSize) * KB_SIZE;
 				else if (memStr.endsWith("M") == true)
-					currMemSize = GuiUtil.readLong(memStr.substring(0, memStr.length() - 1), currMemSize) * MB_SIZE;
+					currMemSize = ParseUtil.readLong(memStr.substring(0, memStr.length() - 1), currMemSize) * MB_SIZE;
 				else if (memStr.endsWith("G") == true)
-					currMemSize = GuiUtil.readLong(memStr.substring(0, memStr.length() - 1), currMemSize) * GB_SIZE;
+					currMemSize = ParseUtil.readLong(memStr.substring(0, memStr.length() - 1), currMemSize) * GB_SIZE;
 				else
-					currMemSize = GuiUtil.readLong(memStr, currMemSize);
+					currMemSize = ParseUtil.readLong(memStr, currMemSize);
 
 //System.out.println(" ---> Parsed mem value: " + new ByteUnit(2).getString(currMemSize));
 			}
@@ -260,7 +273,8 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	}
 
 	/**
-	 * Utility method to round (floor) values to the nearest megabyte. The returned value is guaranteed to be at least 1 megabyte.
+	 * Utility method to round (floor) values to the nearest megabyte. The returned value is guaranteed to be at least 1
+	 * megabyte.
 	 * <P>
 	 * The input value, aSize, should be specified in bytes, and the returned value will be specified in bytes.
 	 */
@@ -284,7 +298,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 		boolean isEnabled;
 
 		// Target area
-		targMemSize = (long)targMemS.getModelValue();
+		targMemSize = (long) targMemS.getModelValue();
 		targMemSize = roundToMB(targMemSize);
 
 		targMemS.setModelValue(targMemSize);

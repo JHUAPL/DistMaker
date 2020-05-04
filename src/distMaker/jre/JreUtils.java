@@ -1,28 +1,27 @@
 package distMaker.jre;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
-import distMaker.digest.Digest;
-import distMaker.digest.DigestType;
+import distMaker.platform.*;
 import distMaker.utils.ParseUtils;
 import distMaker.utils.PlainVersion;
-import glum.gui.GuiUtil;
+import glum.digest.Digest;
+import glum.digest.DigestType;
 import glum.io.IoUtil;
+import glum.io.ParseUtil;
 import glum.net.Credential;
 import glum.net.NetUtil;
 import glum.task.Task;
 import glum.util.ThreadUtil;
 
+/**
+ * Collection of utility methods that provide JRE related functionality.
+ *
+ * @author lopeznr1
+ */
 public class JreUtils
 {
 	/**
@@ -50,7 +49,7 @@ public class JreUtils
 	 */
 	public static List<JreRelease> getAvailableJreReleases(Task aTask, URL aUpdateSiteUrl, Credential aCredential)
 	{
-		List<JreRelease> retList;
+		List<JreRelease> retL;
 		URL catUrl;
 		URLConnection connection;
 		InputStream inStream;
@@ -58,7 +57,7 @@ public class JreUtils
 		String errMsg, strLine;
 
 		errMsg = null;
-		retList = new ArrayList<>();
+		retL = new ArrayList<>();
 		catUrl = IoUtil.createURL(aUpdateSiteUrl.toString() + "/jre/jreCatalog.txt");
 
 		// Default to DigestType of MD5
@@ -110,7 +109,7 @@ public class JreUtils
 				{
 					DigestType tmpDigestType = DigestType.parse(tokens[1]);
 					if (tmpDigestType == null)
-						aTask.infoAppendln("Failed to locate DigestType for: " + tokens[1]);
+						aTask.logRegln("Failed to locate DigestType for: " + tokens[1]);
 					else
 						digestType = tmpDigestType;
 				}
@@ -140,71 +139,93 @@ public class JreUtils
 						continue;
 					}
 
-					aTask.infoAppendln("Unreconized line: " + strLine);
+					aTask.logRegln("Unreconized line: " + strLine);
 				}
 				// Logic to handle the 'F' command: JRE File
 				else if (tokens[0].equals("F") == true && tokens.length >= 4 && tokens.length <= 6)
 				{
 					if (version == null)
 					{
-						aTask.infoAppendln("Skipping input: " + strLine);
-						aTask.infoAppendln("\tJRE version has not been specifed. Missing input line: jre,<jreVersion>");
+						aTask.logRegln("Skipping input: " + strLine);
+						aTask.logRegln("\tJRE version has not been specifed. Missing input line: jre,<jreVersion>");
 						continue;
 					}
 
 					// Parse the JRE release
-					String archStr, platStr, filename, digestStr;
+					Architecture architecture;
+					Platform platform;
+					String filename, digestStr;
 					long fileLen;
 
 					if (tokens.length == 6)
 					{
-						archStr = tokens[1];
-						platStr = tokens[2];
+						architecture = ArchitectureUtils.transformToArchitecture(tokens[1]);
+						if (architecture == null)
+						{
+							aTask.logRegln("Skipping input: " + strLine);
+							aTask.logRegln("\tFailed to determine the target architecture of the JRE.");
+							continue;
+						}
+
+						platform = PlatformUtils.transformToPlatform(tokens[2]);
+						if (platform == null)
+						{
+							aTask.logRegln("Skipping input: " + strLine);
+							aTask.logRegln("\tFailed to determine the target platform of the JRE.");
+							continue;
+						}
+
 						filename = tokens[3];
 						digestStr = tokens[4];
-						fileLen = GuiUtil.readLong(tokens[5], -1);
+						fileLen = ParseUtil.readLong(tokens[5], -1);
 					}
 					else if (tokens.length == 5)
 					{
-						archStr = "x64";
+						architecture = Architecture.x64;
 						digestStr = tokens[1];
-						fileLen = GuiUtil.readLong(tokens[2], -1);
-						platStr = tokens[3];
-						if (platStr.equalsIgnoreCase("apple") == true)
-							platStr = "macosx";
+						fileLen = ParseUtil.readLong(tokens[2], -1);
+
+						platform = PlatformUtils.transformToPlatform(tokens[3]);
+						if (platform == null)
+						{
+							aTask.logRegln("Skipping input: " + strLine);
+							aTask.logRegln("\tFailed to determine the target platform of the JRE.");
+							continue;
+						}
+
 						filename = tokens[4];
 					}
 					else // tokens.length == 4
 					{
-						archStr = "x64";
+						architecture = Architecture.x64;
 						digestStr = tokens[1];
-						fileLen = GuiUtil.readLong(tokens[2], -1);
+						fileLen = ParseUtil.readLong(tokens[2], -1);
 						filename = tokens[3];
 
-						platStr = JreUtils.getPlatformOfJreTarGz(filename);
-						if (platStr == null)
+						platform = JreUtils.getPlatformOfJreTarGz(filename);
+						if (platform == null)
 						{
-							aTask.infoAppendln("Skipping input: " + strLine);
-							aTask.infoAppendln("\tFailed to determine the target platform of the JRE.");
+							aTask.logRegln("Skipping input: " + strLine);
+							aTask.logRegln("\tFailed to determine the target platform of the JRE.");
 							continue;
 						}
 					}
 
 					// Form the JreRelease
 					Digest tmpDigest = new Digest(digestType, digestStr);
-					retList.add(new JreRelease(archStr, platStr, version, filename, tmpDigest, fileLen, alMinVer, alMaxVer));
+					retL.add(new JreRelease(architecture, platform, version, filename, tmpDigest, fileLen, alMinVer, alMaxVer));
 				}
 				else
 				{
-					aTask.infoAppendln("Unreconized line: " + strLine);
+					aTask.logRegln("Unreconized line: " + strLine);
 				}
 			}
 		}
-		catch(FileNotFoundException aExp)
+		catch (FileNotFoundException aExp)
 		{
 			errMsg = "Failed to locate resource: " + catUrl;
 		}
-		catch(IOException aExp)
+		catch (IOException aExp)
 		{
 			errMsg = ThreadUtil.getStackTrace(aExp);
 		}
@@ -217,42 +238,42 @@ public class JreUtils
 		// See if we are in a valid state
 		if (errMsg != null)
 			; // Nothing to do, as an earlier error has occurred
-		else if (retList.size() == 0)
+		else if (retL.size() == 0)
 			errMsg = "The catalog appears to be invalid.";
 
 		// Bail if there were issues
 		if (errMsg != null)
 		{
-			aTask.infoAppendln(errMsg);
+			aTask.logRegln(errMsg);
 			return null;
 		}
 
-		return retList;
+		return retL;
 	}
 
 	/**
 	 * Utility method that returns a list of matching JREs. The list will be sorted in order from newest to oldest. All
 	 * returned JREs will have a platform that matches aPlatform.
 	 */
-	public static List<JreRelease> getMatchingPlatforms(List<JreRelease> aJreList, String aArchStr, String aPlatStr)
+	public static List<JreRelease> getMatchingPlatforms(List<JreRelease> aJreList, Architecture aArch, Platform aPlat)
 	{
-		List<JreRelease> retList;
+		List<JreRelease> retL;
 
 		// Grab all JREs with a matching platforms
-		retList = new ArrayList<>();
+		retL = new ArrayList<>();
 		for (JreRelease aRelease : aJreList)
 		{
-			if (aRelease.isSystemMatch(aArchStr, aPlatStr) == false)
+			if (aRelease.isSystemMatch(aArch, aPlat) == false)
 				continue;
 
-			retList.add(aRelease);
+			retL.add(aRelease);
 		}
 
 		// Sort the platforms, but reverse the order so that the newest version is first
-		Collections.sort(retList);
-		Collections.reverse(retList);
+		Collections.sort(retL);
+		Collections.reverse(retL);
 
-		return retList;
+		return retL;
 	}
 
 	/**
@@ -263,15 +284,15 @@ public class JreUtils
 	 * This method should be considered deprecated as of DistMaker 0.48
 	 */
 	@Deprecated
-	private static String getPlatformOfJreTarGz(String aFileName)
+	private static Platform getPlatformOfJreTarGz(String aFileName)
 	{
 		aFileName = aFileName.toUpperCase();
 		if (aFileName.contains("LINUX") == true)
-			return "Linux";
+			return Platform.Linux;
 		if (aFileName.contains("MACOSX") == true)
-			return "Macosx";
+			return Platform.Macosx;
 		if (aFileName.contains("WINDOWS") == true)
-			return "Windows";
+			return Platform.Windows;
 
 		return null;
 	}

@@ -1,45 +1,39 @@
 package distMaker.jre;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
-import distMaker.DistUtils;
-import distMaker.ErrorMsg;
-import distMaker.digest.Digest;
-import distMaker.digest.DigestType;
-import distMaker.digest.DigestUtils;
+import distMaker.*;
 import distMaker.platform.PlatformUtils;
-import distMaker.utils.ParseUtils;
-import distMaker.utils.PlainVersion;
-import distMaker.utils.Version;
-import distMaker.utils.VersionUtils;
-import glum.gui.GuiUtil;
+import distMaker.utils.*;
+import glum.digest.Digest;
+import glum.digest.DigestType;
 import glum.io.IoUtil;
+import glum.io.ParseUtil;
 import glum.net.Credential;
 import glum.net.NetUtil;
 import glum.task.PartialTask;
 import glum.task.Task;
 import glum.util.ThreadUtil;
 
+/**
+ * Collection of utility methods associated with the DistMaker's AppLauncher.
+ * 
+ * @author lopeznr1
+ */
 public class AppLauncherUtils
 {
 	/**
 	 * Returns a list of all the available AppLauncher releases specified at: <BR>
 	 * {@literal <aUpdateSiteUrl>/launcher/appCatalog.txt}
 	 */
-	public static List<AppLauncherRelease> getAvailableAppLauncherReleases(Task aTask, URL aUpdateSiteUrl, Credential aCredential)
+	public static List<AppLauncherRelease> getAvailableAppLauncherReleases(Task aTask, URL aUpdateSiteUrl,
+			Credential aCredential)
 	{
-		List<AppLauncherRelease> retList;
+		List<AppLauncherRelease> retL;
 		URL catUrl;
 		URLConnection connection;
 		InputStream inStream;
@@ -48,7 +42,7 @@ public class AppLauncherUtils
 		String errMsg, strLine;
 
 		errMsg = null;
-		retList = new ArrayList<>();
+		retL = new ArrayList<>();
 		catUrl = IoUtil.createURL(aUpdateSiteUrl.toString() + "/launcher/appCatalog.txt");
 
 		// Default to DigestType of MD5
@@ -100,7 +94,7 @@ public class AppLauncherUtils
 
 					tmpDigestType = DigestType.parse(tokens[1]);
 					if (tmpDigestType == null)
-						aTask.infoAppendln("Failed to locate DigestType for: " + tokens[1]);
+						aTask.logRegln("Failed to locate DigestType for: " + tokens[1]);
 					else
 						digestType = tmpDigestType;
 				}
@@ -112,24 +106,24 @@ public class AppLauncherUtils
 
 					// Form the JreRelease
 					digestStr = tokens[1];
-					fileLen = GuiUtil.readLong(tokens[2], -1);
+					fileLen = ParseUtil.readLong(tokens[2], -1);
 					filename = tokens[3];
 					version = tokens[4];
 
 					Digest tmpDigest = new Digest(digestType, digestStr);
-					retList.add(new AppLauncherRelease(version, filename, tmpDigest, fileLen));
+					retL.add(new AppLauncherRelease(version, filename, tmpDigest, fileLen));
 				}
 				else
 				{
-					aTask.infoAppendln("Unreconized line: " + strLine);
+					aTask.logRegln("Unreconized line: " + strLine);
 				}
 			}
 		}
-		catch(FileNotFoundException aExp)
+		catch (FileNotFoundException aExp)
 		{
 			errMsg = "Failed to locate resource: " + catUrl;
 		}
-		catch(IOException aExp)
+		catch (IOException aExp)
 		{
 			errMsg = ThreadUtil.getStackTrace(aExp);
 		}
@@ -142,17 +136,17 @@ public class AppLauncherUtils
 		// See if we are in a valid state
 		if (errMsg != null)
 			; // Nothing to do, as an earlier error has occurred
-		else if (retList.size() == 0)
+		else if (retL.size() == 0)
 			errMsg = "The catalog appears to be invalid.";
 
 		// Bail if there were issues
 		if (errMsg != null)
 		{
-			aTask.infoAppendln(errMsg);
+			aTask.logRegln(errMsg);
 			return null;
 		}
 
-		return retList;
+		return retL;
 	}
 
 	/**
@@ -173,13 +167,13 @@ public class AppLauncherUtils
 			return false;
 
 		// Log the fact that we need to update our AppLauncher
-		aTask.infoAppendln("Your current AppLauncher is not compatible with this release. It will need to be upgraded!");
-		aTask.infoAppendln("\tCurrent ver: " + currVer);
+		aTask.logRegln("Your current AppLauncher is not compatible with this release. It will need to be upgraded!");
+		aTask.logRegln("\tCurrent ver: " + currVer);
 		if (nMinVer != PlainVersion.AbsMin)
-			aTask.infoAppendln("\tMinimum ver: " + nMinVer);
+			aTask.logRegln("\tMinimum ver: " + nMinVer);
 		if (nMaxVer != PlainVersion.AbsMax)
-			aTask.infoAppendln("\tMaximum ver: " + nMaxVer);
-		aTask.infoAppendln("");
+			aTask.logRegln("\tMaximum ver: " + nMaxVer);
+		aTask.logRegln("");
 
 		return true;
 	}
@@ -199,22 +193,23 @@ public class AppLauncherUtils
 	 * <P>
 	 * Returns false on any failure.
 	 */
-	public static AppLauncherRelease updateAppLauncher(Task aTask, JreRelease aJreRelease, File aDestPath, URL updateSiteUrl, Credential aCredential)
+	public static AppLauncherRelease updateAppLauncher(Task aTask, JreRelease aJreRelease, File aDestPath,
+			URL updateSiteUrl, Credential aCredential)
 	{
 		// Locate the list of available AppLaunchers
-		List<AppLauncherRelease> availList;
-		availList = AppLauncherUtils.getAvailableAppLauncherReleases(aTask, updateSiteUrl, aCredential);
-		if (availList == null)
+		List<AppLauncherRelease> availL;
+		availL = AppLauncherUtils.getAvailableAppLauncherReleases(aTask, updateSiteUrl, aCredential);
+		if (availL == null)
 		{
-			aTask.infoAppendln("The update site does not have any deployed AppLaunchers.");
-			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
+			aTask.logRegln("The update site does not have any deployed AppLaunchers.");
+			aTask.logRegln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 
-		if (availList.size() == 0)
+		if (availL.size() == 0)
 		{
-			aTask.infoAppendln("No AppLauncher releases found!");
-			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
+			aTask.logRegln("No AppLauncher releases found!");
+			aTask.logRegln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 
@@ -223,7 +218,7 @@ public class AppLauncherUtils
 		Version nMaxVer = aJreRelease.getAppLauncherMaxVersion();
 
 		AppLauncherRelease pickRelease = null;
-		for (AppLauncherRelease aRelease : availList)
+		for (AppLauncherRelease aRelease : availL)
 		{
 			Version evalVer = aRelease.getVersion();
 			if (VersionUtils.isInRange(evalVer, nMinVer, nMaxVer) == false)
@@ -236,8 +231,8 @@ public class AppLauncherUtils
 		// Bail if no compatible release could be found
 		if (pickRelease == null)
 		{
-			aTask.infoAppendln("No compatible AppLauncher releases have been deployed!");
-			aTask.infoAppendln(ErrorMsg.ContactSiteAdmin);
+			aTask.logRegln("No compatible AppLauncher releases have been deployed!");
+			aTask.logRegln(ErrorMsg.ContactSiteAdmin);
 			return null;
 		}
 
@@ -250,37 +245,18 @@ public class AppLauncherUtils
 		relLauncherPath = PlatformUtils.getAppLauncherLocation(pickVer);
 
 		// Download the AppLauncher
-		Digest targDigest, testDigest;
-		MessageDigest msgDigest;
-		targDigest = pickRelease.getDigest();
-		msgDigest = DigestUtils.getDigest(targDigest.getType());
-		aTask.infoAppendln("Downloading AppLauncher... Version: " + pickVer);
+		Digest targDigest = pickRelease.getDigest();
+		aTask.logRegln("Downloading AppLauncher... Version: " + pickVer);
 		URL srcUrl = IoUtil.createURL(updateSiteUrl.toString() + "/launcher/" + pickRelease.getFileName());
 		File dstFile = new File(aDestPath.getParentFile(), relLauncherPath);
 		Task tmpTask = new PartialTask(aTask, aTask.getProgress(), 0.01);
 //		Task tmpTask = new PartialTask(aTask, aTask.getProgress(), (tmpFileLen * 0.75) / (releaseSizeFull + 0.00));
 //		Task tmpTask = new SilentTask();
-		if (DistUtils.downloadFile(tmpTask, srcUrl, dstFile, aCredential, fileLen, msgDigest) == false)
-		{
-			aTask.infoAppendln("Failed to download updated AppLauncher.");
-			aTask.infoAppendln("\tSource: " + srcUrl);
-			aTask.infoAppendln("\tFile: " + dstFile);
+		if (MiscUtils.download(tmpTask, srcUrl, dstFile, aCredential, fileLen, targDigest) == false)
 			return null;
-		}
-
-		// Validate that the AppLauncher was downloaded successfully
-		testDigest = new Digest(targDigest.getType(), msgDigest.digest());
-		if (targDigest.equals(testDigest) == false)
-		{
-			aTask.infoAppendln("The download of the AppLauncher appears to be corrupted.");
-			aTask.infoAppendln("\tFile: " + dstFile);
-			aTask.infoAppendln("\t\tExpected " + targDigest.getDescr());
-			aTask.infoAppendln("\t\tReceived " + testDigest.getDescr());
-			return null;
-		}
 
 		// Log the success
-		aTask.infoAppendln("Success updating AppLauncher...");
+		aTask.logRegln("Success updating AppLauncher...");
 
 		return pickRelease;
 	}

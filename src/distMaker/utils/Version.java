@@ -8,6 +8,8 @@ package distMaker.utils;
  * Reference: https://semver.org/
  * <P>
  * Implementors of this interface should be immutable.
+ * 
+ * @author lopeznr1
  */
 public interface Version
 {

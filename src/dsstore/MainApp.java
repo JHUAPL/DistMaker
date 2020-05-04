@@ -84,7 +84,7 @@ public class MainApp
 		try (FileZinStream iStream = new FileZinStream(aFile))
 		{
 			byte[] byteArr;
-List<BlockDir> blockDirList;
+List<BlockDir> blockDirL;
 String dmgMagicKey;
 int fileMagicKey;
 int allocBlockOffset1, allocBlockOffset2, allocBlockSize;			
@@ -134,7 +134,7 @@ int blockAddrArr[];
 int blkLen, blkPos;			
 blkLen = 1 << (blockAddrArr[c1] & 0x1F);		
 blkPos = (blockAddrArr[c1] >> 5) * 32;
-refTask.infoAppendln("BlockAddr[" + c1 + "] -> Size: " + blkLen + "  Offset: " + blkPos);				
+refTask.logRegln("BlockAddr[" + c1 + "] -> Size: " + blkLen + "  Offset: " + blkPos);				
 
 //The entries in the block address table are what I call block addresses. Each address is a packed offset+size. 
 //The least-significant 5 bits of the number indicate the block's size, as a power of 2 (from 2^5 to 2^31). If those bits are masked off, the result 
@@ -153,23 +153,23 @@ refTask.infoAppendln("BlockAddr[" + c1 + "] -> Size: " + blkLen + "  Offset: " +
 			
 			// Read the block directories
 			dirCnt = dataBuf.getInt();
-refTask.infoAppendln("Block directory count: " + dirCnt);
+refTask.logRegln("Block directory count: " + dirCnt);
 			
-			blockDirList = new ArrayList<>(dirCnt);
+			blockDirL = new ArrayList<>(dirCnt);
 			for (int c1 = 0; c1 < dirCnt; c1++)
-				blockDirList.add(new BlockDir(dataBuf));
+				blockDirL.add(new BlockDir(dataBuf));
 			
 			
 			// Read the free lists
 int freeCnt;			
-refTask.infoAppendln("Reading freelists...");
+refTask.logRegln("Reading freelists...");
 			for (int c1 = 0; c1 < 32; c1++)
 			{
 				freeCnt = dataBuf.getInt();
-				refTask.infoAppend("[" + c1 + "]: " + freeCnt + " Offsets: ");				
+				refTask.logReg("[" + c1 + "]: " + freeCnt + " Offsets: ");				
 				for (int c2 = 0; c2 < freeCnt; c2++)
-					refTask.infoAppend(dataBuf.getInt() + ",");
-				refTask.infoAppendln("");
+					refTask.logReg(dataBuf.getInt() + ",");
+				refTask.logRegln("");
 			}
 			
 			
@@ -203,7 +203,7 @@ refTask.infoAppendln("Reading freelists...");
 	
 	public void readRecords(ByteBuffer aBuf)
 	{
-		List<Record> recordList;
+		List<Record> recordL;
 		BKGDRecord bkgdRecord;
 		Record tmpRecord;
 		int pCode, numRecords;
@@ -216,7 +216,7 @@ refTask.infoAppendln("Reading freelists...");
 		numRecords = aBuf.getInt();
 		
 		bkgdRecord = null;
-		recordList = new ArrayList<>(numRecords);
+		recordL = new ArrayList<>(numRecords);
 		for (int c1 = 0; c1 < numRecords; c1++)
 		{
 			BufUtils.seek(aBuf, 2); // empty
@@ -250,9 +250,9 @@ refTask.infoAppendln("Reading freelists...");
 				tmpRecord = new ShorRecord(name, id, type);
 			
 			tmpRecord.readPayload(aBuf);
-			recordList.add(tmpRecord);
+			recordL.add(tmpRecord);
 
-			refTask.infoAppendln("Found Name: <" + name + ">  recordId: " + id + " dataType: " + type + " payloadSize: " + tmpRecord.getSize());
+			refTask.logRegln("Found Name: <" + name + ">  recordId: " + id + " dataType: " + type + " payloadSize: " + tmpRecord.getSize());
 		}
 		
 		
@@ -260,7 +260,7 @@ refTask.infoAppendln("Reading freelists...");
 		// Update the records to reflect the new volumeName
 		if (volumeName != null)
 		{
-			for (Record aRecord : recordList)
+			for (Record aRecord : recordL)
 			{
 				if (aRecord instanceof PictRecord)
 					((PictRecord)aRecord).getAliasRecord().setVolumeName(volumeName);
@@ -273,7 +273,7 @@ refTask.infoAppendln("Reading freelists...");
 			}
 			
 			// Sort the list alphabetically
-			Collections.sort(recordList);
+			Collections.sort(recordL);
 			
 			
 			// Output back to the ByteBuf
@@ -282,7 +282,7 @@ refTask.infoAppendln("Reading freelists...");
 			aBuf.putInt(pCode);
 			aBuf.putInt(numRecords);
 			
-			for (Record aRecord : recordList)
+			for (Record aRecord : recordL)
 			{
 				aBuf.putShort((short)0);
 				aRecord.writeHeader(aBuf);
@@ -316,11 +316,11 @@ refTask.infoAppendln("Reading freelists...");
 		numNodes = srcBuf.getInt();
 		valConst = srcBuf.getInt();
 
-		refTask.infoAppendln("rootBlockNum: " + rootBlockNum);
-		refTask.infoAppendln("numLevels: " + numLevels);
-		refTask.infoAppendln("rootRecords: " + numRecords);
-		refTask.infoAppendln("rootNodes: " + numNodes);
-		refTask.infoAppendln("valConst: " + valConst);
+		refTask.logRegln("rootBlockNum: " + rootBlockNum);
+		refTask.logRegln("numLevels: " + numLevels);
+		refTask.logRegln("rootRecords: " + numRecords);
+		refTask.logRegln("rootNodes: " + numNodes);
+		refTask.logRegln("valConst: " + valConst);
 	}
 	
 	

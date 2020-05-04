@@ -2,6 +2,8 @@ package distMaker.utils;
 
 /**
  * Provides the standard implementation of the Version interface.
+ * 
+ * @author lopeznr1
  */
 public class PlainVersion implements Version
 {

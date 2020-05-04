@@ -1,27 +1,32 @@
 package distMaker;
 
 import java.io.*;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.ZipInputStream;
 
 import org.apache.commons.compress.archivers.*;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.compress.utils.IOUtils;
 
 import com.google.common.base.Strings;
 import com.google.common.io.CountingInputStream;
 
+import glum.digest.Digest;
+import glum.digest.DigestUtils;
+import glum.net.*;
 import glum.task.Task;
 import glum.util.ThreadUtil;
 
 /**
  * Collection of generic utility methods that should be migrated to another library / class.
+ *
+ * @author lopeznr1
  */
 public class MiscUtils
 {
@@ -55,6 +60,54 @@ public class MiscUtils
 	public static Set<PosixFilePermission> convertUnixModeToPFP(int aMode)
 	{
 		return PosixFilePermissions.fromString(convertUnixModeToStr(aMode));
+	}
+
+
+	public static boolean download(Task aTask, URL aSrcUrl, File aDstFile, Credential aCredential, long aFileLen,
+			Digest aTargDigest)
+	{
+		// Form the message digest of interest
+		MessageDigest tmpMessageDigest = null;
+		if (aTargDigest != null)
+			tmpMessageDigest = DigestUtils.getDigest(aTargDigest.getType());
+
+		try
+		{
+			NetUtil.download(aTask, aSrcUrl, aDstFile, aCredential, aFileLen, tmpMessageDigest, null);
+			if (aTask.isAborted() == true)
+			{
+				aTask.logRegln("File download has been aborted...");
+				aTask.logRegln("\tSource: " + aSrcUrl);
+				aTask.logRegln("\tFile: " + aDstFile + "\n");
+//				aTask.logRegln("\tFile: " + dstFile + " Bytes transferred: " + cntByteCurr);
+				return false;
+			}
+		}
+		catch (FetchError aExp)
+		{
+			aTask.logRegln("File download has failed...");
+			aTask.logRegln("\tReason: " + aExp.getResult());
+			aTask.logRegln("\tSource: " + aSrcUrl);
+			aTask.logRegln("\tFile: " + aDstFile + "\n");
+			return false;
+		}
+
+		// Success if there is no targDigest to validate against
+		if (aTargDigest == null)
+			return true;
+
+		// Validate that the file was downloaded successfully
+		Digest testDigest = new Digest(aTargDigest.getType(), tmpMessageDigest.digest());
+		if (aTargDigest.equals(testDigest) == false)
+		{
+			aTask.logRegln("File download is corrupted...");
+			aTask.logRegln("\tFile: " + aDstFile);
+			aTask.logRegln("\t\tExpected " + aTargDigest.getDescr());
+			aTask.logRegln("\t\tReceived " + testDigest.getDescr() + "\n");
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
@@ -97,25 +150,25 @@ public class MiscUtils
 
 		tabStr = Strings.repeat("\t", numTabs);
 
-		aTask.infoAppendln(tabStr + "Reason: " + aErrorDM.getMessage());
+		aTask.logRegln(tabStr + "Reason: " + aErrorDM.getMessage());
 		cause = aErrorDM.getCause();
 		while (cause != null)
 		{
 			if (cause instanceof ErrorDM)
 			{
-				aTask.infoAppendln(tabStr + "Reason: " + cause.getMessage());
+				aTask.logRegln(tabStr + "Reason: " + cause.getMessage());
 			}
 			else
 			{
-				aTask.infoAppendln(tabStr + "StackTrace: ");
-				aTask.infoAppendln(ThreadUtil.getStackTrace(cause));
+				aTask.logRegln(tabStr + "StackTrace: ");
+				aTask.logRegln(ThreadUtil.getStackTrace(cause));
 				break;
 			}
 
 			cause = aErrorDM.getCause();
 		}
 
-		aTask.infoAppendln("");
+		aTask.logRegln("");
 	}
 
 	/**
@@ -126,7 +179,7 @@ public class MiscUtils
 	 * <P>
 	 * The output file is created in the output folder, having the same name as the input file, minus the '.tar'
 	 * extension.
-	 * 
+	 *
 	 * @param inputFile
 	 *        the input .tar.gz or zip file
 	 * @param aDestPath
@@ -138,10 +191,10 @@ public class MiscUtils
 	 */
 	public static List<File> unPack(Task aTask, final File inputFile, final File aDestPath) throws FileNotFoundException, IOException, ArchiveException
 	{
-		Map<File, Long> pathMap;
+		Map<File, Long> pathM;
 		InputStream iStream;
 
-		final List<File> untaredFiles = new ArrayList<>();
+		final List<File> untaredFileL = new ArrayList<>();
 		long fullLen = inputFile.length();
 
 		// Open up the stream to the tar file (set up a counting stream to allow for progress updates)
@@ -160,7 +213,7 @@ public class MiscUtils
 //			iStream = new ZipInputStream(iStream);
 		}
 
-		pathMap = new LinkedHashMap<>();
+		pathM = new LinkedHashMap<>();
 		final ArchiveInputStream debInputStream = new ArchiveStreamFactory().createArchiveInputStream(archiverName, iStream);
 		TarArchiveEntry entry = null;
 		while ((entry = (TarArchiveEntry)debInputStream.getNextEntry()) != null)
@@ -182,7 +235,7 @@ public class MiscUtils
 
 				long tmpUtc = entry.getModTime().getTime();
 				outputFile.setLastModified(tmpUtc);
-				pathMap.put(outputFile, tmpUtc);
+				pathM.put(outputFile, tmpUtc);
 			}
 			else if (entry.isSymbolicLink() == true)
 			{
@@ -201,7 +254,7 @@ public class MiscUtils
 //				{
 //					DateUnit dUnit = new DateUnit("", "yyyyMMddHHmmss");
 //					long tmpUtc = entry.getModTime().getTime();
-//					String timeStamp = dUnit.getString(tmpUtc); 
+//					String timeStamp = dUnit.getString(tmpUtc);
 //					Runtime.getRuntime().exec("touch -h -t " + timeStamp + " " + outLink.toAbsolutePath());
 //				}
 			}
@@ -235,28 +288,28 @@ public class MiscUtils
 //				System.out.println(String.format("\tMode: %d %x %s %s  name: %s", mode, mode, Integer.toOctalString(mode), permStr, entry.getName()));
 			}
 
-			untaredFiles.add(outputFile);
+			untaredFileL.add(outputFile);
 
 			// Update the progress bar
-			aTask.infoUpdate("\tUnpacked: " + entry.getName());
+			aTask.logRegUpdate("\tUnpacked: " + entry.getName());
 			long currLen = cntStream.getCount();
 			aTask.setProgress(currLen / (fullLen + 0.0));
 		}
 		debInputStream.close();
 
 		// Update all of the times on the folders last
-		for (File aDir : pathMap.keySet())
+		for (File aDir : pathM.keySet())
 		{
 			// Bail if we have been aborted
 			if (aTask.isActive() == false)
 				return null;
 
-			aDir.setLastModified(pathMap.get(aDir));
+			aDir.setLastModified(pathM.get(aDir));
 		}
 
-		aTask.infoAppendln("\tUnpacked: " + untaredFiles.size() + " files\n");
+		aTask.logRegln("\tUnpacked: " + untaredFileL.size() + " files\n");
 
-		return untaredFiles;
+		return untaredFileL;
 	}
 
 	/**
@@ -264,13 +317,13 @@ public class MiscUtils
 	 * <P>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
-	public static void writeDoc(File aFile, List<String> aStrList)
+	public static void writeDoc(File aFile, List<String> aStrL)
 	{
 		// Output the strList
 		try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(aFile)));)
 		{
 			// Write the lines
-			for (String aStr : aStrList)
+			for (String aStr : aStrL)
 				bw.write(aStr + '\n');
 		}
 		catch(IOException aExp)

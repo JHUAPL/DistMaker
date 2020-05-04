@@ -2,13 +2,15 @@ package distMaker;
 
 /**
  * Generic runtime exception thrown by various DistMaker modules/routines.
+ * 
+ * @author lopeznr1
  */
 public class ErrorDM extends RuntimeException
 {
 	private static final long serialVersionUID = 1L;
 
 	// State vars
-	private String subject;
+	private final String subject;
 
 	public ErrorDM(Throwable aCause, String aMessage, String aSubject)
 	{

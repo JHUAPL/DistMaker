@@ -18,7 +18,9 @@ import distMaker.*;
 import distMaker.jre.*;
 
 /**
- * Utility class which contains a set of methods to interact with an Apple Info.plist file.
+ * Collection of utility methods specific to the Macosx platform.
+ *
+ * @author lopeznr1
  */
 public class AppleUtils
 {
@@ -65,7 +67,7 @@ public class AppleUtils
 	{
 		Document doc;
 		Element docElement;
-		NodeList nodeList;
+		NodeList nodeL;
 		Node keyNode, strNode;
 		String valStr;
 
@@ -87,10 +89,10 @@ public class AppleUtils
 			throw new ErrorDM(aExp, "Failed to parse XML document. File: " + pFile);
 		}
 
-		nodeList = docElement.getElementsByTagName("*");
-		for (int c1 = 0; c1 < nodeList.getLength(); c1++)
+		nodeL = docElement.getElementsByTagName("*");
+		for (int c1 = 0; c1 < nodeL.getLength(); c1++)
 		{
-			keyNode = nodeList.item(c1).getFirstChild();
+			keyNode = nodeL.item(c1).getFirstChild();
 			if (keyNode == null)
 				continue;
 
@@ -102,7 +104,7 @@ public class AppleUtils
 			{
 				System.out.println("Updating contents of file: " + pFile);
 
-				strNode = nodeList.item(c1 + 1).getFirstChild();
+				strNode = nodeL.item(c1 + 1).getFirstChild();
 				System.out.println("  Old App Version: " + strNode.getNodeValue());
 
 				strNode.setNodeValue(aNewVersin);
@@ -145,7 +147,7 @@ public class AppleUtils
 //		Pattern tmpPattern = Pattern.compile(regex);
 //
 //		// Process our input
-//		inputList = new ArrayList<>();
+//		inputL = new ArrayList<>();
 //		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
 //		{
 //			// Read the lines
@@ -173,7 +175,7 @@ public class AppleUtils
 //					isFound = true;
 //				}
 //
-//				inputList.add(evalStr);
+//				inputL.add(evalStr);
 //			}
 //		}
 //		catch(IOException aExp)
@@ -196,7 +198,7 @@ public class AppleUtils
 	 */
 	public static void updateJreVersion(JreVersion aJreVersion, File pFile)
 	{
-		List<String> inputList;
+		List<String> inputL;
 		String evalStr, tmpStr;
 		String prevKeyValue;
 		boolean isFound;
@@ -211,7 +213,7 @@ public class AppleUtils
 
 		// Process our input
 		isFound = false;
-		inputList = new ArrayList<>();
+		inputL = new ArrayList<>();
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(pFile))
 		{
 			// Read the lines
@@ -237,7 +239,7 @@ public class AppleUtils
 					isFound = true;
 				}
 
-				inputList.add(evalStr);
+				inputL.add(evalStr);
 			}
 		}
 		catch(IOException aExp)
@@ -250,7 +252,7 @@ public class AppleUtils
 			throw new ErrorDM("[" + pFile + "] The pFile does not specify a 'JVMRuntime' section.");
 
 		// Write the pFile
-		MiscUtils.writeDoc(pFile, inputList);
+		MiscUtils.writeDoc(pFile, inputL);
 	}
 
 	/**
@@ -267,7 +269,7 @@ public class AppleUtils
 		Document doc;
 		Element docElement;
 		String evalStr, updateStr;
-		NodeList dictList, childList;
+		NodeList dictNL, childNL;
 		Node childNode, targNode;
 		Element evalE, arrE, memE;
 		String tagStr, valStr, currKeyVal;
@@ -292,16 +294,16 @@ public class AppleUtils
 		}
 
 		// Locate the <dict> element
-		dictList = docElement.getElementsByTagName("dict");
-		if (dictList.getLength() == 0)
+		dictNL = docElement.getElementsByTagName("dict");
+		if (dictNL.getLength() == 0)
 			throw new ErrorDM("No <dict> element found! File: " + pFile);
 
 		arrE = null;
 		currKeyVal = null;
-		childList = dictList.item(0).getChildNodes();
-		for (int c1 = 0; c1 < childList.getLength(); c1++)
+		childNL = dictNL.item(0).getChildNodes();
+		for (int c1 = 0; c1 < childNL.getLength(); c1++)
 		{
-			childNode = childList.item(c1);
+			childNode = childNL.item(c1);
 			if (childNode.getNodeType() != Node.ELEMENT_NODE)
 				continue;
 
@@ -332,10 +334,10 @@ public class AppleUtils
 			throw new ErrorDM("Failed to locate the element <array> following the element: <key>JVMOptions</key>\nFile: " + pFile);
 
 		memE = null;
-		childList = arrE.getChildNodes();
-		for (int c1 = 0; c1 < childList.getLength(); c1++)
+		childNL = arrE.getChildNodes();
+		for (int c1 = 0; c1 < childNL.getLength(); c1++)
 		{
-			childNode = childList.item(c1);
+			childNode = childNL.item(c1);
 			if (childNode.getNodeType() != Node.ELEMENT_NODE)
 				continue;
 
@@ -391,7 +393,7 @@ public class AppleUtils
 	 * <LI>http://java9.wtf/xml-transformer/
 	 * <LI>https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
 	 * </UL>
-	 * 
+	 *
 	 * @param aDoc
 	 * @throws XPathExpressionException
 	 */

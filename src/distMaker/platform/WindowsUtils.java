@@ -8,6 +8,11 @@ import distMaker.*;
 import distMaker.jre.AppLauncherRelease;
 import distMaker.jre.JreVersion;
 
+/**
+ * Collection of utility methods specific to the Windows platform.
+ *
+ * @author lopeznr1
+ */
 public class WindowsUtils
 {
 	/**
@@ -99,7 +104,7 @@ public class WindowsUtils
 	 */
 	public static void updateMaxMem(long numBytes, File aConfigFile)
 	{
-		List<String> inputList;
+		List<String> inputL;
 		String strLine, updateStr;
 		boolean isProcessed;
 
@@ -108,7 +113,7 @@ public class WindowsUtils
 			throw new ErrorDM("The config file is not writeable: " + aConfigFile);
 
 		isProcessed = false;
-		inputList = new ArrayList<>();
+		inputL = new ArrayList<>();
 
 		// Process our input
 		try (BufferedReader br = MiscUtils.openFileAsBufferedReader(aConfigFile))
@@ -127,15 +132,15 @@ public class WindowsUtils
 					strLine = updateStr;
 				}
 
-				inputList.add(strLine);
+				inputL.add(strLine);
 			}
 
 			// Create a new max heap input config line if one is not specified
 			if (isProcessed == false)
 			{
 				strLine = MemUtils.transformMaxMemHeapString("-Xmx256m", numBytes);
-				inputList.add(strLine);
-				inputList.add("\n");
+				inputL.add(strLine);
+				inputL.add("\n");
 				isProcessed = true;
 			}
 		}
@@ -145,7 +150,7 @@ public class WindowsUtils
 		}
 
 		// Update the script
-		MiscUtils.writeDoc(aConfigFile, inputList);
+		MiscUtils.writeDoc(aConfigFile, inputL);
 	}
 
 }

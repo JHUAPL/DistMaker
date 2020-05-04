@@ -5,10 +5,13 @@ import java.util.*;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import distMaker.jre.*;
+import distMaker.jre.JreRelease;
+import distMaker.jre.JreVersion;
 
 /**
  * Object that describes the structure (files, folders, and JRE version) of a Java application.
+ *
+ * @author lopeznr1
  */
 public class AppCatalog
 {
@@ -19,27 +22,28 @@ public class AppCatalog
 	private JreVersion maxJreVer;
 
 	/** A mapping of filename to to corresponding Node */
-	private ImmutableMap<String, Node> nodeMap;
+	private ImmutableMap<String, Node> nodeM;
 
-	public AppCatalog(List<Node> aNodeList, JreVersion aMinJreVer, JreVersion aMaxJreVer)
+	public AppCatalog(List<Node> aNodeL, JreVersion aMinJreVer, JreVersion aMaxJreVer)
 	{
 		minJreVer = aMinJreVer;
 		maxJreVer = aMaxJreVer;
-		nodeMap = ImmutableMap.copyOf(formNameMap(aNodeList));
+		nodeM = ImmutableMap.copyOf(formNameMap(aNodeL));
 	}
 
 	/**
-	 * Returns the most recent JRE from the specified release that is compatible with this Appcatalog.
+	 * Returns the most recent {@link JreRelease} from the specified list that is compatible with this
+	 * {@link AppCatalog}.
 	 * <P>
-	 * Returns null if there are no JREs that are compatible.
+	 * Returns null if there are no {@link JreRelease} that is compatible.
 	 */
-	public JreRelease getCompatibleJre(List<JreRelease> aJreList)
+	public JreRelease getCompatibleJre(List<JreRelease> aJreL)
 	{
 		// Sort the platforms, but reverse the order so that the newest version is first
-		Collections.sort(aJreList);
-		Collections.reverse(aJreList);
+		Collections.sort(aJreL);
+		Collections.reverse(aJreL);
 
-		for (JreRelease aRelease : aJreList)
+		for (JreRelease aRelease : aJreL)
 		{
 			if (isJreVersionTooNew(aRelease.getVersion()) == true)
 				continue;
@@ -112,7 +116,7 @@ public class AppCatalog
 	 */
 	public Node getNode(String aName)
 	{
-		return nodeMap.get(aName);
+		return nodeM.get(aName);
 	}
 
 	/**
@@ -120,7 +124,7 @@ public class AppCatalog
 	 */
 	public ImmutableList<Node> getAllNodesList()
 	{
-		return nodeMap.values().asList();
+		return nodeM.values().asList();
 	}
 
 	/**
@@ -129,15 +133,15 @@ public class AppCatalog
 	 * TODO: This should be renamed formNameMap to formDigestMap<BR>
 	 * TODO: This should probably be a mapping of Digest to Node rather than filename to Node
 	 */
-	private Map<String, Node> formNameMap(List<Node> aNodeList)
+	private Map<String, Node> formNameMap(List<Node> aNodeL)
 	{
-		Map<String, Node> retMap;
+		Map<String, Node> retM;
 
-		retMap = new LinkedHashMap<>();
-		for (Node aNode : aNodeList)
-			retMap.put(aNode.getFileName(), aNode);
+		retM = new LinkedHashMap<>();
+		for (Node aNode : aNodeL)
+			retM.put(aNode.getFileName(), aNode);
 
-		return retMap;
+		return retM;
 	}
 
 }

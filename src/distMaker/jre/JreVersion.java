@@ -5,10 +5,12 @@ import java.util.ArrayList;
 import com.google.common.collect.ImmutableList;
 
 import distMaker.utils.Version;
-import glum.gui.GuiUtil;
+import glum.io.ParseUtil;
 
 /**
  * Immutable class which defines a Java version.
+ *
+ * @author lopeznr1
  */
 public class JreVersion implements Comparable<JreVersion>, Version
 {
@@ -32,7 +34,7 @@ public class JreVersion implements Comparable<JreVersion>, Version
 		ArrayList<Integer> workL = new ArrayList<>();
 		for (String aStr : tokenArr)
 		{
-			int tmpVal = GuiUtil.readInt(aStr, Integer.MIN_VALUE);
+			int tmpVal = ParseUtil.readInt(aStr, Integer.MIN_VALUE);
 			if (tmpVal == Integer.MIN_VALUE)
 				break;
 

@@ -7,29 +7,23 @@ import distMaker.jre.*;
 import distMaker.node.AppRelease;
 import distMaker.utils.Version;
 
+/**
+ * Collection of utility methods that provide platform independent mechanism for the following:
+ * <UL>
+ * <LI>Retrieval of the DistMaker configuration file
+ * <LI>Retrieval of the file name of the app launcher.
+ * <LI>Retrieval of the location of the app launcher.
+ * <LI>Retrieval / Setting of the JRE location.
+ * <LI>Retrieval of the system {@link Platform}.
+ * <LI>Setting of the heap memory.
+ * <LI>Transformation of a platform string into the corresponding {@link Platform}.
+ * </UL>
+ * Note that setting of system parameters will not take effect until the DistMaker application is restarted.
+ *
+ * @author lopeznr1
+ */
 public class PlatformUtils
 {
-	/**
-	 * Utility method that returns the platform specific configuration file for the java application.
-	 */
-	public static File getConfigurationFile()
-	{
-		File cfgFile;
-		String platform;
-
-		platform = PlatformUtils.getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
-			cfgFile = AppleUtils.getPlistFile();
-		else if (platform.equals("LINUX") == true)
-			cfgFile = LinuxUtils.getScriptFile();
-		else if (platform.equals("WINDOWS") == true)
-			cfgFile = WindowsUtils.getConfigFile();
-		else
-			throw new ErrorDM("Unsupported platform: " + platform);
-
-		return cfgFile;
-	}
-
 	/**
 	 * Returns the file name that should be used for a specific AppLauncher version.
 	 * <P>
@@ -51,25 +45,47 @@ public class PlatformUtils
 	 * <P>
 	 * The returned path will be relative to the top of the application's DistMaker root rather than the applications
 	 * Java run path.
+	 * <P>
+	 * On failure this method will throw an exception of type {@link ErrorDM}.
 	 */
 	public static String getAppLauncherLocation(Version aVersion)
 	{
-		String platform, tmpPathName, retPath;
+		Platform platform;
+		String tmpPathName;
 
-		retPath = null;
 		tmpPathName = getAppLauncherFileName(aVersion);
 
-		platform = PlatformUtils.getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
-			retPath = "Java/" + tmpPathName;
-		else if (platform.equals("LINUX") == true)
-			retPath = "launcher/" + tmpPathName;
-		else if (platform.equals("WINDOWS") == true)
-			retPath = "launcher/" + tmpPathName;
-		else
-			throw new ErrorDM("Unsupported platform: " + platform);
+		// Delegate to the proper util class
+		platform = PlatformUtils.getPlatform();
+		if (platform == Platform.Linux)
+			return "launcher/" + tmpPathName;
+		else if (platform == Platform.Macosx)
+			return "Java/" + tmpPathName;
+		else if (platform == Platform.Windows)
+			return "launcher/" + tmpPathName;
 
-		return retPath;
+		throw new ErrorDM("Unsupported platform: " + platform);
+	}
+
+	/**
+	 * Utility method that returns the platform specific configuration file for the java application.
+	 * <P>
+	 * On failure this method will throw an exception of type {@link ErrorDM}.
+	 */
+	public static File getConfigurationFile()
+	{
+		Platform platform;
+
+		// Delegate to the proper util class
+		platform = PlatformUtils.getPlatform();
+		if (platform == Platform.Linux)
+			return LinuxUtils.getScriptFile();
+		else if (platform == Platform.Macosx)
+			return AppleUtils.getPlistFile();
+		else if (platform == Platform.Windows)
+			return WindowsUtils.getConfigFile();
+
+		throw new ErrorDM("Unsupported platform: " + platform);
 	}
 
 	/**
@@ -77,56 +93,42 @@ public class PlatformUtils
 	 * <P>
 	 * The returned path will be relative to the top of the application's DistMaker root rather than the applications
 	 * Java run path.
+	 * <P>
+	 * On failure this method will throw an exception of type {@link ErrorDM}.
 	 */
 	public static String getJreLocation(JreVersion aJreVersion)
 	{
-		String platform, tmpPathName, retPath;
+		Platform platform;
+		String tmpPathName;
 
-		retPath = null;
 		tmpPathName = JreUtils.getExpandJrePath(aJreVersion);
 
-		platform = PlatformUtils.getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
-			retPath = "PlugIns/" + tmpPathName;
-		else if (platform.equals("LINUX") == true)
-			retPath = tmpPathName;
-		else if (platform.equals("WINDOWS") == true)
-			retPath = tmpPathName;
-		else
-			throw new ErrorDM("Unsupported platform: " + platform);
+		// Delegate to the proper util class
+		platform = PlatformUtils.getPlatform();
+		if (platform == Platform.Linux)
+			return tmpPathName;
+		else if (platform == Platform.Macosx)
+			return "PlugIns/" + tmpPathName;
+		else if (platform == Platform.Windows)
+			return tmpPathName;
 
-		return retPath;
+		throw new ErrorDM("Unsupported platform: " + platform);
 	}
 
 	/**
-	 * Returns the architecture the current JRE is running on.
-	 * <P>
-	 * This always returns x64.
-	 * <P>
-	 * TODO: In the future update the code to return the architecture rather than assume x64!
-	 */
-	public static String getArchitecture()
-	{
-		// TODO: In the future update the code to return the architecture rather than assume x64!
-		return "x64";
-	}
-
-	/**
-	 * Returns the platform (Linux, Macosx, or Windows) on which the current JRE is running on.
+	 * Returns the {@link Platform} on which the current JRE is running on.
 	 * <P>
 	 * If the platform is not recognized the a {@link ErrorDM} will be thrown.
 	 */
-	public static String getPlatform()
+	public static Platform getPlatform()
 	{
-		String osName;
-
-		osName = System.getProperty("os.name").toUpperCase();
+		String osName = System.getProperty("os.name").toUpperCase();
 		if (osName.startsWith("LINUX") == true)
-			return "Linux";
+			return Platform.Linux;
 		else if (osName.startsWith("MAC OS X") == true)
-			return "Macosx";
+			return Platform.Macosx;
 		else if (osName.startsWith("WINDOWS") == true)
-			return "Windows";
+			return Platform.Windows;
 
 		throw new ErrorDM("Unrecognized os.name: " + osName);
 	}
@@ -136,26 +138,26 @@ public class PlatformUtils
 	 * <P>
 	 * Note this will only take effect after the application has been restarted.
 	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 * 
+	 * On failure this method will throw an exception of type {@link ErrorDM}.
+	 *
 	 * @param aRelease
 	 *        The AppLauncher release that will be utilized.
 	 */
 	public static void setAppLauncher(AppLauncherRelease aRelease)
 	{
-		String platform;
+		Platform platform;
 		File cfgFile;
 
 		// Retrieve the appropriate configuration file
 		cfgFile = PlatformUtils.getConfigurationFile();
 
-		// Delegate to the proper platform code
-		platform = PlatformUtils.getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
-			AppleUtils.updateAppLauncher(aRelease, cfgFile);
-		else if (platform.equals("LINUX") == true)
+		// Delegate to the proper util class
+		platform = PlatformUtils.getPlatform();
+		if (platform == Platform.Linux)
 			LinuxUtils.updateAppLauncher(aRelease, cfgFile);
-		else if (platform.equals("WINDOWS") == true)
+		else if (platform == Platform.Macosx)
+			AppleUtils.updateAppLauncher(aRelease, cfgFile);
+		else if (platform == Platform.Windows)
 			WindowsUtils.updateAppLauncher(aRelease, cfgFile);
 		else
 			throw new ErrorDM("Unrecognized platform: " + platform);
@@ -166,26 +168,26 @@ public class PlatformUtils
 	 * <P>
 	 * Note this will only take effect after the application has been restarted.
 	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 * 
+	 * On failure this method will throw an exception of type {@link ErrorDM}.
+	 *
 	 * @param aJrePath
 	 *        Path to top of the JRE.
 	 */
 	public static void setJreVersion(JreVersion aJreVersion)
 	{
-		String platform;
+		Platform platform;
 		File cfgFile;
 
 		// Retrieve the appropriate configuration file
 		cfgFile = PlatformUtils.getConfigurationFile();
 
-		// Delegate to the proper platform code
-		platform = PlatformUtils.getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
-			AppleUtils.updateJreVersion(aJreVersion, cfgFile);
-		else if (platform.equals("LINUX") == true)
+		// Delegate to the proper util class
+		platform = PlatformUtils.getPlatform();
+		if (platform == Platform.Linux)
 			LinuxUtils.updateJreVersion(aJreVersion, cfgFile);
-		else if (platform.equals("WINDOWS") == true)
+		else if (platform == Platform.Macosx)
+			AppleUtils.updateJreVersion(aJreVersion, cfgFile);
+		else if (platform == Platform.Windows)
 			WindowsUtils.updateJreVersion(aJreVersion, cfgFile);
 		else
 			throw new ErrorDM("Unrecognized platform: " + platform);
@@ -196,29 +198,53 @@ public class PlatformUtils
 	 * <P>
 	 * Note this will only take effect after the application has been restarted.
 	 * <P>
-	 * On failure this method will throw an exception of type ErrorDM.
-	 * 
+	 * On failure this method will throw an exception of type {@link ErrorDM}.
+	 *
 	 * @param maxMemSize
 	 *        Maximum heap memory in bytes.
 	 */
 	public static void setMaxHeapMem(long maxMemSize)
 	{
-		String platform;
+		Platform platform;
 		File cfgFile;
 
 		// Retrieve the appropriate configuration file
 		cfgFile = PlatformUtils.getConfigurationFile();
 
-		// Delegate to the proper platform code
-		platform = PlatformUtils.getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
-			AppleUtils.updateMaxMem(maxMemSize, cfgFile);
-		else if (platform.equals("LINUX") == true)
+		// Delegate to the proper util class
+		platform = PlatformUtils.getPlatform();
+		if (platform == Platform.Linux)
 			LinuxUtils.updateMaxMem(maxMemSize, cfgFile);
-		else if (platform.equals("WINDOWS") == true)
+		else if (platform == Platform.Macosx)
+			AppleUtils.updateMaxMem(maxMemSize, cfgFile);
+		else if (platform == Platform.Windows)
 			WindowsUtils.updateMaxMem(maxMemSize, cfgFile);
 		else
 			throw new ErrorDM(null, "Unrecognized platform: " + platform, "Unsupported Platform");
+	}
+
+	/**
+	 * Utility method that takes a string and will transform it to the corresponding {@link Platform}.
+	 * <P>
+	 * Returns null if the platform could not be determined.
+	 */
+	public static Platform transformToPlatform(String aInputStr)
+	{
+		aInputStr = aInputStr.toLowerCase();
+
+		if (aInputStr.equals("linux") == true)
+			return Platform.Linux;
+
+		if (aInputStr.equals("macosx") == true)
+			return Platform.Macosx;
+
+		if (aInputStr.equals("apple") == true)
+			return Platform.Macosx;
+
+		if (aInputStr.equals("windows") == true)
+			return Platform.Windows;
+
+		return null;
 	}
 
 	/**
@@ -230,15 +256,15 @@ public class PlatformUtils
 	 */
 	public static void updateAppRelease(AppRelease aRelease)
 	{
-		String platform;
+		Platform platform;
 		File cfgFile;
 
 		// Retrieve the appropriate configuration file
 		cfgFile = PlatformUtils.getConfigurationFile();
 
-		// Delegate to the proper platform code
-		platform = getPlatform().toUpperCase();
-		if (platform.equals("APPLE") == true)
+		// Delegate to the proper util class
+		platform = getPlatform();
+		if (platform == Platform.Macosx)
 			AppleUtils.updateAppVersion(aRelease.getVersion(), cfgFile);
 	}
 

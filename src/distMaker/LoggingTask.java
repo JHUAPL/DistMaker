@@ -7,31 +7,31 @@ import java.util.List;
 
 public class LoggingTask extends SilentTask
 {
-	private final List<String> messages = new ArrayList<>();
+	private final List<String> messageL = new ArrayList<>();
 
 	@Override
-	public void infoAppend(String aMsg)
+	public void logReg(String aMsg)
 	{
-		messages.add(aMsg);
-		super.infoAppend(aMsg);
+		messageL.add(aMsg);
+		super.logReg(aMsg);
 	}
 
 	@Override
-	public void infoAppendln(String aMsg)
+	public void logRegln(String aMsg)
 	{
-		messages.add(aMsg);
-		super.infoAppendln(aMsg);
+		messageL.add(aMsg);
+		super.logRegln(aMsg);
 	}
 
 	@Override
-	public void infoUpdate(String aMsg)
+	public void logRegUpdate(String aMsg)
 	{
-		messages.add(aMsg);
-		super.infoUpdate(aMsg);
+		messageL.add(aMsg);
+		super.logRegUpdate(aMsg);
 	}
 
 	List<String> getMessages()
 	{
-		return messages;
+		return messageL;
 	}
 }

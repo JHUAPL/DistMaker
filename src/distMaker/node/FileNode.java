@@ -1,19 +1,18 @@
 package distMaker.node;
 
-import glum.io.IoUtil;
-import glum.net.Credential;
-import glum.task.Task;
-
 import java.io.File;
 import java.net.URL;
-import java.security.MessageDigest;
 
-import distMaker.DistUtils;
-import distMaker.digest.Digest;
-import distMaker.digest.DigestUtils;
+import glum.digest.Digest;
+import glum.io.IoUtil;
+import glum.net.Credential;
+import glum.net.NetUtil;
+import glum.task.Task;
 
 /**
  * Immutable node describing a File.
+ * 
+ * @author lopeznr1
  */
 public class FileNode implements Node
 {
@@ -38,7 +37,7 @@ public class FileNode implements Node
 		if (aNode instanceof FileNode == false)
 			return false;
 
-		fNode = (FileNode)aNode;
+		fNode = (FileNode) aNode;
 		if (fNode.digest.equals(digest) == false)
 			return false;
 		if (fNode.fileName.equals(fileName) == false)
@@ -66,33 +65,15 @@ public class FileNode implements Node
 	@Override
 	public boolean transferContentTo(Task aTask, Credential aCredential, File dstPath)
 	{
-		URL srcUrl;
-		File dstFile;
-		Digest tmpDigest;
-		boolean isPass;
-
 		// Determine the source URL to copy the contents from
-		srcUrl = IoUtil.createURL(rootUrl.toString() + "/" + fileName);
+		URL srcUrl = IoUtil.createURL(rootUrl.toString() + "/" + fileName);
 
 		// Determine the file to transfer the contents to
-		dstFile = new File(dstPath, fileName);
+		File dstFile = new File(dstPath, fileName);
 
 		// Download the file
-		MessageDigest msgDigest = DigestUtils.getDigest(digest.getType());
-		isPass = DistUtils.downloadFile(aTask, srcUrl, dstFile, aCredential, fileLen, msgDigest);
-		if (isPass == false)
+		if (NetUtil.download(aTask, srcUrl, dstFile, aCredential, fileLen, digest) == false)
 			return false;
-
-		// Validate that the file was downloaded successfully
-		tmpDigest = new Digest(digest.getType(), msgDigest.digest());
-		if (digest.equals(tmpDigest) == false)
-		{
-			aTask.infoAppendln("\nThe download of the application appears to be corrupted.");
-			aTask.infoAppendln("\tFile: " + fileName);
-			aTask.infoAppendln("\t\tExpected " + digest.getDescr());
-			aTask.infoAppendln("\t\tRecieved " + tmpDigest.getDescr() + "\n");
-			return false;
-		}
 
 		return true;
 	}

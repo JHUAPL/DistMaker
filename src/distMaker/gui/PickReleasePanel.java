@@ -1,5 +1,20 @@
 package distMaker.gui;
 
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+
+import javax.swing.*;
+import javax.swing.border.BevelBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+
+import distMaker.LookUp;
+import distMaker.node.AppRelease;
 import glum.gui.FocusUtil;
 import glum.gui.GuiUtil;
 import glum.gui.action.ClickAction;
@@ -9,23 +24,13 @@ import glum.gui.panel.itemList.StaticItemProcessor;
 import glum.gui.panel.itemList.query.*;
 import glum.unit.ConstUnitProvider;
 import glum.unit.DateUnit;
-
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.*;
-import java.util.List;
-
-import javax.swing.*;
-import javax.swing.border.BevelBorder;
-import javax.swing.border.EmptyBorder;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
-
 import net.miginfocom.swing.MigLayout;
-import distMaker.LookUp;
-import distMaker.node.AppRelease;
 
+/**
+ * User input component that allows the user to specify an {@link AppRelease}.
+ *
+ * @author lopeznr1
+ */
 public class PickReleasePanel extends GlassPanel implements ActionListener, ListSelectionListener
 {
 	// Constants
@@ -47,6 +52,9 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	private AppRelease installedItem;
 	private AppRelease newestItem;
 
+	/**
+	 * Standard Constructor
+	 */
 	public PickReleasePanel(Component aParent, AppRelease aInstalledItem)
 	{
 		super(aParent);
@@ -76,7 +84,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	/**
 	 * Sets in the configuration of available versions
 	 */
-	public void setConfiguration(List<AppRelease> aItemList)
+	public void setConfiguration(List<AppRelease> aItemL)
 	{
 		DateUnit dateUnit;
 		// String currBuildStr;
@@ -85,11 +93,11 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		String appName, headMsg;
 
 		// Sort the items, and isolate the newest item
-		LinkedList<AppRelease> linkedList;
-		linkedList = new LinkedList<>(aItemList);
-		Collections.sort(linkedList);
-		Collections.reverse(linkedList);  // reverse the list to show most recent versions on top
-		newestItem = linkedList.removeFirst();
+		LinkedList<AppRelease> tmpItemL;
+		tmpItemL = new LinkedList<>(aItemL);
+		Collections.sort(tmpItemL);
+		Collections.reverse(tmpItemL);  // reverse the list to show most recent versions on top
+		newestItem = tmpItemL.removeFirst();
 
 		// Retrieve vars of interest
 		appName = installedItem.getName();
@@ -103,7 +111,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		newestRB.setText("Latest: " + lastVerStr + " (" + lastBuildStr + ")");
 
 		// Update the list of available items
-		myItemProcessor.setItems(linkedList);
+		myItemProcessor.setItems(tmpItemL);
 
 		// Update the infoTA
 		if (newestItem.equals(installedItem) == true)

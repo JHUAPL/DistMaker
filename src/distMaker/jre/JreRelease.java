@@ -1,12 +1,14 @@
 package distMaker.jre;
 
-import distMaker.digest.Digest;
+import distMaker.platform.Architecture;
+import distMaker.platform.Platform;
 import distMaker.utils.Version;
+import glum.digest.Digest;
 
 /**
  * Immutable class that describes a JRE Release.
- * <P>
- * The reference fileName should be a compressed (tar.gz) JRE.
+ *
+ * @author lopeznr1
  */
 public class JreRelease implements Comparable<JreRelease>
 {
@@ -14,22 +16,26 @@ public class JreRelease implements Comparable<JreRelease>
 	private final Version alMinVer;
 	private final Version alMaxVer;
 
-	private final String archStr;
-	private final String platStr;
+	private final Architecture architecture;
+	private final Platform platform;
 
 	private final String fileName;
 	private final Digest digest;
 	private final long fileLen;
 
-	public JreRelease(String aArchStr, String aPlatStr, JreVersion aVersion, String aFileName, Digest aDigest, long aFileLen, Version aAlMinVer, Version aAlMaxVer)
+	/**
+	 * Standard Constructor
+	 */
+	public JreRelease(Architecture aArchitecture, Platform aPlatform, JreVersion aVersion, String aFileName,
+			Digest aDigest, long aFileLen, Version aAlMinVer, Version aAlMaxVer)
 	{
 		version = aVersion;
 		alMinVer = aAlMinVer;
 		alMaxVer = aAlMaxVer;
 
-		archStr = aArchStr.toLowerCase();
-		platStr = aPlatStr.toLowerCase();
-	
+		architecture = aArchitecture;
+		platform = aPlatform;
+
 		fileName = aFileName;
 		digest = aDigest;
 		fileLen = aFileLen;
@@ -69,24 +75,20 @@ public class JreRelease implements Comparable<JreRelease>
 
 	/**
 	 * Returns true if the specified system matches the JRE's system.
-	 * 
-	 * @param aArchStr
-	 *        Architecture of the relevant system. (Ex: x64)
-	 * @param aPlatStr
-	 *        Platform of the relevant system. (Ex: linux)
-	 * @return
+	 *
+	 * @param aArchitecture
+	 *        {@link Architecture} of the relevant system.
+	 * @param aPlatform
+	 *        {@link Platform} of the relevant system.s
 	 */
-	public boolean isSystemMatch(String aArchStr, String aPlatStr)
+	public boolean isSystemMatch(Architecture aArchitecture, Platform aPlatform)
 	{
-		aArchStr = aArchStr.toLowerCase();
-		aPlatStr = aPlatStr.toLowerCase();
-		
 		// Ensure the architecture matches
-		if (archStr.equals(aArchStr) == false)
+		if (architecture != aArchitecture)
 			return false;
-		
+
 		// Ensure the platform matches
-		if (platStr.equals(aPlatStr) == false)
+		if (platform != aPlatform)
 			return false;
 
 		return true;
@@ -113,11 +115,11 @@ public class JreRelease implements Comparable<JreRelease>
 	{
 		int cmpVal;
 
-		cmpVal = archStr.compareTo(aItem.archStr);
+		cmpVal = architecture.compareTo(aItem.architecture);
 		if (cmpVal != 0)
 			return cmpVal;
 
-		cmpVal = platStr.compareTo(aItem.platStr);
+		cmpVal = platform.compareTo(aItem.platform);
 		if (cmpVal != 0)
 			return cmpVal;
 

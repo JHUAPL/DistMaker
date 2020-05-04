@@ -5,6 +5,8 @@ package distMaker.utils;
  * <P>
  * Eventually when Java allows operator overloading then this class can go away since the standard mathematical
  * comparison symbols would be much clearer.
+ * 
+ * @author lopeznr1
  */
 public class VersionUtils
 {
