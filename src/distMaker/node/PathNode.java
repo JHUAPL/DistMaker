@@ -1,19 +1,22 @@
 package distMaker.node;
 
-import glum.net.Credential;
-import glum.task.Task;
-
 import java.io.File;
 import java.net.URL;
 
+import glum.net.Credential;
+import glum.task.Task;
+
+/**
+ * Immutable {@link Node} describing a folder / directory.
+ *
+ * @author lopeznr1
+ */
 public class PathNode implements Node
 {
 //	private final URL rootUrl;
 	private final String fileName;
 
-	/**
-	 * Immutable node describing a File.
-	 */
+	/** Standard Constructor */
 	public PathNode(URL aRootUrl, String aFileName)
 	{
 //		rootUrl = aRootUrl;

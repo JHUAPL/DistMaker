@@ -407,7 +407,7 @@ if __name__ == "__main__":
 
 	errMsg = None
 	if jreCatalog == None:
-		errMsg = 'A JRE catalog must be specified! Please specify -jreCatalog'
+		errMsg = 'A JRE catalog must be specified! Please specify --jreCatalog'
 	elif os.path.exists(jreCatalog) == False:
 		errMsg = 'The specified JRE catalog does not exist! File: ' + jreCatalog
 	elif os.path.isfile(jreCatalog) == False:

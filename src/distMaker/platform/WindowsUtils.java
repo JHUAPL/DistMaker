@@ -17,13 +17,13 @@ public class WindowsUtils
 {
 	/**
 	 * Returns the l4j runtime configuration file. If one can not be determined then this method will return null.
-	 * <P>
+	 * <p>
 	 * If the configuration file is determined but does not exist, then an empty configuration file will be created.
-	 * <P>
+	 * <p>
 	 * Note this method looks for a file that ends in .l4j.cfg, or an exe file and creates the corresponding config file.
-	 * <P>
+	 * <p>
 	 * If there are multiple .exe or .l4j.cfg files, then this method may grab the wrong file and fail.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static File getConfigFile()
@@ -73,7 +73,7 @@ public class WindowsUtils
 
 	/**
 	 * Utility method to update the configuration to reflect the specified AppLauncher version.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateAppLauncher(AppLauncherRelease aRelease, File aConfigFile)
@@ -84,7 +84,7 @@ public class WindowsUtils
 
 	/**
 	 * Utility method to update the configuration to reflect the specified JRE version.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateJreVersion(JreVersion aJreVersion, File aConfigFile)
@@ -96,10 +96,10 @@ public class WindowsUtils
 	/**
 	 * Utility method to update the specified max memory (-Xmx) value in the text file (aFile) to the specified
 	 * maxMemVal.
-	 * <P>
+	 * <p>
 	 * Note this method is very brittle, and assumes that there is a single value where the string, -Xmx, is specified in
 	 * the script. It assumes this string will be surrounded by a single space character on each side.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateMaxMem(long numBytes, File aConfigFile)

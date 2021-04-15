@@ -8,6 +8,11 @@ import signal
 import subprocess
 import sys
 
+
+# Define the libraries the application depends on
+libList = ['glum-1.3.7.jar', 'guava-18.0.jar', 'distMaker.jar']
+
+
 def buildRelease(aVersion, aDoNotClean=False):
 	"""Method that builds a release of DistMaker. Upon sucessful execution, a
 	tar.gz archive will be generated named: 'DistMaker-<aVersion>.tar.gz'. Note
@@ -35,10 +40,24 @@ def buildRelease(aVersion, aDoNotClean=False):
 	print('Building DistMaker release ' + aVersion + '...')
 	os.mkdir(workPath)
 
+	# Copy the regular docs
+	dstPath = os.path.join(workPath, 'doc')
+	os.mkdir(dstPath)
+	for aFile in ['QuickStartGuide.pdf', 'ReadMe.txt']:
+		srcPath = os.path.join(installPath, 'doc', aFile)
+		shutil.copy2(srcPath, dstPath)
+
+	# Copy the legal documents
+	dstPath = os.path.join(workPath, 'doc/legal')
+	os.mkdir(dstPath)
+	for aFile in glob.glob('doc/legal/*txt'):
+		srcPath = os.path.join(installPath, aFile)
+		shutil.copy2(srcPath, dstPath)
+
 	# Copy the libraries
 	dstPath = os.path.join(workPath, 'lib')
 	os.mkdir(dstPath)
-	for aLib in ['glum-1.3.jar', 'guava-18.0.jar', 'distMaker.jar']:
+	for aLib in libList:
 		srcPath = os.path.join(installPath, 'lib', aLib)
 		shutil.copy2(srcPath, dstPath)
 
@@ -96,7 +115,9 @@ def getDistMakerVersion():
 		exit(-1)
 
 	try:
-		exeCmd = ['java', '-cp', 'lib/distMaker.jar', 'distMaker.DistApp', '--version']
+		cpStr = ':lib/'.join(libList)
+		cpStr = 'lib/' + cpStr
+		exeCmd = ['java', '-cp', cpStr, 'distMaker.DistApp', '--version']
 		output = subprocess.check_output(exeCmd).decode('utf-8')
 		version = output.split()[1]
 		return version

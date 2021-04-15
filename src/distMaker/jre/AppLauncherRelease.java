@@ -1,11 +1,11 @@
 package distMaker.jre;
 
-import distMaker.utils.*;
 import glum.digest.Digest;
+import glum.version.*;
 
 /**
  * Immutable class that describes an AppLauncher release.
- * <P>
+ * <p>
  * The reference fileName should be a jar file.
  *
  * @author lopeznr1

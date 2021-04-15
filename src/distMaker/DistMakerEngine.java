@@ -18,7 +18,6 @@ import distMaker.gui.PickReleasePanel;
 import distMaker.jre.*;
 import distMaker.node.*;
 import distMaker.platform.*;
-import distMaker.utils.Version;
 import glum.digest.Digest;
 import glum.gui.panel.generic.MessagePanel;
 import glum.gui.panel.generic.PromptPanel;
@@ -29,15 +28,16 @@ import glum.net.NetUtil;
 import glum.task.*;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
+import glum.version.Version;
 
 /**
  * Primary controller class of DistMaker package. This class provides the following functionality:
- * <UL>
- * <LI>Management of initialization stage of DistMaker application.
- * <LI>Fetching and downloading of application updates.
- * <LI>Fetching and downloading of JRE updates.
- * <LI>Applying or reverting of an update.
- * </UL>
+ * <ul>
+ * <li>Management of initialization stage of DistMaker application.
+ * <li>Fetching and downloading of application updates.
+ * <li>Fetching and downloading of JRE updates.
+ * <li>Applying or reverting of an update.
+ * </ul>
  *
  * @author lopeznr1
  */
@@ -115,10 +115,12 @@ public class DistMakerEngine
 
 	/**
 	 * Returns the currently running release of this software package.
-	 * <P>
+	 * <p>
 	 * Note this method may return null if we are:
-	 * <LI>running from a developers environment (Ex: Eclipse IDE)
-	 * <LI>If the software application was not properly packaged (or has become corrupt) with DistMaker.
+	 * <ul>
+	 * <li>running from a developers environment (Ex: Eclipse IDE)
+	 * <li>If the software application was not properly packaged (or has become corrupt) with DistMaker.
+	 * </ul>
 	 */
 	public AppRelease getCurrentRelease()
 	{
@@ -262,7 +264,7 @@ public class DistMakerEngine
 
 	/**
 	 * Helper method that does the heavy lifting of the checking for updates.
-	 * <P>
+	 * <p>
 	 * This method will be called via reflection.
 	 */
 	private void checkForUpdatesWorker(FullTaskPanel aTask, UpdateCheckListener aListener)
@@ -399,9 +401,9 @@ public class DistMakerEngine
 
 	/**
 	 * Helper method to show an informative message on msgPanel and execute the specified runnable.
-	 * <P>
+	 * <p>
 	 * If isModal == true then aRunnable will only be executed after the msgPanel has been accepted.
-	 * <P>
+	 * <p>
 	 * The runnable will not be run until the parentFrame is visible.
 	 */
 	private void displayNoticeAndExecute(final String aMsg, final Runnable aRunnable, final boolean isModal)
@@ -450,7 +452,7 @@ public class DistMakerEngine
 
 	/**
 	 * Helper method to download the specified release.
-	 * <P>
+	 * <p>
 	 * Returns true if the release was downloaded properly.
 	 */
 	private boolean downloadAppRelease(Task aTask, AppRelease aRelease, File aDestPath)
@@ -714,7 +716,7 @@ public class DistMakerEngine
 
 	/**
 	 * Class used to store a complex 'tuple' value.
-	 * <P>
+	 * <p>
 	 * This object is used to store the results of a successful JRE update.
 	 */
 	private class JreUpdateResult
@@ -732,7 +734,7 @@ public class DistMakerEngine
 
 	/**
 	 * Helper method to download a compatible JreRelease for the AppCatalog to the specified destPath.
-	 * <P>
+	 * <p>
 	 * On success the JreVersion that was downloaded is returned.
 	 */
 	private JreUpdateResult downloadJreUpdate(Task aTask, AppCatalog aUpdateCat, File aDestPath, long releaseSizeFull)
@@ -863,18 +865,18 @@ public class DistMakerEngine
 	/**
 	 * Helper method that "reverts" an update. After this method is called the DistMaker application's configuration
 	 * should be in the same state as before an update was applied.
-	 * <P>
+	 * <p>
 	 * It is necessary to do this, since the user may later cancel the update request and it is important to leave the
 	 * program and configuration files in a stable state.
-	 * <P>
+	 * <p>
 	 * An update will be reverted by doing:
-	 * <UL>
-	 * <LI>Reverting the configuration to the currently running JRE and AppRelease
-	 * <LI>Executing the 'fail' section of the file: delta/delta.cfg
-	 * <LI>Removing the delta directory
-	 * <LI>Removing the delta.cfg file
-	 * </UL>
-	 * <P>
+	 * <ul>
+	 * <li>Reverting the configuration to the currently running JRE and AppRelease
+	 * <li>Executing the 'fail' section of the file: delta/delta.cfg
+	 * <li>Removing the delta directory
+	 * <li>Removing the delta.cfg file
+	 * </ul>
+	 * <p>
 	 * There should not be any issues with this roll back process. However if there are, a best effort will be made to
 	 * continue rolling back the updates - note that the application might be in an unstable state - and may not be able
 	 * to be restarted.
@@ -1051,7 +1053,7 @@ public class DistMakerEngine
 
 	/**
 	 * Helper method that prompts the user for forms of input depending on the state of the App
-	 * <P>
+	 * <p>
 	 * This method will be called via reflection.
 	 */
 	private void queryUserForInput(Task aTask, File aDeltaPath, List<AppRelease> aFullList)

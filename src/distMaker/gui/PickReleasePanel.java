@@ -1,14 +1,12 @@
 package distMaker.gui;
 
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
 import javax.swing.*;
-import javax.swing.border.BevelBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -31,7 +29,7 @@ import net.miginfocom.swing.MigLayout;
  *
  * @author lopeznr1
  */
-public class PickReleasePanel extends GlassPanel implements ActionListener, ListSelectionListener
+public class PickReleasePanel extends GlassPanel implements ActionListener, ItemListener, ListSelectionListener
 {
 	// Constants
 	private static final long serialVersionUID = 1L;
@@ -164,6 +162,12 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 	}
 
 	@Override
+	public void itemStateChanged(ItemEvent aEvent)
+	{
+		updateGui();
+	}
+
+	@Override
 	public void valueChanged(ListSelectionEvent aEvent)
 	{
 		// Update only after the user has released the mouse
@@ -192,11 +196,11 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		add(headTA, "w 0::,growx,span,wrap");
 
 		// Latest version area
-		newestRB = GuiUtil.createJRadioButton("Unspecified", this, smallFont);
+		newestRB = GuiUtil.createJRadioButton(this, "Unspecified", smallFont);
 		newestRB.setSelected(true);
 
 		// Older version area
-		olderRB = GuiUtil.createJRadioButton("Select an older release:", this, smallFont);
+		olderRB = GuiUtil.createJRadioButton(this, "Select an older release:", smallFont);
 
 		listPanel = buildItemListTablePanel();
 		listPanel.setBorder(new EmptyBorder(0, 15, 0, 0));
@@ -228,8 +232,6 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, List
 		proceedB = GuiUtil.createJButton("Proceed", this, smallFont);
 		add(abortB, "align right,span,split 2");
 		add(proceedB, "");
-
-		setBorder(new BevelBorder(BevelBorder.RAISED));
 	}
 
 	/**

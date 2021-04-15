@@ -4,8 +4,8 @@ import java.util.ArrayList;
 
 import com.google.common.collect.ImmutableList;
 
-import distMaker.utils.Version;
 import glum.io.ParseUtil;
+import glum.version.Version;
 
 /**
  * Immutable class which defines a Java version.
@@ -58,9 +58,9 @@ public class JreVersion implements Comparable<JreVersion>, Version
 
 	/**
 	 * Utility method that returns the better version.
-	 * <P>
+	 * <p>
 	 * The better version is defined as the later version (and the more specific version).
-	 * <P>
+	 * <p>
 	 * Returns null if the better version can not be determined or if the versions are equal.
 	 */
 	public static JreVersion getBetterVersion(JreVersion verA, JreVersion verB)

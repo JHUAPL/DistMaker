@@ -34,7 +34,7 @@ public class AppCatalog
 	/**
 	 * Returns the most recent {@link JreRelease} from the specified list that is compatible with this
 	 * {@link AppCatalog}.
-	 * <P>
+	 * <p>
 	 * Returns null if there are no {@link JreRelease} that is compatible.
 	 */
 	public JreRelease getCompatibleJre(List<JreRelease> aJreL)
@@ -129,8 +129,8 @@ public class AppCatalog
 
 	/**
 	 * Helper method to form the map used to quickly locate a Node with the corresponding filename.
-	 * <P>
-	 * TODO: This should be renamed formNameMap to formDigestMap<BR>
+	 * <p>
+	 * TODO: This should be renamed formNameMap to formDigestMap<br>
 	 * TODO: This should probably be a mapping of Digest to Node rather than filename to Node
 	 */
 	private Map<String, Node> formNameMap(List<Node> aNodeL)

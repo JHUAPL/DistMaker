@@ -26,9 +26,9 @@ public class AppleUtils
 {
 	/**
 	 * Returns the plist file used to configure apple applications.
-	 * <P>
+	 * <p>
 	 * Two locations will be searched.... TODO: Add more details of those locations.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static File getPlistFile()
@@ -57,10 +57,10 @@ public class AppleUtils
 
 	/**
 	 * Utility method to update the specified version in the plist file (pFile) to the new version.
-	 * <P>
+	 * <p>
 	 * Note this method is very brittle, and assumes that the version will occur in the sibling node which immediately
 	 * follows the node with a value of CFBundleVersion. TODO: Consider reducing brittleness.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateAppVersion(String aNewVersin, File pFile)
@@ -118,7 +118,7 @@ public class AppleUtils
 
 	/**
 	 * Utility method to update the configuration file (pFile) to reflect the specified AppLauncherRelease.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateAppLauncher(AppLauncherRelease aRelease, File pFile)
@@ -193,7 +193,7 @@ public class AppleUtils
 
 	/**
 	 * Utility method to update the configuration file (pFile) to reflect the specified JRE version.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateJreVersion(JreVersion aJreVersion, File pFile)
@@ -258,10 +258,10 @@ public class AppleUtils
 	/**
 	 * Utility method to update the specified max memory (-Xmx) value in the plist file (pFile) to the specified
 	 * maxMemVal.
-	 * <P>
+	 * <p>
 	 * In order for this method to succeed there must be a valid JVMOptions section followed by an array of string
 	 * elements of JVM arguments. The array element may be empty but must be specified.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateMaxMem(long numBytes, File pFile)
@@ -384,15 +384,15 @@ public class AppleUtils
 
 	/**
 	 * Utility helper method to clean up the specified XML document.
-	 * <P>
+	 * <p>
 	 * Clean up the XML to remove spurious empty line nodes. This is needed in Java 9 since the XML processing is
 	 * different from Java 8 and prior. Spurious newlines seem to be introduced with Java 9 XML libs.
-	 * <P>
+	 * <p>
 	 * Source:
-	 * <UL>
-	 * <LI>http://java9.wtf/xml-transformer/
-	 * <LI>https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
-	 * </UL>
+	 * <ul>
+	 * <li>http://java9.wtf/xml-transformer/
+	 * <li>https://stackoverflow.com/questions/12669686/how-to-remove-extra-empty-lines-from-xml-file
+	 * </ul>
 	 *
 	 * @param aDoc
 	 * @throws XPathExpressionException
@@ -433,7 +433,7 @@ public class AppleUtils
 
 	/**
 	 * Utility helper method to output aDoc to the specified file.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	private static void saveDoc(File aFile, Document aDoc)

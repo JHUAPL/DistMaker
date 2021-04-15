@@ -1,12 +1,17 @@
 package distMaker.platform;
 
-import glum.reflect.ReflectUtil;
-import glum.unit.ByteUnit;
-
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.reflect.Method;
 
+import glum.reflect.ReflectUtil;
+import glum.unit.ByteUnit;
+
+/**
+ * Collection of utility methods that provide various functionality associated with system memory.
+ *
+ * @author lopeznr1
+ */
 public class MemUtils
 {
 	// Constants
@@ -59,9 +64,9 @@ public class MemUtils
 	/**
 	 * Utility method that takes an inputStr, locates the fragment -Xmx*, and replaces the fragment with the appropriate
 	 * -Xmx with respect to numBytes.
-	 * <P>
+	 * <p>
 	 * This method is a bit brittle in that it assumes the -Xmx string is surrounded with 1 white space character.
-	 * <P>
+	 * <p>
 	 * This method will return null if the string, -Xmx, is not located within the inputStr.
 	 */
 	public static String transformMaxMemHeapString(String inputStr, long numBytes)

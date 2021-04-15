@@ -18,6 +18,7 @@ import glum.net.NetUtil;
 import glum.task.PartialTask;
 import glum.task.Task;
 import glum.util.ThreadUtil;
+import glum.version.*;
 
 /**
  * Collection of utility methods associated with the DistMaker's AppLauncher.
@@ -27,7 +28,7 @@ import glum.util.ThreadUtil;
 public class AppLauncherUtils
 {
 	/**
-	 * Returns a list of all the available AppLauncher releases specified at: <BR>
+	 * Returns a list of all the available AppLauncher releases specified at: <br>
 	 * {@literal <aUpdateSiteUrl>/launcher/appCatalog.txt}
 	 */
 	public static List<AppLauncherRelease> getAvailableAppLauncherReleases(Task aTask, URL aUpdateSiteUrl,
@@ -151,7 +152,7 @@ public class AppLauncherUtils
 
 	/**
 	 * Utility method that checks to see if the AppLauncher will need be updated in order to support the specified JRE.
-	 * <P>
+	 * <p>
 	 * Returns false if the AppLauncher does NOT need be updated. Otherwise true will be returned and the version info
 	 * will be logged to the specified aTask.
 	 */
@@ -181,16 +182,16 @@ public class AppLauncherUtils
 	/**
 	 * Utility method that will return the AppLauncherRelease that satisfies the requirements as specified by the
 	 * JreRelease.
-	 * <P>
+	 * <p>
 	 * Returns null if no AppLauncherRelease is located that can satisfy the specified JreRelease.
-	 * <P>
+	 * <p>
 	 * Any issues that cropped up while searching for a valid AppLauncherRelease will be logged to the specified task,
 	 * aTask.
-	 * <P>
+	 * <p>
 	 * TODO: Remove the comments below
-	 * <P>
+	 * <p>
 	 * corresponding to the AppLauncher that we to the specified version required by this JRE.
-	 * <P>
+	 * <p>
 	 * Returns false on any failure.
 	 */
 	public static AppLauncherRelease updateAppLauncher(Task aTask, JreRelease aJreRelease, File aDestPath,

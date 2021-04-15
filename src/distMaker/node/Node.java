@@ -1,13 +1,17 @@
 package distMaker.node;
 
+import java.io.File;
+
 import glum.net.Credential;
 import glum.task.Task;
 
-import java.io.File;
-
+/**
+ * Interface which provides an abstraction of specific data resource.
+ *
+ * @author lopeznr1
+ */
 public interface Node
 {
-
 	/**
 	 * Returns true, if the contents stored in aNode are equal to this Node.
 	 */

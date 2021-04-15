@@ -7,7 +7,6 @@ import java.util.*;
 
 import distMaker.platform.*;
 import distMaker.utils.ParseUtils;
-import distMaker.utils.PlainVersion;
 import glum.digest.Digest;
 import glum.digest.DigestType;
 import glum.io.IoUtil;
@@ -16,6 +15,7 @@ import glum.net.Credential;
 import glum.net.NetUtil;
 import glum.task.Task;
 import glum.util.ThreadUtil;
+import glum.version.PlainVersion;
 
 /**
  * Collection of utility methods that provide JRE related functionality.
@@ -26,11 +26,11 @@ public class JreUtils
 {
 	/**
 	 * Returns the relative path a JRE should be expanded to.
-	 * <P>
-	 * Namely legacy JRE versions (versions prior to Java 9) will be expanded to:<BR>
-	 * <B>{@code <jre><version>}</B><BR>
-	 * while non legacy versions will be expanded to something like:<BR>
-	 * <B>{@code <jre>-<version>}</B>
+	 * <p>
+	 * Namely legacy JRE versions (versions prior to Java 9) will be expanded to:<br>
+	 * <b>{@code <jre><version>}</b><br>
+	 * while non legacy versions will be expanded to something like:<br>
+	 * <b>{@code <jre>-<version>}</b>
 	 */
 	public static String getExpandJrePath(JreVersion aJreVersion)
 	{
@@ -44,7 +44,7 @@ public class JreUtils
 	}
 
 	/**
-	 * Returns a list of all the available JRE releases specified at: <BR>
+	 * Returns a list of all the available JRE releases specified at: <br>
 	 * {@literal <aUpdateSiteUrl>/jre/jreCatalog.txt}
 	 */
 	public static List<JreRelease> getAvailableJreReleases(Task aTask, URL aUpdateSiteUrl, Credential aCredential)
@@ -278,9 +278,9 @@ public class JreUtils
 
 	/**
 	 * Utility method that returns the platform of the JRE file.
-	 * <P>
+	 * <p>
 	 * This only examines the filename to determine the platform.
-	 * <P>
+	 * <p>
 	 * This method should be considered deprecated as of DistMaker 0.48
 	 */
 	@Deprecated

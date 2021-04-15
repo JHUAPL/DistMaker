@@ -21,6 +21,8 @@ import glum.reflect.ReflectUtil;
 import glum.task.Task;
 import glum.unit.DateUnit;
 import glum.util.ThreadUtil;
+import glum.version.PlainVersion;
+import glum.version.Version;
 
 /**
  * Collection of utility methods used to access the state of a DistMaker enabled application.
@@ -51,7 +53,7 @@ public class DistUtils
 
 	/**
 	 * Utility method to return the version of the AppLauncher that started this process.
-	 * <P>
+	 * <p>
 	 * If we are running in a developers environment then this value will be null.
 	 */
 	public static Version getAppLauncherVersion()
@@ -75,7 +77,7 @@ public class DistUtils
 
 	/**
 	 * Utility method to determine the path where the application is installed.
-	 * <P>
+	 * <p>
 	 * If this application is not a formal DistMaker application, then the working directory will be returned.
 	 */
 	public static File getAppPath()
@@ -450,7 +452,7 @@ public class DistUtils
 	/**
 	 * Utility method to switch the DistMaker library into debug mode. You should never call this method unless you are
 	 * modifying the DistMaker library.
-	 * <P>
+	 * <p>
 	 * This functionality only exists to allow rapid development of DistMaker
 	 */
 	public static void setDebugDeveloperDetails(int aUpdateCode, String aUpdateMsg, File aDevelopAppPath)

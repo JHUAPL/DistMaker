@@ -1,18 +1,21 @@
 package distMaker;
 
-import distMaker.utils.PlainVersion;
-import distMaker.utils.Version;
+import glum.version.PlainVersion;
+import glum.version.Version;
 
 /**
- * Provides main entry point.
- * <P>
- * Currently this will just print the library name and the version. This is used during the build process for making
- * Distmaker releases.
+ * Provides the main entry point.
+ * <p>
+ * Application prints the library name and version.
+ * <p>
+ * This is used during the build process for making DistMaker releases.
+ *
+ * @author lopeznr1
  */
 public class DistApp
 {
 	/** The DistMaker version is defined here. */
-	public static final Version version = new PlainVersion(0, 56, 0);
+	public static final Version version = new PlainVersion(0, 57, 0);
 
 	/**
 	 * Main entry point that will print out the version of DistMaker to stdout.

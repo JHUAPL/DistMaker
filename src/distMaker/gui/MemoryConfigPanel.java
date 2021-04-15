@@ -12,7 +12,6 @@ import java.lang.management.ManagementFactory;
 import java.util.List;
 
 import javax.swing.*;
-import javax.swing.border.BevelBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -36,7 +35,7 @@ import net.miginfocom.swing.MigLayout;
 /**
  * User input component that configures the applications memory usage. Changes will not take effect until the
  * application is restarted.
- * 
+ *
  * @author lopeznr1
  */
 public class MemoryConfigPanel extends GlassPanel implements ActionListener, ListSelectionListener
@@ -61,7 +60,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	/**
 	 * Constructor where the developer specifies the max heap memory. Be careful about using this method, as if a value
 	 * is specified too large, then the program may become non operational on the next run.
-	 * <P>
+	 * <p>
 	 * Should the program become non operational then the end user would have to manually configure the config/script
 	 * files by hand or a reinstall would be required.
 	 */
@@ -176,7 +175,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 
 		// Title Area
 		titleL = new JLabel("App Memory Configuration", JLabel.CENTER); // this text gets replaced once the curent version
-																								// status is known
+		// status is known
 		add(titleL, "gapbottom 15,growx,span 2,wrap");
 
 //GTextField maxMemTF;
@@ -228,8 +227,6 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 		add(resetB, "");
 		add(closeB, "");
 
-		setBorder(new BevelBorder(BevelBorder.RAISED));
-
 		// Configure the slider to be aware of the new memory range
 		targMemS.setModelRange(memSizeRange);
 		targMemS.setModelValue(currMemSize);
@@ -275,7 +272,7 @@ public class MemoryConfigPanel extends GlassPanel implements ActionListener, Lis
 	/**
 	 * Utility method to round (floor) values to the nearest megabyte. The returned value is guaranteed to be at least 1
 	 * megabyte.
-	 * <P>
+	 * <p>
 	 * The input value, aSize, should be specified in bytes, and the returned value will be specified in bytes.
 	 */
 	private long roundToMB(long aSize)

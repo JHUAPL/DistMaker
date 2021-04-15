@@ -1,15 +1,17 @@
 package distMaker.utils;
 
 import distMaker.DistUtils;
+import glum.version.PlainVersion;
+import glum.version.Version;
 
 public class ParseUtils
 {
 
 	/**
 	 * Utility method that processes the 'exit' instruction.
-	 * <P>
+	 * <p>
 	 * Returns true if the processing of the configuration file should exit.
-	 * <P>
+	 * <p>
 	 * Processing of the configuration file should exit if the specified needed version is not met or the version string
 	 * could not be parsed into major minor components.
 	 * 

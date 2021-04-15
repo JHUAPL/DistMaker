@@ -10,8 +10,8 @@ import glum.net.NetUtil;
 import glum.task.Task;
 
 /**
- * Immutable node describing a File.
- * 
+ * Immutable {@link Node} describing a File.
+ *
  * @author lopeznr1
  */
 public class FileNode implements Node
@@ -21,6 +21,7 @@ public class FileNode implements Node
 	private final String fileName;
 	private final long fileLen;
 
+	/** Standard Constructor */
 	public FileNode(URL aRootUrl, String aFileName, Digest aDigest, long aFileLen)
 	{
 		rootUrl = aRootUrl;

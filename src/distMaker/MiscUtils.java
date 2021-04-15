@@ -32,9 +32,9 @@ public class MiscUtils
 {
 	/**
 	 * Utility method to convert a Unix base-10 mode into the equivalent string.
-	 * <P>
+	 * <p>
 	 * Example: 493 -> 'rwxr-xr-x'
-	 * <P>
+	 * <p>
 	 * The returned string will always be of length 9
 	 */
 	public static String convertUnixModeToStr(int aMode)
@@ -52,9 +52,9 @@ public class MiscUtils
 
 	/**
 	 * Utility method to convert a Unix base-10 mode into the Set<PosixFilePermission>.
-	 * <P>
+	 * <p>
 	 * Example: 493 -> 'rwxr-xr-x'
-	 * <P>
+	 * <p>
 	 * The returned string will always be of length 9
 	 */
 	public static Set<PosixFilePermission> convertUnixModeToPFP(int aMode)
@@ -112,7 +112,7 @@ public class MiscUtils
 
 	/**
 	 * Returns the relative path component of aAbsolutePath relative to aBasePath.
-	 * <P>
+	 * <p>
 	 * Returns null if aAbsolutePath does not start with aBasePath.
 	 */
 	public static String getRelativePath(File aBasePath, File aAbsolutePath)
@@ -129,7 +129,7 @@ public class MiscUtils
 
 	/**
 	 * Utility method that returns a BufferedReader corresponding to the specified file.
-	 * <P>
+	 * <p>
 	 * This helps reduce boiler plate code.
 	 */
 	public static BufferedReader openFileAsBufferedReader(File aFile) throws IOException
@@ -139,7 +139,7 @@ public class MiscUtils
 
 	/**
 	 * Helper method that prints the exception of ErrorDM in an intelligent fashion to the specified task.
-	 * <P>
+	 * <p>
 	 * All ErrorDM exceptions (and their causes) will be printed. If the cause is not of type ErrorDM then the stack
 	 * trace will be printed as well.
 	 */
@@ -173,10 +173,10 @@ public class MiscUtils
 
 	/**
 	 * Unpacks an input file into an output file.
-	 * <P>
-	 * Source based off of:<BR>
+	 * <p>
+	 * Source based off of:<br>
 	 * http://stackoverflow.com/questions/315618/how-do-i-extract-a-tar-file-in-java/7556307#7556307
-	 * <P>
+	 * <p>
 	 * The output file is created in the output folder, having the same name as the input file, minus the '.tar'
 	 * extension.
 	 *
@@ -314,7 +314,7 @@ public class MiscUtils
 
 	/**
 	 * Helper method to output the specified strings to aFile
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void writeDoc(File aFile, List<String> aStrL)

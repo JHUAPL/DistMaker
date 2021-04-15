@@ -4,7 +4,17 @@ import distMaker.LookUp;
 import glum.database.QueryItem;
 
 /**
- * Immutable object that has information relevant to the packaged software.
+ * Immutable object that defines attributes associated with a specific release.
+ *
+ * The following attributes are associated with the release:
+ * <ul>
+ * <li>Application name
+ * <li>Version of the application
+ * <li>Build time of the application
+ * <li>Informational message associated with the release.
+ * </ul>
+ *
+ * @author lopeznr1
  */
 public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 {
@@ -20,7 +30,7 @@ public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 		buildTime = aBuildTime;
 		infoMsg = aInfoMsg;
 	}
-	
+
 	public AppRelease(String aAppName, String aVersion, long aBuildTime)
 	{
 		this(aAppName, aVersion, aBuildTime, null);
@@ -49,10 +59,10 @@ public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 	{
 		return buildTime;
 	}
-	
+
 	/**
 	 * Returns the info message associated with this release.
-	 * <P>
+	 * <p>
 	 * Returns null if no infoMsg has been specified.
 	 */
 	public String getInfoMsg()
@@ -77,13 +87,13 @@ public class AppRelease implements Comparable<AppRelease>, QueryItem<LookUp>
 		switch (aEnum)
 		{
 			case BuildTime:
-			return buildTime;
+				return buildTime;
 
 			case Version:
-			return version;
+				return version;
 
 			default:
-			return null;
+				return null;
 		}
 	}
 

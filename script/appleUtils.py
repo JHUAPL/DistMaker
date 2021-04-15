@@ -284,7 +284,7 @@ def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 
 	# Update the .DS_Store file to reflect the new volume name
 	srcPath = os.path.join(aRootPath, '.DS_Store')
-	classPath = appInstallRoot + '/lib/glum-1.3.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
+	classPath = appInstallRoot + '/lib/glum-1.3.7.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
 	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
 	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
 	if proc.returncode != 0:

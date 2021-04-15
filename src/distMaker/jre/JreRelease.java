@@ -2,8 +2,8 @@ package distMaker.jre;
 
 import distMaker.platform.Architecture;
 import distMaker.platform.Platform;
-import distMaker.utils.Version;
 import glum.digest.Digest;
+import glum.version.Version;
 
 /**
  * Immutable class that describes a JRE Release.

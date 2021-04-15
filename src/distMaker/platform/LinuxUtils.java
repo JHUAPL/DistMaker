@@ -18,12 +18,12 @@ public class LinuxUtils
 {
 	/**
 	 * Returns the executable script used to launch the JVM.
-	 * <P>
+	 * <p>
 	 * If there are multiple launch scripts then this method may grab the wrong file and fail.
-	 * <P>
+	 * <p>
 	 * TODO: In the future the launch script should pass itself as an argument to the JVM and DistMaker should keep track
 	 * of that. If the script is significantly manipulated from the original the launch file may be improperly detected.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static File getScriptFile()
@@ -60,7 +60,7 @@ public class LinuxUtils
 
 	/**
 	 * Utility method to update the configuration to reflect the specified JRE version.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateAppLauncher(AppLauncherRelease aRelease, File aScriptFile)
@@ -119,7 +119,7 @@ public class LinuxUtils
 
 	/**
 	 * Utility method to update the configuration to reflect the specified JRE version.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateJreVersion(JreVersion aJreVersion, File aScriptFile)
@@ -170,13 +170,13 @@ public class LinuxUtils
 
 	/**
 	 * Utility method to update the specified maxMem var in the script (aFile) to the requested number of bytes.
-	 * <P>
+	 * <p>
 	 * Note this method assumes the specified file is a shell script built by DistMaker where the var maxMem holds the
 	 * proper (right side) specification for the JVM's -Xmx value.
-	 * <P>
+	 * <p>
 	 * If the maxMem var definition is moved in the script file to after the launch of the application then this method
 	 * will (silently) fail to configure the value needed to launch the JVM.
-	 * <P>
+	 * <p>
 	 * On failure this method will throw an exception of type ErrorDM.
 	 */
 	public static void updateMaxMem(long aNumBytes, File aScriptFile)
