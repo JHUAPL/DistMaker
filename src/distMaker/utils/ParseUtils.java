@@ -14,7 +14,7 @@ public class ParseUtils
 	 * <p>
 	 * Processing of the configuration file should exit if the specified needed version is not met or the version string
 	 * could not be parsed into major minor components.
-	 * 
+	 *
 	 * @param aTargName
 	 *        The target component whose version will be evaluated. Current supported values are one of the following:
 	 *        [AppLauncher, DistMaker]
@@ -39,25 +39,22 @@ public class ParseUtils
 		int needMinorVer = Integer.MAX_VALUE;
 		try
 		{
-			String[] versionArr;
-
-			versionArr = aNeededVer.split("\\.");
+			var versionArr = aNeededVer.split("\\.");
 			if (versionArr.length >= 1)
 				needMajorVer = Integer.parseInt(versionArr[0]);
 			if (versionArr.length >= 2)
 				needMinorVer = Integer.parseInt(versionArr[1]);
 		}
-		catch(Throwable aExp)
+		catch (Throwable aExp)
 		{
 			// Ignore just assume version components are whatever we managed to parse
 		}
-		Version needVer;
-		needVer = new PlainVersion(needMajorVer, needMinorVer, 0);
+		var needVer = new PlainVersion(needMajorVer, needMinorVer, 0);
 
 		// Exit the logic if the needVer > evalVer
-		if (needVer.getMajorVersion() > evalVer.getMajorVersion())
+		if (needVer.major() > evalVer.major())
 			return true;
-		if (needVer.getMajorVersion() == needVer.getMajorVersion() && needVer.getMinorVersion() > evalVer.getMinorVersion())
+		if (needVer.major() == needVer.major() && needVer.minor() > evalVer.minor())
 			return true;
 
 		return false;

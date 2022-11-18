@@ -12,8 +12,6 @@ import java.util.*;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
-import com.google.common.base.Joiner;
-
 import distMaker.gui.PickReleasePanel;
 import distMaker.jre.*;
 import distMaker.node.*;
@@ -142,14 +140,16 @@ public class DistMakerEngine
 	 */
 	public UpdateStatus isUpToDate()
 	{
-		LoggingTask task = new LoggingTask();
+		var task = new BufferTask();
+//		LoggingTask task = new LoggingTask();
 		String appName = currRelease.getName();
 		List<AppRelease> unsortedReleaseL = DistUtils.getAvailableAppReleases(task, updateSiteUrl, appName, refCredential);
 
 		if (unsortedReleaseL == null)
 		{
 			// The update check failed, so return a status of false with a message about the problem
-			String msg = Joiner.on("; ").join(task.getMessages());
+//			String msg = Joiner.on("; ").join(task.getMessages());
+			var msg = task.getBuffer();
 			return new UpdateStatus(msg);
 		}
 		// Sort the items, and isolate the newest item

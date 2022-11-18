@@ -1,6 +1,5 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
-from __future__ import print_function
 import argparse
 import collections
 import getpass
@@ -83,20 +82,18 @@ def addAppLauncherRelease(aRootPath):
 	# Create the appCatalog file
 	catFile = os.path.join(deployPath, 'appCatalog.txt')
 	if os.path.isfile(catFile) == False:
-		f = open(catFile, 'w')
-		f.write('name' + ',' + 'AppLauncher' + '\n')
-		f.write('digest' + ',' + 'sha256' + '\n\n')
-		f.close()
+		with open(catFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+			tmpFO.write('name' + ',' + 'AppLauncher' + '\n')
+			tmpFO.write('digest' + ',' + 'sha256' + '\n\n')
 		os.chmod(catFile, 0o644)
 
 	# Updated the appCatalog file
-	f = open(catFile, 'a')
-	digestStr = miscUtils.computeDigestForFile(srcFile, 'sha256')
-	stat = os.stat(srcFile)
-	fileLen = stat.st_size
-	f.write("F,{},{},{},{}\n".format(digestStr, fileLen, dstFileName, version))
-#	f.write('\n')
-	f.close()
+	with open(catFile, mode='at', encoding='utf-8', newline='\n') as tmpFO:
+		digestStr = miscUtils.computeDigestForFile(srcFile, 'sha256')
+		stat = os.stat(srcFile)
+		fileLen = stat.st_size
+		tmpFO.write("F,{},{},{},{}\n".format(digestStr, fileLen, dstFileName, version))
+#		tmpFO.write('\n')
 
 	# Copy the src appLauncher.jar file to it's deployed location
 	shutil.copy2(srcFile, dstFile)
@@ -112,8 +109,8 @@ def addRelease(aRootPath, aJreNodeL, aVerStr):
 	if os.path.isdir(installPath) == False:
 		regPrintln('A JRE has never been deployed to the root location: ' + aRootPath)
 		regPrintln('Create a new release of the JRE at the specified location?')
-		input = raw_input('--> ').upper()
-		if input != 'Y' and input != 'YES':
+		tmpAns = input('--> ').upper()
+		if tmpAns != 'Y' and tmpAns != 'YES':
 			regPrintln('Release will not be made for JRE version: ' + aVerStr)
 			exit()
 
@@ -141,27 +138,25 @@ def addReleaseInfo(aInstallPath, aJreNodeL, aVerStr):
 	# Create the jreCatalogfile
 	catFile = os.path.join(aInstallPath, 'jreCatalog.txt')
 	if os.path.isfile(catFile) == False:
-		f = open(catFile, 'w')
-		f.write('name' + ',' + 'JRE' + '\n')
-		f.write('digest' + ',' + 'sha256' + '\n\n')
-		# Note new JRE catalogs require DistMaker versions 0.55 or later
-		f.write('exit,DistMaker,0.55' + '\n\n')
-		f.close()
+		with open(catFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+			tmpFO.write('name' + ',' + 'JRE' + '\n')
+			tmpFO.write('digest' + ',' + 'sha256' + '\n\n')
+			# Note new JRE catalogs require DistMaker versions 0.55 or later
+			tmpFO.write('exit,DistMaker,0.55' + '\n\n')
 		os.chmod(catFile, 0o644)
 
 		exitVerDM = [0, 55]
 	# Determine the last exit,DistMaker instruction specified
 	else:
-		f = open(catFile, 'r')
-		for line in f:
-			tokens = line[:-1].split(',');
-			# Record the (exit) version of interest
-			if len(tokens) == 3 and tokens[0] == 'exit' and tokens[1] == 'DistMaker':
-				try:
-					exitVerDM = jreUtils.verStrToVerArr(tokens[2])
-				except:
-					exitVerDM = None
-		f.close()
+		with open(catFile, mode='rt', encoding='utf-8') as tmpFO:
+			for line in tmpFO:
+				tokens = line[:-1].split(',');
+				# Record the (exit) version of interest
+				if len(tokens) == 3 and tokens[0] == 'exit' and tokens[1] == 'DistMaker':
+					try:
+						exitVerDM = jreUtils.verStrToVerArr(tokens[2])
+					except:
+						exitVerDM = None
 
 	# Locate the list of JREs with a matching version
 	matchJreNodeL = jreUtils.getJreNodesForVerStr(aJreNodeL, aVerStr)
@@ -176,29 +171,28 @@ def addReleaseInfo(aInstallPath, aJreNodeL, aVerStr):
 		needExitInstr = True
 
 	# Updated the jreCatalogfile
-	f = open(catFile, 'a')
-	# Write the exit info to stop legacy DistMakers from processing further
-	if needExitInstr == True:
-		f.write('exit,DistMaker,0.48\n\n')
-	# Write out the JRE release info
-	f.write("jre,{}\n".format(aVerStr))
-	if needExitInstr == True:
-		f.write("require,AppLauncher,0.1,0.2\n")
-	for aJreNode in matchJreNodeL:
-		tmpFile = aJreNode.getFile()
-		stat = os.stat(tmpFile)
-		digestStr = miscUtils.computeDigestForFile(tmpFile, 'sha256')
-		fileLen = stat.st_size
-		archStr = aJreNode.getArchitecture();
-		platStr = aJreNode.getPlatform()
-		if exitVerDM != None and exitVerDM > [0, 54]:
-			f.write("F,{},{},{},{},{}\n".format(archStr, platStr, os.path.basename(tmpFile), digestStr, fileLen))
-		elif exitVerDM != None:
-			f.write("F,{},{},{},{}\n".format(digestStr, fileLen, platStr, os.path.basename(tmpFile)))
-		else:
-			f.write("F,{},{},{}\n".format(digestStr, fileLen, os.path.basename(tmpFile)))
-	f.write('\n')
-	f.close()
+	with open(catFile, mode='at', encoding='utf-8', newline='\n') as tmpFO:
+		# Write the exit info to stop legacy DistMakers from processing further
+		if needExitInstr == True:
+			tmpFO.write('exit,DistMaker,0.48\n\n')
+		# Write out the JRE release info
+		tmpFO.write("jre,{}\n".format(aVerStr))
+		if needExitInstr == True:
+			tmpFO.write("require,AppLauncher,0.1,0.2\n")
+		for aJreNode in matchJreNodeL:
+			tmpFile = aJreNode.getFile()
+			stat = os.stat(tmpFile)
+			digestStr = miscUtils.computeDigestForFile(tmpFile, 'sha256')
+			fileLen = stat.st_size
+			archStr = aJreNode.getArchitecture();
+			platStr = aJreNode.getPlatform()
+			if exitVerDM != None and exitVerDM > [0, 54]:
+				tmpFO.write("F,{},{},{},{},{}\n".format(archStr, platStr, os.path.basename(tmpFile), digestStr, fileLen))
+			elif exitVerDM != None:
+				tmpFO.write("F,{},{},{},{}\n".format(digestStr, fileLen, platStr, os.path.basename(tmpFile)))
+			else:
+				tmpFO.write("F,{},{},{}\n".format(digestStr, fileLen, os.path.basename(tmpFile)))
+		tmpFO.write('\n')
 
 	destPath = os.path.join(aInstallPath, aVerStr)
 	os.makedirs(destPath, 0o755)
@@ -248,29 +242,27 @@ def delReleaseInfo(aInstallPath, aVerStr):
 	# Read the file
 	inputLineL = []
 	isDeleteMode = False
-	f = open(catFile, 'r')
-	for line in f:
-		tokens = line[:-1].split(',', 1);
-		# Switch to deleteMode when we find a matching JRE release
-		if len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] == aVerStr:
-			isDeleteMode = True
-			continue
-		# Switch out of deleteMode when we find a different JRE release
-		elif len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] != aVerStr:
-			isDeleteMode = False
-		# Skip over the input line if we are in deleteMode
-		elif isDeleteMode == True:
-			continue
+	with open(catFile, mode='rt', encoding='utf-8') as tmpFO:
+		for line in tmpFO:
+			tokens = line[:-1].split(',', 1);
+			# Switch to deleteMode when we find a matching JRE release
+			if len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] == aVerStr:
+				isDeleteMode = True
+				continue
+			# Switch out of deleteMode when we find a different JRE release
+			elif len(tokens) == 2 and tokens[0] == 'jre' and tokens[1] != aVerStr:
+				isDeleteMode = False
+			# Skip over the input line if we are in deleteMode
+			elif isDeleteMode == True:
+				continue
 
-		# Save off the input line
-		inputLineL.append(line)
-	f.close()
+			# Save off the input line
+			inputLineL.append(line)
 
 	# Write the updated file
-	f = open(catFile, 'w')
-	for aLine in inputLineL:
-		f.write(aLine)
-	f.close()
+	with open(catFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+		for aLine in inputLineL:
+			tmpFO.write(aLine)
 
 
 def showReleaseInfo(aRootPath, aJreNodeL):

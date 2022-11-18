@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import glob
 import os
@@ -110,7 +110,7 @@ def getJreNode(aJreNodeL, aArchStr, aPlatStr, aJvmVerSpec):
 	any specific update for a major version of JAVA then just specify the major version. Example '1.8' instead of
 	1.8.0_73'"""
 	# Transform a single string to a list of size 1
-	if isinstance(aJvmVerSpec, basestring):
+	if isinstance(aJvmVerSpec, str):
 		aJvmVerSpec = [aJvmVerSpec]
 
 	# Retrieve the min and max JVM versions from aJvmVerSpec
@@ -185,8 +185,8 @@ def loadJreCatalog(aFile):
 
 	# Read the file
 	regPrintln('Loading JRE catalog: {}'.format(aFile))
-	with open(aFile, 'r') as workF:
-		for (lineNum, aLine) in enumerate(workF, 1):
+	with open(aFile, mode='rt', encoding='utf-8') as tmpFO:
+		for (lineNum, aLine) in enumerate(tmpFO, 1):
 			# Skip empty lines / comments
 			line = aLine.strip()
 			if len(line) == 0 or line[0] == '#':

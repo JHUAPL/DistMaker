@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import copy
 import os
@@ -109,7 +109,7 @@ def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 		jreUtils.unpackAndRenameToStandard(aJreNode, aRootPath)
 
 
-def buildBashScript(aDestFile, aArgs, aJreNode):
+def buildBashScript(aDstFile, aArgs, aJreNode):
 	# Form the jvmArgStr but strip away the -Xmx* component if it is specified
 	# since the JVM maxMem is dynamically configurable (via DistMaker)
 	maxMem = None
@@ -120,63 +120,61 @@ def buildBashScript(aDestFile, aArgs, aJreNode):
 		else:
 			jvmArgsStr += aStr + ' '
 
-	f = open(aDestFile, 'wb')
-#	f.write('#!/bin/bash\n')
-	f.write('#!/usr/bin/env bash\n')
+	with open(aDstFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+#		tmpFO.write('#!/bin/bash\n')
+		tmpFO.write('#!/usr/bin/env bash\n')
 
-	f.write('# Do not remove the opening or closing brackets: {}. This enables safe inline\n')
-	f.write('# mutations to this script while it is running\n')
-	f.write('{    # Do not remove this bracket! \n\n')
+		tmpFO.write('# Do not remove the opening or closing brackets: {}. This enables safe inline\n')
+		tmpFO.write('# mutations to this script while it is running\n')
+		tmpFO.write('{    # Do not remove this bracket! \n\n')
 
-	f.write('# Define where the Java executable is located\n')
-	if aJreNode == None:
-		f.write('javaExe=java\n\n')
-	else:
-		jrePath = jreUtils.getBasePathFor(aJreNode)
-		f.write('javaExe=../' + jrePath + '/bin/java\n\n')
+		tmpFO.write('# Define where the Java executable is located\n')
+		if aJreNode == None:
+			tmpFO.write('javaExe=java\n\n')
+		else:
+			jrePath = jreUtils.getBasePathFor(aJreNode)
+			tmpFO.write('javaExe=../' + jrePath + '/bin/java\n\n')
 
-	f.write('# Define the maximum memory to allow the application to utilize\n')
-	if maxMem == None:
-		f.write('#maxMem=512m # Uncomment out this line to change from defaults.\n\n')
-	else:
-		f.write('maxMem=' + maxMem + '\n\n')
+		tmpFO.write('# Define the maximum memory to allow the application to utilize\n')
+		if maxMem == None:
+			tmpFO.write('#maxMem=512m # Uncomment out this line to change from defaults.\n\n')
+		else:
+			tmpFO.write('maxMem=' + maxMem + '\n\n')
 
-	f.write('# Get the installation path\n')
-	f.write('# We support the Linux / Macosx variants explicitly and then default back to Linux\n')
-	f.write('if [ "$(uname -s)" == "Darwin" ]; then\n')
-	f.write('  # Macosx platform: We assume the coreutils package has been installed...\n')
-	f.write('  installPath=$(greadlink -f "$BASH_SOURCE")\n')
-	f.write('elif [ "$(uname -s)" == "Linux" ]; then\n')
-	f.write('  # Linux platform\n')
-	f.write('  installPath=$(readlink -f "$BASH_SOURCE")\n')
-	f.write('else\n')
-	f.write('  # Other platform: ---> Defaults back to Linux platform\n')
-	f.write('  installPath=$(readlink -f "$BASH_SOURCE")\n')
-	f.write('fi\n')
-	f.write('installPath=$(dirname "$installPath")\n\n')
+		tmpFO.write('# Get the installation path\n')
+		tmpFO.write('# We support the Linux / Macosx variants explicitly and then default back to Linux\n')
+		tmpFO.write('if [ "$(uname -s)" == "Darwin" ]; then\n')
+		tmpFO.write('  # Macosx platform: We assume the coreutils package has been installed...\n')
+		tmpFO.write('  installPath=$(greadlink -f "$BASH_SOURCE")\n')
+		tmpFO.write('elif [ "$(uname -s)" == "Linux" ]; then\n')
+		tmpFO.write('  # Linux platform\n')
+		tmpFO.write('  installPath=$(readlink -f "$BASH_SOURCE")\n')
+		tmpFO.write('else\n')
+		tmpFO.write('  # Other platform: ---> Defaults back to Linux platform\n')
+		tmpFO.write('  installPath=$(readlink -f "$BASH_SOURCE")\n')
+		tmpFO.write('fi\n')
+		tmpFO.write('installPath=$(dirname "$installPath")\n\n')
 
-	f.write('# Change the working directory to the app folder in the installation path\n')
-	f.write('cd "$installPath"/app\n\n')
+		tmpFO.write('# Change the working directory to the app folder in the installation path\n')
+		tmpFO.write('cd "$installPath"/app\n\n')
 
-	f.write('# Setup the xmxStr to define the maximum JVM memory.\n')
-	f.write('if [ -z ${maxMem+x} ]; then\n')
-	f.write('  xmxStr=""\n')
-	f.write('else\n')
-	f.write('  xmxStr=\'-Xmx\'$maxMem\n')
-	f.write('fi\n\n')
+		tmpFO.write('# Setup the xmxStr to define the maximum JVM memory.\n')
+		tmpFO.write('if [ -z ${maxMem+x} ]; then\n')
+		tmpFO.write('  xmxStr=""\n')
+		tmpFO.write('else\n')
+		tmpFO.write('  xmxStr=\'-Xmx\'$maxMem\n')
+		tmpFO.write('fi\n\n')
 
-	exeCmd = '$javaExe ' + jvmArgsStr + '$xmxStr -Djava.system.class.loader=appLauncher.RootClassLoader '
-	exeCmd = exeCmd + '-cp ../launcher/' + deployJreDist.getAppLauncherFileName() + ' appLauncher.AppLauncher $*'
-	f.write('# Run the application\n')
-	f.write(exeCmd + '\n\n')
+		exeCmd = '$javaExe ' + jvmArgsStr + '$xmxStr -Djava.system.class.loader=appLauncher.RootClassLoader '
+		exeCmd = exeCmd + '-cp ../launcher/' + deployJreDist.getAppLauncherFileName() + ' appLauncher.AppLauncher $*'
+		tmpFO.write('# Run the application\n')
+		tmpFO.write(exeCmd + '\n\n')
 
-	f.write('exit # Do not remove this exit! (just before the bracket)\n')
-	f.write('}    # Do not remove this bracket! \n\n')
-
-	f.close()
+		tmpFO.write('exit # Do not remove this exit! (just before the bracket)\n')
+		tmpFO.write('}    # Do not remove this bracket! \n\n')
 
 	# Make the script executable
-	os.chmod(aDestFile, 00755)
+	os.chmod(aDstFile, 0o755)
 
 
 def checkSystemEnvironment():

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import copy
 import glob
@@ -55,13 +55,13 @@ def buildRelease(aArgs, aBuildPath, aJreNodeL):
 	appInstallRoot = os.path.dirname(appInstallRoot)
 	l4jPath = os.path.join(appInstallRoot, 'template', 'launch4j')
 	if platform.system() == 'Darwin':
-		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-macosx-x86.tgz']
+		exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.14-macosx-x86.tgz']
 	else:
 		is64Bit = sys.maxsize > 2**32
 		if is64Bit == True:
-			exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-linux-x64.tgz']
+			exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.14-linux-x64.tgz']
 		else:
-			exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.12-linux.tgz']
+			exeCmd = ['tar', '-C', tmpPath, '-xf', l4jPath + '/launch4j-3.14-linux.tgz']
 	retCode = subprocess.call(exeCmd)
 	if retCode != 0:
 		print('Failed to extract launch4j package...')
@@ -166,66 +166,65 @@ def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 		if winIconFile != None:
 			os.remove(winIconFile)
 
-def buildLaunch4JConfig(aDestFile, aArgs, aJreNode, aIconFile):
-	f = open(aDestFile, 'wb')
+def buildLaunch4JConfig(aDstFile, aArgs, aJreNode, aIconFile):
+	with open(aDstFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
 
-	writeln(f, 0, "<launch4jConfig>")
-	if aArgs.debug == True:
-		writeln(f, 1, "<headerType>console</headerType>");
-	else:
-		writeln(f, 1, "<headerType>gui</headerType>");
-	writeln(f, 1, "<outfile>" + aArgs.name + ".exe</outfile>");
-	writeln(f, 1, "<dontWrapJar>true</dontWrapJar>");
-	writeln(f, 1, "<errTitle>" + aArgs.name + "</errTitle>");
-	writeln(f, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
-# 	writeln(f, 1, "<supportUrl>url</supportUrl>");
+		writeln(tmpFO, 0, "<launch4jConfig>")
+		if aArgs.debug == True:
+			writeln(tmpFO, 1, "<headerType>console</headerType>");
+		else:
+			writeln(tmpFO, 1, "<headerType>gui</headerType>");
+		writeln(tmpFO, 1, "<outfile>" + aArgs.name + ".exe</outfile>");
+		writeln(tmpFO, 1, "<dontWrapJar>true</dontWrapJar>");
+		writeln(tmpFO, 1, "<errTitle>" + aArgs.name + "</errTitle>");
+		writeln(tmpFO, 1, "<downloadUrl>http://java.com/download</downloadUrl>");
+	# 	writeln(tmpFO, 1, "<supportUrl>url</supportUrl>");
 
-#	writeln(f, 1, "<cmdLine>app.cfg</cmdLine>");
-	writeln(f, 1, "<chdir>app/</chdir>");
-	writeln(f, 1, "<priority>normal</priority>");
-	writeln(f, 1, "<customProcName>true</customProcName>");
-	writeln(f, 1, "<stayAlive>false</stayAlive>");
-	if aIconFile != None:
-		writeln(f, 1, "<icon>" + aIconFile + "</icon>");
+	#	writeln(tmpFO, 1, "<cmdLine>app.cfg</cmdLine>");
+		writeln(tmpFO, 1, "<chdir>app/</chdir>");
+		writeln(tmpFO, 1, "<priority>normal</priority>");
+		writeln(tmpFO, 1, "<customProcName>true</customProcName>");
+		writeln(tmpFO, 1, "<stayAlive>false</stayAlive>");
+		if aIconFile != None:
+			writeln(tmpFO, 1, "<icon>" + aIconFile + "</icon>");
 
-	writeln(f, 1, "<classPath>");
-	writeln(f, 2, "<mainClass>appLauncher.AppLauncher</mainClass>");
-	writeln(f, 2, "<cp>../launcher/" + deployJreDist.getAppLauncherFileName() + "</cp>");
-	writeln(f, 1, "</classPath>");
+		writeln(tmpFO, 1, "<classPath>");
+		writeln(tmpFO, 2, "<mainClass>appLauncher.AppLauncher</mainClass>");
+		writeln(tmpFO, 2, "<cp>../launcher/" + deployJreDist.getAppLauncherFileName() + "</cp>");
+		writeln(tmpFO, 1, "</classPath>");
 
-	if aArgs.forceSingleInstance != False:
-		writeln(f, 0, "");
-		writeln(f, 1, "<singleInstance>");
-		writeln(f, 2, "<mutexName>" + aArgs.name + ".mutex</mutexName>");
-		writeln(f, 2, "<windowTitle>" + aArgs.name + "</windowTitle>");
-		writeln(f, 1, "</singleInstance>");
+		if aArgs.forceSingleInstance != False:
+			writeln(tmpFO, 0, "");
+			writeln(tmpFO, 1, "<singleInstance>");
+			writeln(tmpFO, 2, "<mutexName>" + aArgs.name + ".mutex</mutexName>");
+			writeln(tmpFO, 2, "<windowTitle>" + aArgs.name + "</windowTitle>");
+			writeln(tmpFO, 1, "</singleInstance>");
 
-	writeln(f, 0, "");
-	writeln(f, 1, "<jre>");
-	if aJreNode != None:
-		jrePath = jreUtils.getBasePathFor(aJreNode)
-		writeln(f, 2, "<path>" + jrePath + "</path>");
-	else:
-		jreVer = getJreMajorVersion(aArgs.jreVerSpec)
-		writeln(f, 2, "<minVersion>" + jreVer + "</minVersion>");  # Valid values: '1.7.0' or '1.8.0' ...
-	writeln(f, 2, "<jdkPreference>preferJre</jdkPreference>");  # Valid values: jreOnlyjdkOnly|preferJre|preferJdk
-	for aJvmArg in aArgs.jvmArgs:
-		writeln(f, 2, "<opt>" + aJvmArg + "</opt>");
-	writeln(f, 2, "<opt>-Djava.system.class.loader=appLauncher.RootClassLoader</opt>");
-	writeln(f, 1, "</jre>");
+		writeln(tmpFO, 0, "");
+		writeln(tmpFO, 1, "<jre>");
+		if aJreNode != None:
+			jrePath = jreUtils.getBasePathFor(aJreNode)
+			writeln(tmpFO, 2, "<path>" + jrePath + "</path>");
+		else:
+			jreVer = getJreMajorVersion(aArgs.jreVerSpec)
+			writeln(tmpFO, 2, "<minVersion>" + jreVer + "</minVersion>");  # Valid values: '1.7.0' or '1.8.0' ...
+		writeln(tmpFO, 2, "<jdkPreference>preferJre</jdkPreference>");  # Valid values: jreOnlyjdkOnly|preferJre|preferJdk
+		for aJvmArg in aArgs.jvmArgs:
+			writeln(tmpFO, 2, "<opt>" + aJvmArg + "</opt>");
+		writeln(tmpFO, 2, "<opt>-Djava.system.class.loader=appLauncher.RootClassLoader</opt>");
+		writeln(tmpFO, 1, "</jre>");
 
-	writeln(f, 0, "");
-	writeln(f, 1, "<messages>");
-	writeln(f, 2, "<startupErr>" + aArgs.name + " error...</startupErr>");
-	writeln(f, 2, "<bundledJreErr>Failed to locate the bundled JRE</bundledJreErr>");
-	writeln(f, 2, "<jreVersionErr>Located JRE is not the proper version.</jreVersionErr>");
-	writeln(f, 2, "<launcherErr>Failed to launch " + aArgs.name + "</launcherErr>");
-	writeln(f, 1, "</messages>");
+		writeln(tmpFO, 0, "");
+		writeln(tmpFO, 1, "<messages>");
+		writeln(tmpFO, 2, "<startupErr>" + aArgs.name + " error...</startupErr>");
+		writeln(tmpFO, 2, "<bundledJreErr>Failed to locate the bundled JRE</bundledJreErr>");
+		writeln(tmpFO, 2, "<jreVersionErr>Located JRE is not the proper version.</jreVersionErr>");
+		writeln(tmpFO, 2, "<launcherErr>Failed to launch " + aArgs.name + "</launcherErr>");
+		writeln(tmpFO, 1, "</messages>");
 
-	writeln(f, 0, "")
-	writeln(f, 0, "</launch4jConfig>")
-	f.write('\n')
-	f.close()
+		writeln(tmpFO, 0, "")
+		writeln(tmpFO, 0, "</launch4jConfig>")
+		tmpFO.write('\n')
 
 
 def checkSystemEnvironment():

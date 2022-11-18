@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import argparse
 import getpass
@@ -24,18 +24,17 @@ def getDistInfo(aDistPath):
 		exit()
 
 	exeMode = None
-	f = open(cfgFile, 'r')
-	for aLine in f:
-		aLine = aLine[:-1]
-		if aLine.startswith('-') == True:
-			exeMode = aLine;
-		elif exeMode == '-name' and len(aLine) > 0:
-			appName = aLine
-		elif exeMode == '-version' and len(aLine) > 0:
-			version = aLine
-		elif exeMode == '-buildDate' and len(aLine) > 0:
-			buildDate = aLine
-	f.close()
+	with open(cfgFile, mode='rt', encoding='utf-8') as tmpFO:
+		for aLine in tmpFO:
+			aLine = aLine[:-1]
+			if aLine.startswith('-') == True:
+				exeMode = aLine;
+			elif exeMode == '-name' and len(aLine) > 0:
+				appName = aLine
+			elif exeMode == '-version' and len(aLine) > 0:
+				version = aLine
+			elif exeMode == '-buildDate' and len(aLine) > 0:
+				buildDate = aLine
 
 	if appName == None or version == None or buildDate == None:
 		print('Distribution corresponding to the folder: ' + aDistPath + ' does not appear to be valid!')
@@ -51,16 +50,15 @@ def getDistInfo(aDistPath):
 		print('Release will not be deployed...')
 		exit()
 
-	f = open(catFile, 'r')
-	for aLine in f:
-		aLine = aLine[:-1]
-		tokenL = aLine.split(',')
-		# Check to see if legacy JREs are allowed
-		if len(tokenL) >= 2 and tokenL[0] == 'jre' and isLegacyJre == None:
-			isLegacyJre = False
-			if tokenL[1].strip().startswith('1.') == True:
-				isLegacyJre = True
-	f.close()
+	with open(catFile, mode='rt', encoding='utf-8') as tmpFO:
+		for aLine in tmpFO:
+			aLine = aLine[:-1]
+			tokenL = aLine.split(',')
+			# Check to see if legacy JREs are allowed
+			if len(tokenL) >= 2 and tokenL[0] == 'jre' and isLegacyJre == None:
+				isLegacyJre = False
+				if tokenL[1].strip().startswith('1.') == True:
+					isLegacyJre = True
 
 	if isLegacyJre == None:
 		print('Distribution corresponding to the folder: ' + aDistPath + ' does not appear to be valid!')
@@ -84,66 +82,61 @@ def addReleaseInfo(aDeployPath, aAppName, aVerStr, aBuildDate, aIsLegacyJre):
 	verFile = os.path.join(aDeployPath, 'releaseInfo.txt')
 	if os.path.isfile(verFile) == True:
 		# Read the legacy releases
-		f = open(verFile, 'r')
-		for aLine in f:
-			aLine = aLine[:-1]
-			# Ignore empty lines and comments
-			if len(aLine) == 0:
-				continue
-			if aLine.startswith('#') == True:
-				continue
+		with open(verFile, mode='rt', encoding='utf-8') as tmpFO:
+			for aLine in tmpFO:
+				aLine = aLine[:-1]
+				# Ignore empty lines and comments
+				if len(aLine) == 0:
+					continue
+				if aLine.startswith('#') == True:
+					continue
 
-			tokenL = aLine.split(',')
-			if len(tokenL) >= 2 and tokenL[0] == 'name':
-				isLegacyRelease = True
-				continue
+				tokenL = aLine.split(',')
+				if len(tokenL) >= 2 and tokenL[0] == 'name':
+					isLegacyRelease = True
+					continue
 
-			# Ignore legacy exit instructions
-			if len(tokenL) >= 1 and tokenL[0] == 'exit':
-				continue
+				# Ignore legacy exit instructions
+				if len(tokenL) >= 1 and tokenL[0] == 'exit':
+					continue
 
-			# Record all legacy releases
-			if len(tokenL) == 2:
-				legacyReleaseL += [(tokenL[0], tokenL[1])]
-				continue
-		f.close()
+				# Record all legacy releases
+				if len(tokenL) == 2:
+					legacyReleaseL += [(tokenL[0], tokenL[1])]
+					continue
 
 	# Create the appCatalog.txt file
 	catFile = os.path.join(aDeployPath, 'appCatalog.txt')
 	if os.path.isfile(catFile) == False:
 		if isLegacyRelease == True and len(legacyReleaseL) > 0:
-			f = open(catFile, 'w')
-			f.write('name' + ',' + aAppName + '\n\n')
-			# Copy the legacy releases
-			for (aLegacyVer, aLegacyDate) in legacyReleaseL:
-				f.write('R,{},{}\n'.format(aLegacyVer, aLegacyDate))
-				f.write('info,msg,This is a legacy release.\n')
-				f.write('info,msg,\n')
-				if aIsLegacyJre == True:
-					f.write('info,msg,Downgrading to this version may require a mandatory upgrade (ver: ' + aVerStr + ') before further upgrades are allowed.\n\n')
-				else:
-					f.write('# A release should be made using a legacy JRE (1.8+) and this DistMaker release. The release notes will need to be manually.\n')
-					f.write('info,msg,Downgrading to this version will require a mandatory 2-step upgrade in order to use releases made with non legacy JREs.\n\n')
-			f.close()
-			os.chmod(catFile, 0o644)
+			with open(catFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+				tmpFO.write('name' + ',' + aAppName + '\n\n')
+				# Copy the legacy releases
+				for (aLegacyVer, aLegacyDate) in legacyReleaseL:
+					tmpFO.write('R,{},{}\n'.format(aLegacyVer, aLegacyDate))
+					tmpFO.write('info,msg,This is a legacy release.\n')
+					tmpFO.write('info,msg,\n')
+					if aIsLegacyJre == True:
+						tmpFO.write('info,msg,Downgrading to this version may require a mandatory upgrade (ver: ' + aVerStr + ') before further upgrades are allowed.\n\n')
+					else:
+						tmpFO.write('# A release should be made using a legacy JRE (1.8+) and this DistMaker release. The release notes will need to be manually.\n')
+						tmpFO.write('info,msg,Downgrading to this version will require a mandatory 2-step upgrade in order to use releases made with non legacy JREs.\n\n')
 		else:
 			# Form the default (empty) appCatalog.txt
-			f = open(catFile, 'w')
-			f.write('name' + ',' + aAppName + '\n\n')
-			f.close()
-			os.chmod(catFile, 0o644)
+			with open(catFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+				tmpFO.write('name' + ',' + aAppName + '\n\n')
+
+		os.chmod(catFile, 0o644)
 
 	# Updated the appCatalog.txt info file
-	f = open(catFile, 'a')
-	f.write('R,{},{}\n'.format(aVerStr, aBuildDate))
-	f.write('info,msg,There are no release notes available.\n\n')
-	f.close()
+	with open(catFile, mode='at', encoding='utf-8', newline='\n') as tmpFO:
+		tmpFO.write('R,{},{}\n'.format(aVerStr, aBuildDate))
+		tmpFO.write('info,msg,There are no release notes available.\n\n')
 
 	# Update the (legacy) releaseInfo.txt file
 	if isLegacyRelease == True and aIsLegacyJre == True:
-		f = open(verFile, 'a')
-		f.write(aVerStr + ',' + aBuildDate + '\n')
-		f.close()
+		with open(verFile, mode='at', encoding='utf-8', newline='\n') as tmpFO:
+			tmpFO.write(aVerStr + ',' + aBuildDate + '\n')
 
 
 def delReleaseInfoLegacy(aDeployPath, aAppName, aVerStr, aBuildDate):
@@ -155,22 +148,20 @@ def delReleaseInfoLegacy(aDeployPath, aAppName, aVerStr, aBuildDate):
 
 	# Read the file
 	releaseInfo = []
-	f = open(verFile, 'r')
-	for line in f:
-		tokens = line[:-1].split(',', 1);
-		if len(tokens) == 2 and tokens[0] == aVerStr:
-			# By not adding the current record to the releaseInfo list, we are effectively removing the record
-			print('Removing release record from info file. Version: ' + aVerStr)
-		elif len(tokens) == 2 and tokens[0] != 'name':
-			releaseInfo.append((tokens[0], tokens[1]))
-	f.close()
+	with open(verFile, mode='rt', encoding='utf-8') as tmpFO:
+		for line in tmpFO:
+			tokens = line[:-1].split(',', 1);
+			if len(tokens) == 2 and tokens[0] == aVerStr:
+				# By not adding the current record to the releaseInfo list, we are effectively removing the record
+				print('Removing release record from info file. Version: ' + aVerStr)
+			elif len(tokens) == 2 and tokens[0] != 'name':
+				releaseInfo.append((tokens[0], tokens[1]))
 
 	# Write the updated file
-	f = open(verFile, 'w')
-	f.write('name' + ',' + aAppName + '\n')
-	for verTup in releaseInfo:
-		f.write(verTup[0] + ',' + verTup[1] + '\n')
-	f.close()
+	with open(verFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+		tmpFO.write('name' + ',' + aAppName + '\n')
+		for verTup in releaseInfo:
+			tmpFO.write(verTup[0] + ',' + verTup[1] + '\n')
 
 
 def delReleaseInfo(aDeployPath, aAppName, aVerStr, aBuildDate):
@@ -188,33 +179,31 @@ def delReleaseInfo(aDeployPath, aAppName, aVerStr, aBuildDate):
 	# Read the file (and skip over all lines found after the release we are searching for)
 	isDeleteMode = False
 	passLineL = []
-	f = open(catFile, 'r')
-	for aLine in f:
-		aLine = aLine[:-1]
-		tokenL = aLine.split(',');
-		# Determine when to enter / exit isDeleteMode
-		if len(tokenL) == 3 and tokenL[0] == 'R' and tokenL[1] == aVerStr:
-			# By not adding the current record to the releaseInfo list, we are effectively removing the record
-			isDeleteMode = True
-		# We exit deleteMode when see a different release or exit instruction
-		elif len(tokenL) == 3 and tokenL[0] == 'R' and tokenL[1] != aVerStr:
-			isDeleteMode = False
-		elif len(tokenL) >= 1 and tokenL[0] == 'exit':
-			isDeleteMode = False
+	with open(catFile, mode='rt', encoding='utf-8') as tmpFO:
+		for aLine in tmpFO:
+			aLine = aLine[:-1]
+			tokenL = aLine.split(',');
+			# Determine when to enter / exit isDeleteMode
+			if len(tokenL) == 3 and tokenL[0] == 'R' and tokenL[1] == aVerStr:
+				# By not adding the current record to the releaseInfo list, we are effectively removing the record
+				isDeleteMode = True
+			# We exit deleteMode when see a different release or exit instruction
+			elif len(tokenL) == 3 and tokenL[0] == 'R' and tokenL[1] != aVerStr:
+				isDeleteMode = False
+			elif len(tokenL) >= 1 and tokenL[0] == 'exit':
+				isDeleteMode = False
 
-		# Skip to next if we are in deleteMode
-		if isDeleteMode == True:
-			continue
+			# Skip to next if we are in deleteMode
+			if isDeleteMode == True:
+				continue
 
-		# Save off all lines when we are not in delete mode
-		passLineL += [aLine]
-	f.close()
+			# Save off all lines when we are not in delete mode
+			passLineL += [aLine]
 
 	# Write the updated file
-	f = open(catFile, 'w')
-	for aLine in passLineL:
-		f.write(aLine + '\n')
-	f.close()
+	with open(catFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+		for aLine in passLineL:
+			tmpFO.write(aLine + '\n')
 
 
 def addRelease(aRootPath, aAppName, aVerStr, aBuildDate, aIsLegacyJre):
@@ -223,8 +212,8 @@ def addRelease(aRootPath, aAppName, aVerStr, aBuildDate, aIsLegacyJre):
 	if os.path.isdir(deployPath) == False:
 		print('Application ' + aAppName + ' has never been deployed to the root location: ' + aRootPath)
 		print('Create a new release of the application at the specified location?')
-		input = raw_input('--> ').upper()
-		if input != 'Y' and input != 'YES':
+		tmpAns = input('--> ').upper()
+		if tmpAns != 'Y' and tmpAns != 'YES':
 			print('Release will not be made for app ' + aAppName)
 			exit()
 

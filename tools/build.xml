@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Ant script for building the library. This Ant script is used by the
+     script buildRelease to aide in the compilation of Java source files into
+     a binary jar file.
+     Please note that the basedir is set to the parent folder. This build.xml
+     file is expected to reside in ~/tools/ folder.-->
+<project basedir="../" default="install" name="DistMaker">
+
+	<description>
+		DistMaker Library
+	</description>
+
+	<!-- PACKAGE PROPERTIES -->
+	<property file="build.properties"/>
+	<property name="src" location="src"/>
+	<property name="build" location="bin"/>
+	<property name="classes" location="bin/classes"/>
+
+	<path id="class.path">
+		<pathelement path="${classes}"/>
+		<pathelement path="lib/commons-compress-1.15.jar"/>
+		<pathelement path="lib/glum-2.0.0-RC3.jar"/>
+		<pathelement path="lib/guava-18.0.jar"/>
+		<pathelement path="lib/miglayout-3.7.2-swing.jar"/>
+		<pathelement path="."/>
+	</path>
+
+	<!-- BUILD PROPERTIES -->
+	<property name="javac.cmdline" value="-Xlint:unchecked"/>
+	<property name="javac.debug" value="on"/>
+	<property name="javac.debuglevel" value="lines,vars,source"/>
+	<property name="javac.deprecated" value="on"/>
+	<property name="javac.optimize" value="on"/>
+	<property name="javac.version" value="11"/>
+
+
+	<!-- Perform initialization for various tasks -->
+	<target name="init" description="Initialization task">
+		<!-- create timestamp -->
+		<tstamp/>
+		<!-- create any necessary directories -->
+		<mkdir dir="${build}"/>
+		<mkdir dir="${classes}"/>
+<!--		<mkdir dir="${doc}"/>  -->
+	</target>
+
+
+	<!-- Build the binary build structure from source files -->
+	<target name="compile" depends="init" description="Compile source code for the library">
+		<!-- Build class files from source files -->
+		<javac srcdir="${src}" destdir="${classes}" includeantruntime="false"
+				debug="${javac.debug}" debuglevel="${javac.debuglevel}"
+				deprecation="${javac.deprecated}" includes="**/*.java"
+				optimize="${javac.optimize}" source="${javac.version}" target="${javac.version}">
+			<classpath refid="class.path"/>
+			<compilerarg line="${javac.cmdline}"/>
+		</javac>
+	</target>
+
+
+	<!-- Clean up ant build content -->
+	<target name="clean" description="Complete clean">
+		<delete dir="${build}"/>
+	</target>
+
+
+	<!-- Generate JavaDoc documentation -->
+<!--
+	<target name="javadoc" description="Produce javadoc API in doc directory">
+		<javadoc destdir="${doc}">
+			<classpath refid="class.path"/>
+			<link href="http://ws.apache.org/axis/java/apiDocs/"/>
+			<link href="http://java.sun.com/javase/6/docs/api/"/>
+			<packageset dir="src"/>
+			<bottom><![CDATA[<i>Copyright &#169; 2008 JHU/APL. All Rights Reserved.</i>]]></bottom>
+		</javadoc>
+	</target>
+-->
+
+</project>

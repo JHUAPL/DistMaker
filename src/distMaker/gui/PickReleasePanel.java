@@ -38,7 +38,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, Item
 	// GUI vars
 	private JLabel titleL;
 	private JRadioButton newestRB, olderRB;
-	private ItemListPanel<AppRelease> listPanel;
+	private ItemListPanel<AppRelease, LookUp> listPanel;
 	private QueryTableCellRenderer col0Renderer, col1Renderer;
 	private JButton abortB, proceedB;
 	private JTextArea headTA, infoTA;
@@ -197,7 +197,7 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, Item
 
 		// Latest version area
 		newestRB = GuiUtil.createJRadioButton(this, "Unspecified", smallFont);
-		newestRB.setSelected(true);
+//		newestRB.setSelected(true);
 
 		// Older version area
 		olderRB = GuiUtil.createJRadioButton(this, "Select an older release:", smallFont);
@@ -232,6 +232,9 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, Item
 		proceedB = GuiUtil.createJButton("Proceed", this, smallFont);
 		add(abortB, "align right,span,split 2");
 		add(proceedB, "");
+
+		// Set the initial state
+		newestRB.setSelected(true);
 	}
 
 	/**
@@ -255,10 +258,10 @@ public class PickReleasePanel extends GlassPanel implements ActionListener, Item
 		tmpComposer.setRenderer(LookUp.Version, col0Renderer);
 		tmpComposer.setRenderer(LookUp.BuildTime, col1Renderer);
 
-		tmpIH = new QueryItemHandler<>(tmpComposer);
+		tmpIH = new QueryItemHandler<>();
 		myItemProcessor = new StaticItemProcessor<>();
 
-		listPanel = new ItemListPanel<>(tmpIH, myItemProcessor, false);
+		listPanel = new ItemListPanel<>(tmpIH, myItemProcessor, tmpComposer, false);
 		listPanel.setSortingEnabled(false);
 		listPanel.addListSelectionListener(this);
 		return listPanel;

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import copy
 import math
@@ -224,9 +224,8 @@ def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 
 	# Write out the PkgInfo file
 	dstPath = os.path.join(aRootPath, appName + '.app', 'Contents', "PkgInfo")
-	f = open(dstPath, 'wb')
-	f.write('APPL????')
-	f.close()
+	with open(dstPath, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+		tmpFO.write('APPL????')
 
 	# Define the payloadPath for where to store the appLauncher
 	payloadPath = os.path.join(aRootPath, appName + '.app', 'Contents')
@@ -284,14 +283,14 @@ def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 
 	# Update the .DS_Store file to reflect the new volume name
 	srcPath = os.path.join(aRootPath, '.DS_Store')
-	classPath = appInstallRoot + '/lib/glum-1.3.7.jar:' + appInstallRoot + '/lib/distMaker.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
+	classPath = appInstallRoot + '/lib/glum-2.0.0-RC3.jar:' + appInstallRoot + '/lib/distMaker-0.61.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
 	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
 	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
 	if proc.returncode != 0:
 		print('\tError: Failed to update .DS_Store. Return code: ' + str(proc.returncode))
 
 
-def buildPListInfo(aDestFile, aArgs, aJreNode):
+def buildPListInfo(aDstFile, aArgs, aJreNode):
 	"""Method that will construct and populate the Info.plist file. This file
 	defines the attributes associated with the (Apple) app."""
 	# Retrieve vars of interest
@@ -299,84 +298,82 @@ def buildPListInfo(aDestFile, aArgs, aJreNode):
 	if aArgs.icnsFile != None:
 		icnsStr = os.path.basename(aArgs.icnsFile)
 
-	f = open(aDestFile, 'wb')
-#	writeln(f, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
-	writeln(f, 0, '<?xml version="1.0" ?>')
-	writeln(f, 0, '<plist version="1.0">')
-	writeln(f, 1, '<dict>')
+	with open(aDstFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+#		writeln(tmpFO, 0, '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
+		writeln(tmpFO, 0, '<?xml version="1.0" ?>')
+		writeln(tmpFO, 0, '<plist version="1.0">')
+		writeln(tmpFO, 1, '<dict>')
 
-	tupL = []
-	tupL.append(('CFBundleDevelopmentRegion', 'English'))
-	tupL.append(('CFBundleExecutable', 'JavaAppLauncher'))
-	tupL.append(('CFBundleGetInfoString', aArgs.company))
-	tupL.append(('CFBundleInfoDictionaryVersion', 6.0))
-	tupL.append(('CFBundleIconFile', icnsStr))
-	tupL.append(('CFBundleIdentifier', aArgs.name.lower()))
-	tupL.append(('CFBundleDisplayName', aArgs.name))
-	tupL.append(('CFBundleName', aArgs.name))
-	tupL.append(('CFBundlePackageType', 'APPL'))
-	tupL.append(('CFBundleSignature', '????'))
-	tupL.append(('CFBundleVersion', aArgs.version))
-	tupL.append(('NSHighResolutionCapable', 'true'))
-	tupL.append(('NSHumanReadableCopyright', ''))
+		tupL = []
+		tupL.append(('CFBundleDevelopmentRegion', 'English'))
+		tupL.append(('CFBundleExecutable', 'JavaAppLauncher'))
+		tupL.append(('CFBundleGetInfoString', aArgs.company))
+		tupL.append(('CFBundleInfoDictionaryVersion', 6.0))
+		tupL.append(('CFBundleIconFile', icnsStr))
+		tupL.append(('CFBundleIdentifier', aArgs.name.lower()))
+		tupL.append(('CFBundleDisplayName', aArgs.name))
+		tupL.append(('CFBundleName', aArgs.name))
+		tupL.append(('CFBundlePackageType', 'APPL'))
+		tupL.append(('CFBundleSignature', '????'))
+		tupL.append(('CFBundleVersion', aArgs.version))
+		tupL.append(('NSHighResolutionCapable', 'true'))
+		tupL.append(('NSHumanReadableCopyright', ''))
 
-	# Define the JVM that is to be uesd
-	if aJreNode != None:
-		jrePath = jreUtils.getBasePathFor(aJreNode)
-		tupL.append(('JVMRuntime', jrePath))
-	else:
-#		tupL.append(('JVMVersion', '1.7+'))
-		raise Exception('Support for utilizing the system JRE has not been added yet.')
+		# Define the JVM that is to be uesd
+		if aJreNode != None:
+			jrePath = jreUtils.getBasePathFor(aJreNode)
+			tupL.append(('JVMRuntime', jrePath))
+		else:
+#			tupL.append(('JVMVersion', '1.7+'))
+			raise Exception('Support for utilizing the system JRE has not been added yet.')
 
-	# Define the main entry point (AppLauncher) and the working directory
-	tupL.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
+		# Define the main entry point (AppLauncher) and the working directory
+		tupL.append(('JVMMainClassName', 'appLauncher.AppLauncher'))
 
-	cwdPath = os.path.join('$APP_ROOT', 'Contents', 'app')
-	tupL.append(('WorkingDirectory', cwdPath))
+		cwdPath = os.path.join('$APP_ROOT', 'Contents', 'app')
+		tupL.append(('WorkingDirectory', cwdPath))
 
-	# Application configuration
-	for (key, val) in tupL:
-		writeln(f, 2, '<key>' + key + '</key>')
-		writeln(f, 2, '<string>' + str(val) + '</string>')
+		# Application configuration
+		for (key, val) in tupL:
+			writeln(tmpFO, 2, '<key>' + key + '</key>')
+			writeln(tmpFO, 2, '<string>' + str(val) + '</string>')
 
-	# JVM options
-	jvmArgs = list(aArgs.jvmArgs)
-	if any(aStr.startswith('-Dapple.laf.useScreenMenuBar') == False for aStr in jvmArgs) == True:
-		jvmArgs.append('-Dapple.laf.useScreenMenuBar=true')
-	if any(aStr.startswith('-Dcom.apple.macos.useScreenMenuBar') == False for aStr in jvmArgs) == True:
-		jvmArgs.append('-Dcom.apple.macos.useScreenMenuBar=true')
-	if any(aStr.startswith('-Dcom.apple.macos.use-file-dialog-packages') == False for aStr in jvmArgs) == True:
-		jvmArgs.append('-Dcom.apple.macos.use-file-dialog-packages=true')
-	jvmArgs.append('-Dcom.apple.mrj.application.apple.menu.about.name=' + aArgs.name)
-	jvmArgs.append('-Dapple.awt.application.name=' + aArgs.name)
-	jvmArgs.append('-Djava.system.class.loader=appLauncher.RootClassLoader')
-#	if icnsStr != None:
-#		jvmArgs.append('-Xdock:icon=Contents/Resources/' + icnsStr)
+		# JVM options
+		jvmArgs = list(aArgs.jvmArgs)
+		if any(aStr.startswith('-Dapple.laf.useScreenMenuBar') == False for aStr in jvmArgs) == True:
+			jvmArgs.append('-Dapple.laf.useScreenMenuBar=true')
+		if any(aStr.startswith('-Dcom.apple.macos.useScreenMenuBar') == False for aStr in jvmArgs) == True:
+			jvmArgs.append('-Dcom.apple.macos.useScreenMenuBar=true')
+		if any(aStr.startswith('-Dcom.apple.macos.use-file-dialog-packages') == False for aStr in jvmArgs) == True:
+			jvmArgs.append('-Dcom.apple.macos.use-file-dialog-packages=true')
+		jvmArgs.append('-Dcom.apple.mrj.application.apple.menu.about.name=' + aArgs.name)
+		jvmArgs.append('-Dapple.awt.application.name=' + aArgs.name)
+		jvmArgs.append('-Djava.system.class.loader=appLauncher.RootClassLoader')
+#		if icnsStr != None:
+#			jvmArgs.append('-Xdock:icon=Contents/Resources/' + icnsStr)
 
-	writeln(f, 2, '<key>JVMOptions</key>')
-	writeln(f, 2, '<array>')
-	for aStr in jvmArgs:
-		writeln(f, 3, '<string>' + aStr + '</string>')
-	writeln(f, 2, '</array>')
+		writeln(tmpFO, 2, '<key>JVMOptions</key>')
+		writeln(tmpFO, 2, '<array>')
+		for aStr in jvmArgs:
+			writeln(tmpFO, 3, '<string>' + aStr + '</string>')
+		writeln(tmpFO, 2, '</array>')
 
-#	# ClassPath: AppLauncher
-#	writeln(f, 2, '<key>Java</key>')
-#	writeln(f, 2, '<dict>')
+#		# ClassPath: AppLauncher
+#		writeln(tmpFO, 2, '<key>Java</key>')
+#		writeln(tmpFO, 2, '<dict>')
 #
-#	classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
+#		classPathStr = '$JAVAROOT/' + deployJreDist.getAppLauncherFileName()
 #
-#	tupL = []
-#	tupL.append(('ClassPath', classPathStr))
+#		tupL = []
+#		tupL.append(('ClassPath', classPathStr))
 #
-#	for (key, val) in tupL:
-#		writeln(f, 3, '<key>' + key + '</key>')
-#		writeln(f, 3, '<string>' + str(val) + '</string>')
+#		for (key, val) in tupL:
+#			writeln(tmpFO, 3, '<key>' + key + '</key>')
+#			writeln(tmpFO, 3, '<string>' + str(val) + '</string>')
 #
-#	writeln(f, 2, '</dict>')
-	writeln(f, 1, '</dict>')
-	writeln(f, 0, '</plist>')
-
-	f.close()
+#		writeln(tmpFO, 2, '</dict>')
+		writeln(tmpFO, 1, '</dict>')
+		writeln(tmpFO, 0, '</plist>')
 
 
 def checkSystemEnvironment():
@@ -386,9 +383,9 @@ def checkSystemEnvironment():
 	return True
 
 
-def writeln(f, tabL, aStr, tabStr='   '):
+def writeln(aFO, tabL, aStr, tabStr='   '):
 	tStr = ''
 	for i in range(tabL):
 		tStr += tabStr
-	f.write(tStr + aStr + '\n')
+	aFO.write(tStr + aStr + '\n')
 

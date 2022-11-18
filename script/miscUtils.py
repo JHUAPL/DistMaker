@@ -1,4 +1,5 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
+
 import argparse
 import hashlib
 import os
@@ -56,14 +57,14 @@ def computeDigestForFile(evalFile, digestType, block_size=2**20):
 	else:
 		raise ErrorDM('Unrecognized hash function: ' + digestType);
 
-	f = open(evalFile, 'rb')
-	while True:
-		data = f.read(block_size)
-		if not data:
-			break
-		hash.update(data)
-	f.close()
-	return hash.hexdigest()
+	with open(evalFile, mode='rb') as tmpFO:
+		while True:
+			data = tmpFO.read(block_size)
+			if not data:
+				break
+			hash.update(data)
+
+		return hash.hexdigest()
 
 
 def getPlatformTypes(aPlatformArr, aPlatformStr):
@@ -103,7 +104,7 @@ def executeAndLog(aCommand, indentStr=""):
 	try:
 		proc = subprocess.Popen(aCommand, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
 		proc.wait()
-		outStr = proc.stdout.read()
+		outStr = proc.stdout.read().decode('utf-8')
 		if outStr != "":
 			outStr = logUtils.appendLogOutputWithText(outStr, indentStr)
 			print(outStr)
@@ -164,13 +165,7 @@ def requirePythonVersion(aVer):
 	exit(-1)
 
 
-def buildAppLauncherConfig(aDestFile, aArgs):
-	classPathStr = ''
-	for aStr in aArgs.classPath:
-		classPathStr += 'java/' + aStr + ':'
-	if len(classPathStr) > 0:
-		classPathStr = classPathStr[0:-1]
-
+def buildAppLauncherConfig(aDstFile, aArgs):
 	jvmArgsStr = ''
 	for aStr in aArgs.jvmArgs:
 		if len(aStr) > 2 and aStr[0:1] == '\\':
@@ -181,41 +176,39 @@ def buildAppLauncherConfig(aDestFile, aArgs):
 	for aStr in aArgs.appArgs:
 		appArgsStr += ' ' + aStr
 
-	f = open(aDestFile, 'wb')
+	with open(aDstFile, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+		# App name section
+		tmpFO.write('-name\n')
+		tmpFO.write(aArgs.name + '\n')
+		tmpFO.write('\n')
 
-	# App name section
-	f.write('-name\n')
-	f.write(aArgs.name + '\n')
-	f.write('\n')
+		# Version section
+		tmpFO.write('-version\n')
+		tmpFO.write(aArgs.version + '\n')
+		tmpFO.write('\n')
 
-	# Version section
-	f.write('-version\n')
-	f.write(aArgs.version + '\n')
-	f.write('\n')
+		# Build date section
+		exeDate = time.localtime()
+		buildDate = time.strftime('%Y%b%d %H:%M:%S', exeDate)
+		tmpFO.write('-buildDate\n')
+		tmpFO.write(buildDate + '\n')
+		tmpFO.write('\n')
 
-	# Build date section
-	exeDate = time.localtime()
-	buildDate = time.strftime('%Y%b%d %H:%M:%S', exeDate)
-	f.write('-buildDate\n')
-	f.write(buildDate + '\n')
-	f.write('\n')
+		# MainClass section
+		tmpFO.write('-mainClass\n')
+		tmpFO.write(aArgs.mainClass + '\n')
+		tmpFO.write('\n')
 
-	# MainClass section
-	f.write('-mainClass\n')
-	f.write(aArgs.mainClass + '\n')
-	f.write('\n')
+		# ClassPath section
+		tmpFO.write('-classPath\n')
+		for aPath in aArgs.classPath:
+			fileName = os.path.basename(aPath)
+			tmpFO.write(fileName + '\n')
+		tmpFO.write('\n')
 
-	# ClassPath section
-	f.write('-classPath\n')
-	for aStr in aArgs.classPath:
-		f.write(aStr + '\n')
-	f.write('\n')
-
-	# Application args section
-	f.write('-appArgs\n')
-	for aStr in aArgs.appArgs:
-		f.write(aStr + '\n')
-	f.write('\n')
-
-	f.close()
+		# Application args section
+		tmpFO.write('-appArgs\n')
+		for aStr in aArgs.appArgs:
+			tmpFO.write(aStr + '\n')
+		tmpFO.write('\n')
 

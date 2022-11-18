@@ -15,7 +15,7 @@ import glum.version.Version;
 public class DistApp
 {
 	/** The DistMaker version is defined here. */
-	public static final Version version = new PlainVersion(0, 57, 0);
+	public static final Version version = new PlainVersion(0, 61, 0);
 
 	/**
 	 * Main entry point that will print out the version of DistMaker to stdout.

@@ -1,6 +1,5 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
-from __future__ import print_function
 import argparse
 import os
 import platform
@@ -11,7 +10,6 @@ import subprocess
 import sys
 import tempfile
 
-import distutils.spawn
 import jreUtils
 import miscUtils
 import appleUtils
@@ -73,12 +71,11 @@ def buildCatalogFile(aArgs, aDeltaPath):
 
 	# Save the records to the catalog file
 	dstPath = os.path.join(aDeltaPath, "catalog.txt")
-	f = open(dstPath, 'wb')
-	for aRecord in records:
-		f.write(','.join(aRecord) + '\n')
+	with open(dstPath, mode='wt', encoding='utf-8', newline='\n') as tmpFO:
+		for aRecord in records:
+			tmpFO.write(','.join(aRecord) + '\n')
 
-	f.write('exit\n')
-	f.close()
+		tmpFO.write('exit\n')
 
 
 def checkForRequiredApplicationsAndExit():
@@ -87,26 +84,29 @@ def checkForRequiredApplicationsAndExit():
 	The current set of required applications are:
 	java, jar, (genisoimage or hdiutil)"""
 	# Check for java (version 1.8 or later)
-	evalPath = distutils.spawn.find_executable('java')
+	evalPath = shutil.which('java')
 	errL = []
 	if evalPath == None:
 		errL.append('Failed while trying to locate java. Please install Java')
 	else:
-		tmpStr = subprocess.check_output(['java', '-version'], stderr=subprocess.STDOUT)
-		pattern = '\"(\d+\.\d+).*\"'
-		verStr = re.search(pattern, tmpStr).groups()[0]
-		verVal = float(verStr)
-		if verVal < 1.8:
+		verStrRaw = subprocess.check_output(['java', '-version'], stderr=subprocess.STDOUT)
+		verStrRaw = verStrRaw.decode("utf-8")
+		pattern = '\"(\d+)(\.\d+)*.*\"'
+		verStrFull = re.search(pattern, verStrRaw).group().strip('"')
+		pattern = '(\d+)(\.\d+){0,1}'
+		verStrPart = re.search(pattern, verStrFull).group()
+		javaVer = float(verStrPart)
+		if javaVer < 1.8:
 			errL.append('Installed version of Java is too old. Require Java 1.8. Installed version: {}'.format(verVal))
 
 	# Check for jar
-	evalPath = distutils.spawn.find_executable('jar')
+	evalPath = shutil.which('jar')
 	if evalPath == None:
 		errL.append('Failed while trying to locate jar. Please install jar (typically included with Java)')
 
 	# Check for genisoimage or hdiutil
-	genisoimagePath = distutils.spawn.find_executable('genisoimage')
-	hdiutilPath = distutils.spawn.find_executable('hdiutil')
+	genisoimagePath = shutil.which('genisoimage')
+	hdiutilPath = shutil.which('hdiutil')
 	if genisoimagePath == None and hdiutilPath == None:
 		if platform.system() == 'Darwin':
 			errL.append('Failed while trying to locate executable hdiutil. Please install hdiutil')
@@ -137,7 +137,7 @@ def checkForSuggestedApplications():
 	The current set of suggested applications are:
 	ImageMagick:convert"""
 	retL = []
-	evalPath = distutils.spawn.find_executable('convert')
+	evalPath = shutil.which('convert')
 	if evalPath == None:
 		retL.append('Application \'convert\' was not found. Please install (ImageMagick) convert')
 		retL.append('\tWindows icons will not be supported when using argument: -iconFile.')
@@ -293,6 +293,22 @@ if __name__ == "__main__":
 	if args.javaCode != None and len(args.classPath) == 0:
 		args.classPath = getClassPath(args.javaCode)
 
+	# Ensure all specified classPath files exist
+	errMsgL = []
+	for aPath in args.classPath:
+		fullPath = os.path.join(args.javaCode, aPath)
+		if os.path.exists(fullPath) == False:
+			errMsgL += ['Specified file does not exist: ' + aPath]
+		elif os.path.isfile(fullPath) == False:
+			errMsgL += ['Specified path is not a regular file: ' + aPath]
+
+	if len(errMsgL) > 0:
+		print('There are issues with the --classPath argument.')
+		print('Utilized --javaCode argument: ' + args.javaCode)
+		for aErrMsg in errMsgL:
+			print('   ' + aErrMsg)
+		exit()
+
 	# Clean up the jvmArgs to replace the escape sequence '\-' to '-'
 	# and to ensure that all the args start with the '-' character
 	newJvmArgs = []
@@ -377,7 +393,11 @@ if __name__ == "__main__":
 			exit(-1)
 		dstPath = deltaCodePath;
 		try:
-			shutil.copytree(srcPath, dstPath, symlinks=False, ignore=checkReadable)
+			os.makedirs(deltaCodePath)
+			for aPath in args.classPath:
+				fullSrcPath = os.path.join(args.javaCode, aPath)
+				dstPath = os.path.join(deltaCodePath, os.path.basename(fullSrcPath))
+				shutil.copy(fullSrcPath, dstPath)
 		except (ErrorDM, shutil.Error) as aExp:
 			print('   [ERROR] There were issues while copying the javaCode files. Path: ' + srcPath)
 			print('      {}\n'.format(aExp), file=sys.stderr)

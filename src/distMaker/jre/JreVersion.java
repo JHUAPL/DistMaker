@@ -30,8 +30,8 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	{
 		label = aLabel;
 
-		String[] tokenArr = label.split("[._]");
-		ArrayList<Integer> workL = new ArrayList<>();
+		var tokenArr = label.split("[._]");
+		var workL = new ArrayList<Integer>();
 		for (String aStr : tokenArr)
 		{
 			int tmpVal = ParseUtil.readInt(aStr, Integer.MIN_VALUE);
@@ -66,7 +66,6 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	public static JreVersion getBetterVersion(JreVersion verA, JreVersion verB)
 	{
 		JreVersion defaultVer;
-		int valA, valB, idxCnt;
 
 		// Default JreVersion is the version that is more specific
 		defaultVer = null;
@@ -76,14 +75,14 @@ public class JreVersion implements Comparable<JreVersion>, Version
 			defaultVer = verA;
 
 		// Set the idxCnt to the less specific JreVersion
-		idxCnt = Math.min(verA.compL.size(), verB.compL.size());
+		var idxCnt = Math.min(verA.compL.size(), verB.compL.size());
 
 		// Compare each integral component (which originated from the label)
 		// Assume higher values correspond to later versions
 		for (int c1 = 0; c1 < idxCnt; c1++)
 		{
-			valA = verA.compL.get(c1);
-			valB = verB.compL.get(c1);
+			var valA = verA.compL.get(c1);
+			var valB = verB.compL.get(c1);
 			if (valA > valB)
 				return verA;
 			if (valB > valA)
@@ -95,7 +94,7 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	}
 
 	@Override
-	public int getMajorVersion()
+	public int major()
 	{
 		if (isLegacy == true)
 			return compL.get(1);
@@ -107,7 +106,7 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	}
 
 	@Override
-	public int getMinorVersion()
+	public int minor()
 	{
 		if (isLegacy == true)
 		{
@@ -123,7 +122,7 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	}
 
 	@Override
-	public int getPatchVersion()
+	public int patch()
 	{
 		if (isLegacy == true)
 		{
@@ -141,10 +140,8 @@ public class JreVersion implements Comparable<JreVersion>, Version
 	@Override
 	public int compareTo(JreVersion aItem)
 	{
-		JreVersion tmpVer;
-
 		// Note the natural ordering is from oldest version to most recent version
-		tmpVer = JreVersion.getBetterVersion(this, aItem);
+		var tmpVer = JreVersion.getBetterVersion(this, aItem);
 		if (tmpVer == aItem)
 			return -1;
 		if (tmpVer == this)

@@ -34,7 +34,7 @@ public class PlatformUtils
 	 */
 	public static String getAppLauncherFileName(Version aVersion)
 	{
-		if (aVersion.getMajorVersion() == 0 && aVersion.getMinorVersion() == 0)
+		if (aVersion.major() == 0 && aVersion.minor() == 0)
 			return "appLauncher.jar";
 
 		return "appLauncher-" + aVersion + ".jar";
