@@ -1,3 +1,16 @@
+// Copyright (C) 2024 The Johns Hopkins University Applied Physics Laboratory LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package distMaker;
 
 import java.awt.event.ComponentAdapter;
@@ -141,14 +154,12 @@ public class DistMakerEngine
 	public UpdateStatus isUpToDate()
 	{
 		var task = new BufferTask();
-//		LoggingTask task = new LoggingTask();
 		String appName = currRelease.getName();
 		List<AppRelease> unsortedReleaseL = DistUtils.getAvailableAppReleases(task, updateSiteUrl, appName, refCredential);
 
 		if (unsortedReleaseL == null)
 		{
 			// The update check failed, so return a status of false with a message about the problem
-//			String msg = Joiner.on("; ").join(task.getMessages());
 			var msg = task.getBuffer();
 			return new UpdateStatus(msg);
 		}

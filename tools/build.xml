@@ -20,7 +20,7 @@
 	<path id="class.path">
 		<pathelement path="${classes}"/>
 		<pathelement path="lib/commons-compress-1.15.jar"/>
-		<pathelement path="lib/glum-2.0.0-RC3.jar"/>
+		<pathelement path="lib/glum-2.0.0.jar"/>
 		<pathelement path="lib/guava-18.0.jar"/>
 		<pathelement path="lib/miglayout-3.7.2-swing.jar"/>
 		<pathelement path="."/>
@@ -32,7 +32,7 @@
 	<property name="javac.debuglevel" value="lines,vars,source"/>
 	<property name="javac.deprecated" value="on"/>
 	<property name="javac.optimize" value="on"/>
-	<property name="javac.version" value="11"/>
+	<property name="javac.version" value="17"/>
 
 
 	<!-- Perform initialization for various tasks -->

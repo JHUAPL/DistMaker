@@ -11,20 +11,20 @@ import traceback
 
 
 # Define the (baseline) version
-baseVersion = "0.61"
+baseVersion = "0.70"
 
 # Define relevant base names
 appBaseName = 'DistMaker'
 libBaseName = 'distMaker'
 
 # Define the libraries DistMaker depends on
-libList = ['glum-2.0.0-RC3.jar', 'guava-18.0.jar']
+libList = ['glum-2.0.0.jar', 'guava-18.0.jar']
 #libList += ['commons-compress-1.15.jar']
 
 # Define the paths to various executables
 antPath = '/spare/apache/apache-ant-1.10.8'
 antExe = os.path.join(antPath, 'bin/ant')
-jdkPath = '/spare/jdk-11'
+jdkPath = '/spare/jdk-17'
 jarExe = os.path.join(jdkPath, 'bin/jar')
 javaExe = os.path.join(jdkPath, 'bin/java')
 

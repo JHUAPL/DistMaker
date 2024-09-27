@@ -1,11 +1,11 @@
 Product: DistMaker
-Version: 0.57
+Version: 0.70
 
 
 
 Requires:
-- Java 8
-- Python 2.7
+- Java 17
+- Python 3.6
 
 
 

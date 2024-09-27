@@ -1,3 +1,16 @@
+// Copyright (C) 2024 The Johns Hopkins University Applied Physics Laboratory LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package dsstore;
 
 import glum.task.*;
@@ -12,9 +25,9 @@ import java.util.*;
 import dsstore.record.*;
 
 /**
- * Most of the decoding of the .DS_store is described in the following source. 
+ * Most of the decoding of the .DS_store is described in the following source.
  * Source:
- * http://search.cpan.org/~wiml/Mac-Finder-DSStore/DSStoreFormat.pod#FILE_FORMAT 
+ * http://search.cpan.org/~wiml/Mac-Finder-DSStore/DSStoreFormat.pod#FILE_FORMAT
  */
 public class MainApp
 {
@@ -42,7 +55,7 @@ public class MainApp
 		volumeName = aVolumeName;
 	}
 
-	
+
 	public void writeStore(File aFile)
 	{
 		// Ensure we have a valid dataBuf
@@ -68,7 +81,7 @@ public class MainApp
 
 	/**
 	 * Method to read the actual store contents.
-	 * 
+	 *
 	 * @return True if we successfully read the store
 	 */
 	public boolean readStore(File aFile)
@@ -79,7 +92,7 @@ public class MainApp
 			System.err.println("File does note exist: " + aFile);
 			return false;
 		}
-		
+
 		dataBuf = null;
 		try (FileZinStream iStream = new FileZinStream(aFile))
 		{
@@ -87,12 +100,12 @@ public class MainApp
 List<BlockDir> blockDirL;
 String dmgMagicKey;
 int fileMagicKey;
-int allocBlockOffset1, allocBlockOffset2, allocBlockSize;			
-int blockCnt, tmpSize, seekDiff, dirCnt;			
+int allocBlockOffset1, allocBlockOffset2, allocBlockSize;
+int blockCnt, tmpSize, seekDiff, dirCnt;
 int blockAddrArr[];
-			
+
 			int fileSize = (int)aFile.length();
-			
+
 			// DS_Store magic key: 0x0001
 			fileMagicKey = iStream.readInt();
 			if (fileMagicKey != 0x0001)
@@ -110,79 +123,79 @@ int blockAddrArr[];
 			allocBlockOffset1 = dataBuf.getInt();
 			allocBlockSize = dataBuf.getInt();
 			allocBlockOffset2 = dataBuf.getInt();
-			
+
 			// Check the header block validity
 			if (dmgMagicKey.equals("Bud1") == false)
 				throw new RuntimeException("Header magic key does not equal: 'Bud1'  Found: '" + dmgMagicKey + "'");
-			
+
 			if (allocBlockOffset1 != allocBlockOffset2)
 				throw new RuntimeException("Allocator block offset mismatch: " + allocBlockOffset1 + " != " + allocBlockOffset2);
-			
-			
-			
+
+
+
 			// Advance to the allocator section
 			dataBuf.position(allocBlockOffset1);
-			
+
 			blockCnt = dataBuf.getInt();
 			dataBuf.getInt(); // Unknown
-			
+
 			blockAddrArr = new int[blockCnt];
 			for (int c1 = 0; c1 < blockCnt; c1++)
 			{
 				blockAddrArr[c1] = dataBuf.getInt();
-				
-int blkLen, blkPos;			
-blkLen = 1 << (blockAddrArr[c1] & 0x1F);		
-blkPos = (blockAddrArr[c1] >> 5) * 32;
-refTask.logRegln("BlockAddr[" + c1 + "] -> Size: " + blkLen + "  Offset: " + blkPos);				
 
-//The entries in the block address table are what I call block addresses. Each address is a packed offset+size. 
-//The least-significant 5 bits of the number indicate the block's size, as a power of 2 (from 2^5 to 2^31). If those bits are masked off, the result 
-//is the starting offset of the block (keeping in mind the 4-byte fudge factor). Since the lower 5 bits are unusable to store an offset, blocks must be 
+int blkLen, blkPos;
+blkLen = 1 << (blockAddrArr[c1] & 0x1F);
+blkPos = (blockAddrArr[c1] >> 5) * 32;
+refTask.logRegln("BlockAddr[" + c1 + "] -> Size: " + blkLen + "  Offset: " + blkPos);
+
+//The entries in the block address table are what I call block addresses. Each address is a packed offset+size.
+//The least-significant 5 bits of the number indicate the block's size, as a power of 2 (from 2^5 to 2^31). If those bits are masked off, the result
+//is the starting offset of the block (keeping in mind the 4-byte fudge factor). Since the lower 5 bits are unusable to store an offset, blocks must be
 //allocated on 32-byte boundaries, and as a side effect the minimum block size is 32 bytes (in which case the least significant 5 bits are equal to 0x05).
 
 
 			}
-			
+
 			// Seek to the end of %256 items (which are unused)
 			seekDiff = 0;
 			if (blockCnt % 256 != 0)
 				seekDiff = (256 - blockCnt%256) * 4;
-			
+
 			dataBuf.position(dataBuf.position() + seekDiff);
-			
+
 			// Read the block directories
 			dirCnt = dataBuf.getInt();
 refTask.logRegln("Block directory count: " + dirCnt);
-			
+
 			blockDirL = new ArrayList<>(dirCnt);
 			for (int c1 = 0; c1 < dirCnt; c1++)
 				blockDirL.add(new BlockDir(dataBuf));
-			
-			
+
+
 			// Read the free lists
-int freeCnt;			
+int freeCnt;
 refTask.logRegln("Reading freelists...");
 			for (int c1 = 0; c1 < 32; c1++)
 			{
 				freeCnt = dataBuf.getInt();
-				refTask.logReg("[" + c1 + "]: " + freeCnt + " Offsets: ");				
+				refTask.logReg("[" + c1 + "]: " + freeCnt + " Offsets: ");
 				for (int c2 = 0; c2 < freeCnt; c2++)
 					refTask.logReg(dataBuf.getInt() + ",");
 				refTask.logRegln("");
 			}
-			
-			
-			
+
+
+
 			// Read the DSDB structure
-// TODO: Remove hard coded value			
+// TODO: Remove hard coded value
 			dataBuf.position(64);
 			readDsdbNode(dataBuf);
-			
-// TODO: Remove hard coded value			
+
+// TODO: Remove hard coded value
 			dataBuf.position(4096);
 			readRecords(dataBuf);
-			
+
 //			The 32-byte header has the following fields:
 //
 //		    Magic number Bud1 (42 75 64 31)
@@ -196,16 +209,16 @@ refTask.logRegln("Reading freelists...");
 			aExp.printStackTrace();
 			return false;
 		}
-		
+
 		return true;
 	}
-	
-	
+
+
 	public void readRecords(ByteBuffer aBuf)
 	{
-		List<Record> recordL;
+		List<dsstore.record.Record> recordL;
 		BKGDRecord bkgdRecord;
-		Record tmpRecord;
+		dsstore.record.Record tmpRecord;
 		int pCode, numRecords;
 		String name, id, type;
 		int begPos;
@@ -214,17 +227,17 @@ refTask.logRegln("Reading freelists...");
 		begPos = aBuf.position();
 		pCode = aBuf.getInt();
 		numRecords = aBuf.getInt();
-		
+
 		bkgdRecord = null;
 		recordL = new ArrayList<>(numRecords);
 		for (int c1 = 0; c1 < numRecords; c1++)
 		{
 			BufUtils.seek(aBuf, 2); // empty
 			name = BufUtils.readStringUtf16(aBuf);
-			
+
 			id = BufUtils.readRawAsciiStr(aBuf, 4);
 			type = BufUtils.readRawAsciiStr(aBuf, 4);
-			
+
 			// Read the Records
 			if (id.equals("pict") == true && type.equals(DT_blob) == true)
 			{
@@ -248,41 +261,41 @@ refTask.logRegln("Reading freelists...");
 				tmpRecord = new LongRecord(name, id, type);
 			else
 				tmpRecord = new ShorRecord(name, id, type);
-			
+
 			tmpRecord.readPayload(aBuf);
 			recordL.add(tmpRecord);
 
 			refTask.logRegln("Found Name: <" + name + ">  recordId: " + id + " dataType: " + type + " payloadSize: " + tmpRecord.getSize());
 		}
-		
-		
+
+
 		// TODO: This should not be in the read method...
 		// Update the records to reflect the new volumeName
 		if (volumeName != null)
 		{
-			for (Record aRecord : recordL)
+			for (var aRecord : recordL)
 			{
 				if (aRecord instanceof PictRecord)
 					((PictRecord)aRecord).getAliasRecord().setVolumeName(volumeName);
-				
-//				if (aRecord.getName().equals(" ") == false && aRecord.getId().equals("Iloc") == true)				
+
+//				if (aRecord.getName().equals(" ") == false && aRecord.getId().equals("Iloc") == true)
 				if (aRecord.getName().endsWith(".app") == true && aRecord.getId().equals("Iloc") == true)
 					aRecord.setName(volumeName + ".app");
 				else if (aRecord.getName().equals(" ") == true && aRecord.getId().equals("Iloc") == true)
 					aRecord.setName("Applications");
 			}
-			
+
 			// Sort the list alphabetically
 			Collections.sort(recordL);
-			
-			
+
+
 			// Output back to the ByteBuf
 			aBuf.position(begPos);
-			
+
 			aBuf.putInt(pCode);
 			aBuf.putInt(numRecords);
-			
-			for (Record aRecord : recordL)
+
+			for (var aRecord : recordL)
 			{
 				aBuf.putShort((short)0);
 				aRecord.writeHeader(aBuf);
@@ -290,9 +303,9 @@ refTask.logRegln("Reading freelists...");
 			}
 		}
 	}
-	
-	
-	
+
+
+
 
 
 
@@ -322,8 +335,8 @@ refTask.logRegln("Reading freelists...");
 		refTask.logRegln("rootNodes: " + numNodes);
 		refTask.logRegln("valConst: " + valConst);
 	}
-	
-	
+
+
 	/**
 	 * Application main entry point
 	 */
