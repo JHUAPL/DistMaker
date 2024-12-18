@@ -29,6 +29,13 @@ import miscUtils
 import deployJreDist
 
 
+# Define the command used to compress the DMG file. Leave this variable set to
+# None, if you do not have an installed copy of the libdmg-hfsplus 'dmg'
+# command. Otherwise specify the path to the command here:
+# compressCmd = '/spare/libdmg-hfsplus/build/dmg/dmg'
+compressCmd = None
+
+
 def buildRelease(aArgs, aBuildPath, aJreNodeL):
 	# We mutate args - thus make a custom copy
 	args = copy.copy(aArgs)
@@ -98,7 +105,22 @@ def buildRelease(aArgs, aBuildPath, aJreNodeL):
 		if proc.returncode != 0:
 			print('\tError: Failed to form DMG image. Return code: ' + str(proc.returncode) + '\n')
 		else:
-			print('\tFinished building release: ' + os.path.basename(dmgFile) + '\n')
+			if compressCmd != None:
+				print('\tCompressing DMG image: ' + os.path.basename(dmgFile))
+				isoFile = dmgFile + '.iso'
+				os.rename(dmgFile, isoFile)
+
+				cmd2 = [compressCmd, isoFile, dmgFile]
+				proc = miscUtils.executeAndLog(cmd2, indentStr)
+				if proc.returncode != 0:
+					print('\tError: Failed to compress DMG image. Return code: ' + str(proc.returncode) + '\n')
+				else:
+					print('\tFinished building release: ' + os.path.basename(dmgFile) + '\n')
+
+				os.remove(isoFile)
+			else:
+				print('\tNote the dmg file is not compressed... Consider defining the compressCmd to enable compression.')
+				print('\tFinished building release: ' + os.path.basename(dmgFile) + '\n')
 
 		# Perform cleanup
 		shutil.rmtree(tmpPath)
@@ -297,7 +319,7 @@ def buildDistTree(aBuildPath, aRootPath, aArgs, aJreNode):
 
 	# Update the .DS_Store file to reflect the new volume name
 	srcPath = os.path.join(aRootPath, '.DS_Store')
-	classPath = appInstallRoot + '/lib/glum-2.0.0.jar:' + appInstallRoot + '/lib/distMaker-0.70.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
+	classPath = appInstallRoot + '/lib/glum-2.0.0.jar:' + appInstallRoot + '/lib/distMaker-0.71.jar:' + appInstallRoot + '/lib/guava-18.0.jar'
 	cmd = ['java', '-cp', classPath, 'dsstore.MainApp', srcPath, appName]
 	proc = miscUtils.executeAndLog(cmd, "\t\tdsstore.MainApp: ")
 	if proc.returncode != 0:

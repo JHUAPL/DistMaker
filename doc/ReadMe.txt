@@ -1,5 +1,5 @@
 Product: DistMaker
-Version: 0.70
+Version: 0.71
 
 
 

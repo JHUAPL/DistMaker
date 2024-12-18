@@ -11,7 +11,7 @@ import traceback
 
 
 # Define the (baseline) version
-baseVersion = "0.70"
+baseVersion = "0.71"
 
 # Define relevant base names
 appBaseName = 'DistMaker'

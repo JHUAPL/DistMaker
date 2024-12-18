@@ -61,6 +61,11 @@ The following sofware are dependencies for compiling DistMaker:
 
 Note, you will have to edit the script, ./tools/buildRelease, so that the variables antPath and jdkPath are relative to your system.
 
+In addition, if DistMaker is to build compressed DMG files you will need to get a copy of the libdmg-hfsplus software. That software is located at:
+
+&nbsp;&nbsp;&nbsp;&nbsp;https://github.com/fanquake/libdmg-hfsplus
+
+You would then need to update the file ./script/appleUtils.py, and change the compressCmd to reflect the location to the actual dmg executable. This executable does the actual compression.
 
 ## Legal Notice
 DistMaker utilizes a number of copyrighted products.
